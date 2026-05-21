@@ -1,0 +1,55 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Logo } from "@/components/shared/logo";
+import { Button } from "@/components/ui/button";
+import { LinkButton } from "@/components/ui/link-button";
+import { useAppStore } from "@/store/app-store";
+import { useRouter } from "next/navigation";
+import { getAgentForDiscipline } from "@/lib/data";
+
+export function Navbar() {
+  const { setAuthenticated, setUser, setDiscipline, setAgent, completeOnboarding } = useAppStore();
+  const router = useRouter();
+
+  const handleEnterDemo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setAuthenticated(true);
+    completeOnboarding();
+    setUser({
+      fullName: "Guest Geophysicist",
+      institution: "Global Exploration Corp",
+      email: "guest@geophysics.demo",
+      role: "specialist",
+      discipline: "groundwater",
+    });
+    setDiscipline("groundwater");
+    setAgent(getAgentForDiscipline("groundwater"));
+    router.push("/workspace");
+  };
+
+  return (
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/40 backdrop-blur-xl"
+    >
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <Logo />
+        <div className="hidden md:flex items-center gap-8 text-sm text-zinc-400">
+          <Link href="#disciplines" className="hover:text-white transition-colors">Disciplines</Link>
+          <Link href="#features" className="hover:text-white transition-colors">Features</Link>
+          <button onClick={handleEnterDemo} className="hover:text-white transition-colors text-zinc-400 bg-transparent border-none p-0 cursor-pointer text-sm font-sans font-medium">Demo Workspace</button>
+        </div>
+        <div className="flex items-center gap-3">
+          <LinkButton href="/signin" variant="ghost" size="sm">Sign In</LinkButton>
+          <LinkButton href="/signup" size="sm">Get Started</LinkButton>
+        </div>
+      </nav>
+    </motion.header>
+  );
+}
+
+
+

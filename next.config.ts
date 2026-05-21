@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["react-plotly.js", "plotly.js"],
+  devIndicators: false,
 };
 
 export default nextConfig;

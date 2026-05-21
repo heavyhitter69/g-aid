@@ -1,26 +1,419 @@
 @import "tailwindcss";
 
+/* ============================================================
+   DARK THEME (default) - Workspace Design System Tokens
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ffffff;
+  
+  /* Original High-Fidelity Dark Mode Variables */
+  --primary: #ffffff;
+  --secondary: #0d0d0d;
+  --subtle: rgba(255,255,255,0.05);
+  --elevated: rgba(20,20,20,0.8);
+  
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  
+  --bg-void: #000000;
+  --bg-secondary: #0d0d0d;
+  --border-subtle: rgba(255,255,255,0.05);
+
+  /* ---- Workspace-specific design tokens (dark) ---- */
+  /* Topbar / Activity bar / Status bar */
+  --ws-chrome: #181818;
+  --ws-chrome-border: #2b2b2b;
+  --ws-chrome-text: #cccccc;
+  --ws-chrome-text-muted: #858585;
+  --ws-chrome-text-dim: #555555;
+
+  /* Sidebar / Panels */
+  --ws-sidebar: #181818;
+  --ws-panel: #1e1e1e;
+  --ws-panel-alt: #252526;
+  --ws-panel-hover: #2a2d2e;
+  --ws-panel-active: #2d2d2d;
+  --ws-panel-elevated: #181818;
+
+  /* Borders */
+  --ws-border: #2b2b2b;
+  --ws-border-focus: #3c3c3c;
+  --ws-border-active: #007acc;
+
+  /* Text */
+  --ws-text: #cccccc;
+  --ws-text-bright: #ffffff;
+  --ws-text-muted: #858585;
+  --ws-text-dim: #555555;
+
+  /* Input / Controls */
+  --ws-input-bg: #252526;
+  --ws-input-border: #3c3c3c;
+  --ws-tab-active: #1e1e1e;
+  --ws-tab-inactive: #181818;
+
+  /* Context menu / dropdown */
+  --ws-menu-bg: #1e1e1e;
+  --ws-menu-hover: #2d2d2d;
+  --ws-menu-border: #2b2b2b;
+  --ws-menu-text: #cccccc;
+
+  /* Accent */
+  --ws-accent: #007acc;
+  --ws-accent-hover: #005f9e;
+
+  /* Tooltip */
+  --ws-tooltip-bg: #1e1e1e;
+  --ws-tooltip-border: #2b2b2b;
+
+  /* Selection chip in sidebar */
+  --ws-chip-bg: #2d2d2d;
+  --ws-chip-border: #3c3c3c;
+  --ws-chip-text: #e1e1e1;
+
+  /* Rename / active input */
+  --ws-rename-bg: #3c3c3c;
+}
+
+/* ============================================================
+   LIGHT THEME OVERRIDES  (activated via html.light)
+   ============================================================ */
+html.light {
+  color-scheme: light;
+
+  --background: #f8f8f8;
+  --foreground: #1a1a1a;
+
+  --primary: #1a1a1a;
+  --secondary: #e8e8e8;
+  --subtle: rgba(0,0,0,0.04);
+  --elevated: rgba(255,255,255,0.9);
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+
+  --bg-void: #f3f4f6;
+  --bg-secondary: #e8e8e8;
+  --border-subtle: rgba(0,0,0,0.06);
+
+  /* Override inline icon colors in disciplines section for light mode */
+  --discipline-icon-override: #374151;
+
+  /* ---- Workspace-specific design tokens (light) ---- */
+  /* Topbar / Activity bar / Status bar */
+  --ws-chrome: #e8e8e8;
+  --ws-chrome-border: #d1d5db;
+  --ws-chrome-text: #374151;
+  --ws-chrome-text-muted: #6b7280;
+  --ws-chrome-text-dim: #9ca3af;
+
+  /* Sidebar / Panels */
+  --ws-sidebar: #f0f0f0;
+  --ws-panel: #fafafa;
+  --ws-panel-alt: #f3f4f6;
+  --ws-panel-hover: #e5e7eb;
+  --ws-panel-active: #dde1e7;
+  --ws-panel-elevated: #f0f0f0;
+
+  /* Borders */
+  --ws-border: #d1d5db;
+  --ws-border-focus: #9ca3af;
+  --ws-border-active: #007acc;
+
+  /* Text */
+  --ws-text: #374151;
+  --ws-text-bright: #111827;
+  --ws-text-muted: #6b7280;
+  --ws-text-dim: #9ca3af;
+
+  /* Input / Controls */
+  --ws-input-bg: #ffffff;
+  --ws-input-border: #d1d5db;
+  --ws-tab-active: #ffffff;
+  --ws-tab-inactive: #ebebeb;
+
+  /* Context menu / dropdown */
+  --ws-menu-bg: #ffffff;
+  --ws-menu-hover: #f3f4f6;
+  --ws-menu-border: #e5e7eb;
+  --ws-menu-text: #374151;
+
+  /* Accent */
+  --ws-accent: #007acc;
+  --ws-accent-hover: #005f9e;
+
+  /* Tooltip */
+  --ws-tooltip-bg: #1e1e1e;
+  --ws-tooltip-border: #3c3c3c;
+
+  /* Selection chip in sidebar */
+  --ws-chip-bg: #e0e7ef;
+  --ws-chip-border: #c7d2dc;
+  --ws-chip-text: #1e3a5f;
+
+  /* Rename / active input */
+  --ws-rename-bg: #e0e7ef;
+}
+
+/* ============================================================
+   Light-theme body override
+   ============================================================ */
+html.light body {
+  background: var(--background);
+  color: var(--foreground);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-subtle: var(--subtle);
+  --color-elevated: var(--elevated);
+  
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  
+  --color-void: var(--bg-void);
+  --color-border-subtle: var(--border-subtle);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Glass effect utility */
+.glass-panel {
+  @apply bg-elevated backdrop-blur-md border-white/5;
+}
+
+/* Light mode glass override */
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   Workspace Layout Light Theme Overrides
+   ALL overrides are scoped to [data-page="workspace"] so the
+   landing page, signin, signup, and onboarding pages are
+   NEVER affected by the light theme toggle.
+   ============================================================ */
+
+/* --- Main element background --- */
+html.light {
+  background-color: var(--ws-panel) !important;
+}
+
+/* --- Topbar chrome --- */
+html.light header[class*="bg-[#181818]"],
+html.light .ws-topbar {
+  background-color: var(--ws-chrome) !important;
+  border-color: var(--ws-chrome-border) !important;
+}
+
+/* --- Sidebar + Activity Bar --- */
+html.light aside[class*="bg-[#181818]"],
+html.light nav[class*="bg-[#181818]"] {
+  background-color: var(--ws-sidebar) !important;
+  border-color: var(--ws-chrome-border) !important;
+}
+
+html.light aside[class*="border-[#2b2b2b]"],
+html.light nav[class*="border-[#2b2b2b]"],
+html.light header[class*="border-[#2b2b2b]"],
+html.light footer[class*="border-[#2b2b2b]"] {
+  border-color: var(--ws-chrome-border) !important;
+}
+
+/* --- Status Bar --- */
+html.light footer[class*="bg-[#181818]"] {
+  background-color: var(--ws-chrome) !important;
+}
+
+/* ============================================================
+   Comprehensive workspace panel overrides
+   ============================================================ */
+/* Short alias for readability */
+html.light .bg-\[\#1e1e1e\] { background-color: var(--ws-panel) !important; }
+html.light .bg-\[\#181818\] { background-color: var(--ws-chrome) !important; }
+html.light .bg-\[\#141414\] { background-color: var(--ws-tab-inactive) !important; }
+html.light .bg-\[\#252526\] { background-color: var(--ws-panel-alt) !important; }
+html.light .bg-\[\#2a2d2e\] { background-color: var(--ws-panel-hover) !important; }
+html.light .bg-\[\#2d2d2d\] { background-color: var(--ws-panel-active) !important; }
+html.light .bg-\[\#37373d\] { background-color: var(--ws-panel-active) !important; }
+html.light .bg-\[\#202021\] { background-color: var(--ws-panel-hover) !important; }
+html.light .bg-\[\#202020\] { background-color: var(--ws-panel-hover) !important; }
+html.light .bg-\[\#1b1b1c\] { background-color: #e8eaed !important; }
+html.light .bg-\[\#333333\] { background-color: #d0d5dd !important; }
+html.light .bg-\[\#3c3c3c\] { background-color: #c4cad4 !important; }
+html.light .bg-\[\#3d3d3d\] { background-color: #c4cad4 !important; }
+html.light .bg-\[\#3e3e42\] { background-color: #c8cfd9 !important; }
+html.light .bg-black { background-color: var(--ws-panel) !important; }
+
+/* --- Borders --- */
+html.light .border-\[\#2b2b2b\] { border-color: var(--ws-border) !important; }
+html.light .border-\[\#3c3c3c\] { border-color: var(--ws-border-focus) !important; }
+html.light .divide-\[\#2b2b2b\] > * + * { border-color: var(--ws-border) !important; }
+
+/* --- Text colors --- */
+html.light .text-\[\#cccccc\] { color: var(--ws-text) !important; }
+html.light .text-\[\#ffffff\],
+html.light .text-white { color: var(--ws-text-bright) !important; }
+html.light .text-\[\#858585\] { color: var(--ws-text-muted) !important; }
+html.light .text-\[\#555555\] { color: var(--ws-text-dim) !important; }
+html.light .text-\[\#e1e1e1\] { color: var(--ws-text-bright) !important; }
+html.light .text-zinc-300 { color: #374151 !important; }
+html.light .text-zinc-400 { color: #4b5563 !important; }
+html.light .text-zinc-500 { color: #4b5563 !important; }
+/* white/opacity variants used on landing page hero badge */
+html.light .text-white\/80 { color: #374151 !important; }
+
+/* Override inline colors for icons in the disciplines section */
+html.light #disciplines svg { color: var(--discipline-icon-override) !important; }
+
+/* --- Hover states --- */
+html.light .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.04) !important; }
+html.light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07) !important; }
+html.light .hover\:bg-\[\#2a2d2e\]:hover { background-color: var(--ws-panel-hover) !important; }
+html.light .hover\:bg-\[\#2d2d2d\]:hover { background-color: var(--ws-panel-active) !important; }
+html.light .hover\:bg-\[\#202020\]:hover,
+html.light .hover\:bg-\[\#202021\]:hover { background-color: var(--ws-panel-hover) !important; }
+html.light .hover\:bg-\[\#1b1b1c\]:hover { background-color: #e8eaed !important; }
+html.light .hover\:bg-\[\#333333\]:hover { background-color: #dde1e7 !important; }
+html.light .hover\:bg-\[\#3d3d3d\]:hover { background-color: #c4cad4 !important; }
+html.light .hover\:bg-\[\#202021\]:hover { background-color: var(--ws-panel-hover) !important; }
+html.light .hover\:text-\[\#cccccc\]:hover { color: var(--ws-text) !important; }
+html.light .hover\:text-\[\#e1e1e1\]:hover,
+html.light .hover\:text-white:hover { color: var(--ws-text-bright) !important; }
+
+/* --- Active chip in sidebar icon bar --- */
+html.light .bg-\[\#2d2d2d\].text-\[\#e1e1e1\],
+html.light .bg-\[\#2d2d2d\].border-\[\#3c3c3c\] {
+  background-color: var(--ws-chip-bg) !important;
+  border-color: var(--ws-chip-border) !important;
+  color: var(--ws-chip-text) !important;
+}
+
+/* --- Inputs / textareas / selects --- */
+html.light .bg-\[\#252526\].border-\[\#3c3c3c\] {
+  background-color: var(--ws-input-bg) !important;
+  border-color: var(--ws-input-border) !important;
+  color: var(--ws-text) !important;
+}
+html.light .bg-\[\#2a2d2e\].border-\[\#3c3c3c\] {
+  background-color: var(--ws-input-bg) !important;
+  border-color: var(--ws-input-border) !important;
+}
+html.light input,
+html.light textarea,
+html.light select {
+  color: var(--ws-text-bright) !important;
+}
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: var(--ws-text-dim) !important;
+}
+
+/* --- Dropdowns / context menus --- */
+html.light .bg-\[\#1e1e1e\].border-\[\#2b2b2b\].shadow-2xl {
+  background-color: var(--ws-menu-bg) !important;
+  border-color: var(--ws-menu-border) !important;
+  color: var(--ws-menu-text) !important;
+}
+
+/* --- Active workbench tab (blue top border) --- */
+html.light .border-t-2.border-\[\#007acc\] {
+  background-color: var(--ws-tab-active) !important;
+}
+
+/* --- Activity bar active indicator strip --- */
+html.light .absolute.left-0.top-0.bottom-0.w-0\.5.bg-white {
+  background-color: var(--ws-accent) !important;
+}
+
+/* --- Border utilities --- */
+html.light .border-r.border-\[\#2b2b2b\] { border-color: var(--ws-border) !important; }
+html.light .border-t.border-\[\#2b2b2b\] { border-color: var(--ws-border) !important; }
+html.light .border-b.border-\[\#2b2b2b\] { border-color: var(--ws-border) !important; }
+
+/* --- File editor inner panel bars --- */
+html.light .bg-\[\#181818\].border-\[\#2b2b2b\] {
+  background-color: var(--ws-panel-elevated) !important;
+  border-color: var(--ws-border) !important;
+}
+html.light .bg-\[\#252526\].border-b.border-\[\#2b2b2b\],
+html.light .bg-\[\#252526\].px-4.py-2.border-b {
+  background-color: var(--ws-panel-alt) !important;
+  border-color: var(--ws-border) !important;
+}
+
+/* --- Dashboard keyboard shortcut chips --- */
+html.light .bg-\[\#333333\].px-1\.5.py-0\.5 {
+  background-color: #e0e7ef !important;
+  color: #1e3a5f !important;
+}
+
+/* --- AI panel message bubbles --- */
+html.light .bg-\[\#252526\].text-\[\#cccccc\].mr-auto {
+  background-color: var(--ws-panel-alt) !important;
+  border-color: var(--ws-border) !important;
+  color: var(--ws-text) !important;
+}
+
+/* --- AI panel tab bar --- */
+html.light .h-\[35px\].border-b.border-\[\#2b2b2b\].bg-\[\#181818\] {
+  background-color: var(--ws-chrome) !important;
+  border-color: var(--ws-border) !important;
+}
+
+/* --- Sidebar horizontal icon bar --- */
+html.light .h-\[40px\].border-b.border-\[\#2b2b2b\] {
+  background-color: var(--ws-chrome) !important;
+  border-color: var(--ws-border) !important;
+}
+
+/* --- Table rows --- */
+html.light .hover\:bg-\[\#202021\]:hover {
+  background-color: var(--ws-panel-hover) !important;
+}
+html.light table thead tr {
+  background-color: var(--ws-panel-alt) !important;
+}
+html.light tbody.divide-y.divide-\[\#2b2b2b\] > tr {
+  border-color: var(--ws-border) !important;
+}
+
+/* --- Upload modal overlay --- */
+html.light .border-white\/10 { border-color: rgba(0,0,0,0.1) !important; }
+html.light .border-white\/20 { border-color: rgba(0,0,0,0.15) !important; }
+html.light .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02) !important; }
+
+/* --- AI Center glass cards --- */
+html.light .border-white\/5 { border-color: rgba(0,0,0,0.08) !important; }
+html.light .bg-white\/5 { background-color: rgba(0,0,0,0.04) !important; }
+html.light .bg-white\/10 { background-color: rgba(0,0,0,0.06) !important; }
+html.light .glass-panel {
+  background: rgba(255,255,255,0.85) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* ============================================================
+   Hide scrollbar
+   ============================================================ */
+*::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
