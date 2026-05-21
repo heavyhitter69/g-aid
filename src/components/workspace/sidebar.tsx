@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, ChevronDown, ChevronUp, Files, Search, GitBranch, Wrench, Pin, Bug, Table, Layers, Braces, FileCode, FileText } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronUp, Files, Search, GitBranch, Wrench, Pin, Bug, Table, Layers, Braces, FileCode, FileText, PanelLeftClose } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -224,6 +224,19 @@ export function Sidebar() {
           </div>
         </div>
 
+        {/* Close Sidebar Toggle */}
+        <div className="relative group flex items-center h-full ml-auto">
+          <button 
+            onClick={() => setLeftSidebarOpen(false)}
+            className="p-1.5 rounded hover:bg-[#2d2d2d] text-[#858585] hover:text-[#cccccc] transition-colors"
+          >
+            <PanelLeftClose className="h-4 w-4 stroke-[1.5]" />
+          </button>
+          <div className="absolute top-[105%] right-0 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
+            Close sidebar
+          </div>
+        </div>
+
         {/* Reveal to pin or unpin overlay */}
         {chevronOpen && (
           <div 
@@ -288,10 +301,21 @@ export function Sidebar() {
                 className="w-full flex items-center gap-1 px-1 py-1 hover:bg-[#2a2d2e] font-bold text-[#cccccc] text-left border-none bg-transparent cursor-pointer"
               >
                 {explorerOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-                <span className="uppercase truncate">{currentProject.toUpperCase().replace(/\s+/g, '-')}</span>
+                <span className="uppercase truncate">{currentProject ? currentProject.toUpperCase().replace(/\s+/g, '-') : "NO FOLDER OPENED"}</span>
               </button>
               
-              {explorerOpen && (
+              {explorerOpen && !currentProject && (
+                <div className="px-4 py-3 flex flex-col gap-3">
+                  <p className="text-[10px] text-[#858585] leading-relaxed">
+                    You have not yet opened a folder.
+                  </p>
+                  <button className="bg-[#007acc] hover:bg-[#0062a3] text-white py-1.5 px-3 rounded text-xs font-medium transition-colors w-fit border-none cursor-pointer">
+                    Open Folder
+                  </button>
+                </div>
+              )}
+              
+              {explorerOpen && currentProject && (
                 <div className="pl-4 py-1 flex flex-col gap-0.5">
                   {projectFiles.map((file) => {
                     let Icon = FileText;

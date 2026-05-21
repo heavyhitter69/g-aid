@@ -31,6 +31,8 @@ export function AIPanel() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedMode, setSelectedMode] = useState("Agent");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("Auto");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,8 +43,8 @@ export function AIPanel() {
 
   const generateTopic = (msg: string) => {
     const lowercase = msg.toLowerCase();
-    if (lowercase.includes("groundwater") || lowercase.includes("water")) {
-      return "Groundwater Exploration";
+    if (lowercase.includes("exploration") || lowercase.includes("survey")) {
+      return "Exploration Geophysics";
     }
     if (lowercase.includes("ert") || lowercase.includes("resistivity")) {
       return "ERT Line 4 Interpretation";
@@ -76,8 +78,8 @@ export function AIPanel() {
       let agentReply = "";
       const lowercase = userMsg.toLowerCase();
 
-      if (lowercase.includes("groundwater") || lowercase.includes("water")) {
-        agentReply = `[${selectedMode} Mode] Based on the 3D resistivity voxel model, I have mapped the shallow aquifer boundary at 45m depth. There is a distinct conductive zone (15-30 Ohm-m) correlating perfectly with groundwater saturated gravels. I suggest drilling a verification borehole at STATION 450E.`;
+      if (lowercase.includes("exploration") || lowercase.includes("survey")) {
+        agentReply = `[${selectedMode} Mode] Based on the 3D resistivity voxel model, I have mapped the shallow boundary at 45m depth. There is a distinct conductive zone (15-30 Ohm-m) correlating perfectly with saturated gravels. I suggest drilling a verification borehole at STATION 450E.`;
       } else if (lowercase.includes("ert") || lowercase.includes("resistivity")) {
         agentReply = `[${selectedMode} Mode] Running 2.5D inversion sweep on ERT Line 4 dataset... Inversion converged in 4 iterations with RMSE 2.1%. Anomaly detected: high-resistivity zone (>450 Ohm-m) at 12-18m depth, suggesting mineralized quartz vein structures.`;
       } else {
@@ -258,9 +260,40 @@ export function AIPanel() {
                     })}
                   </div>
                 )}
-                <div className="flex items-center gap-1 text-[9px] text-[#858585] px-1">
-                  <span>Auto</span>
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                {/* Model / Agent Dropdown */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+                    className="flex items-center gap-1 text-[9px] text-[#858585] px-1 hover:text-[#cccccc] transition-colors cursor-pointer bg-transparent border-none outline-none"
+                  >
+                    <span className="truncate max-w-[80px]">{selectedModel}</span>
+                    <ChevronDown className="h-2.5 w-2.5" />
+                  </button>
+
+                  {modelDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-1 bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-xl w-[140px] py-1 z-50 flex flex-col text-[10px]">
+                      {["Auto", "Geophysics-GPT", "Claude 3.5 Sonnet", "Gemini 1.5 Pro"].map((model) => {
+                        const isSelected = selectedModel === model;
+                        return (
+                          <button
+                            key={model}
+                            onClick={() => {
+                              setSelectedModel(model);
+                              setModelDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#333333] text-left text-[#cccccc] transition-colors w-full"
+                          >
+                            <span className="flex-1">{model}</span>
+                            {isSelected && (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#e1e1e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 text-[#858585]">

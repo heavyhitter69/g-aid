@@ -15,7 +15,7 @@ import { SettingsView } from "@/components/workspace/settings-view";
 import { FileEditorView } from "@/components/workspace/file-editor";
 import { useAppStore } from "@/store/app-store";
 import { ThemeProvider } from "@/components/shared/theme-provider";
-import { ChevronRight, X, Settings, Table, Layers, Braces, FileCode, FileText, Folder, Search, FolderOpen } from "lucide-react";
+import { ChevronRight, X, Settings, Table, Layers, Braces, FileCode, FileText, Folder, Search, FolderOpen, PanelLeft, Files, GitBranch, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function WorkspacePage() {
@@ -28,6 +28,7 @@ export default function WorkspacePage() {
     isChatPanelOpen,
     isLeftSidebarOpen,
     toggleLeftSidebar,
+    activeLeftSidebarTab,
     conversations,
     workbenchTabs,
     activeWorkbenchTabId,
@@ -155,14 +156,53 @@ export default function WorkspacePage() {
       <Topbar />
       
       <div className="flex-1 flex min-h-0 relative">
-        {/* Slick Sidebar Trigger Strip when closed */}
+        {/* Vertical Icon Strip when closed */}
         {!isLeftSidebarOpen && (
-          <button 
-            onClick={toggleLeftSidebar}
-            className="absolute left-0 top-0 bottom-0 w-2 hover:w-3 bg-transparent hover:bg-white/5 border-r border-[#2b2b2b] flex items-center justify-center group z-40 transition-all cursor-pointer"
-          >
-            <ChevronRight className="h-3 w-3 text-[#858585] opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
+          <div className="w-[48px] bg-[#181818] border-r border-[#2b2b2b] flex flex-col items-center py-2 gap-4 shrink-0 z-40 select-none">
+            <div className="relative group">
+              <button 
+                onClick={toggleLeftSidebar}
+                className="p-1.5 rounded-lg bg-[#2d2d2d] text-[#cccccc] hover:text-white hover:bg-[#3d3d3d] transition-colors flex items-center justify-center border border-[#3c3c3c]"
+              >
+                <PanelLeft className="h-[18px] w-[18px] stroke-[1.5]" />
+              </button>
+              <div className="absolute left-[110%] top-1/2 -translate-y-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
+                Open sidebar
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3 mt-1 w-full items-center">
+              {[
+                { id: "explorer", icon: Files, label: "Explorer" },
+                { id: "search", icon: Search, label: "Search" },
+                { id: "git", icon: GitBranch, label: "Source Control" },
+                { id: "extensions", icon: Wrench, label: "Tools" }
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeLeftSidebarTab === tab.id;
+                return (
+                  <div key={tab.id} className="relative group flex items-center w-full justify-center">
+                    <button
+                      onClick={() => {
+                        setActiveLeftSidebarTab(tab.id);
+                        setLeftSidebarOpen(true);
+                      }}
+                      className={cn(
+                        "p-2 w-full flex items-center justify-center text-[#858585] hover:text-[#cccccc] transition-colors relative",
+                        isActive && "text-[#e1e1e1]"
+                      )}
+                    >
+                      {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 bg-white rounded-r" />}
+                      <Icon className="h-5 w-5 stroke-[1.5]" />
+                    </button>
+                    <div className="absolute left-[110%] top-1/2 -translate-y-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
+                      {tab.label}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {isLeftSidebarOpen && <Sidebar />}

@@ -10,11 +10,21 @@ import { useRouter } from "next/navigation";
 import { getAgentForDiscipline } from "@/lib/data";
 
 export function CTA() {
-  const { setAuthenticated, setUser, setDiscipline, setAgent, completeOnboarding } = useAppStore();
+  const { 
+    setAuthenticated, 
+    setUser, 
+    setDiscipline, 
+    setAgent, 
+    completeOnboarding,
+    setCurrentProject,
+    setProjectFiles
+  } = useAppStore();
   const router = useRouter();
 
   const handleEnterDemo = (e: React.MouseEvent) => {
     e.preventDefault();
+    setCurrentProject(null);
+    setProjectFiles([]);
     setAuthenticated(true);
     completeOnboarding();
     setUser({
@@ -22,10 +32,10 @@ export function CTA() {
       institution: "Global Exploration Corp",
       email: "guest@geophysics.demo",
       role: "specialist",
-      discipline: "groundwater",
+      discipline: "exploration",
     });
-    setDiscipline("groundwater");
-    setAgent(getAgentForDiscipline("groundwater"));
+    setDiscipline("exploration");
+    setAgent(getAgentForDiscipline("exploration"));
     router.push("/workspace");
   };
 

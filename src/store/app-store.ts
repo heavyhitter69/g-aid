@@ -28,7 +28,7 @@ interface AppState {
   selectedDiscipline: DisciplineId | null;
   assignedAgent: AgentProfile | null;
   workspaceView: WorkspaceView;
-  currentProject: string;
+  currentProject: string | null;
   processingStatus: "idle" | "running" | "complete";
   theme: "light" | "dark";
   isAgentSidebarOpen: boolean;
@@ -76,7 +76,7 @@ interface AppState {
   saveAllFiles: () => void;
   setProjectFiles: (files: Array<{ name: string; type: "file" | "folder"; path: string }>) => void;
   addProjectFile: (name: string, type: "file" | "folder", path: string) => void;
-  setCurrentProject: (projectName: string) => void;
+  setCurrentProject: (projectName: string | null) => void;
   setOpenFileDialogOpen: (value: boolean) => void;
   setOpenFolderDialogOpen: (value: boolean) => void;
   setSaveAsDialogOpen: (value: boolean) => void;
@@ -96,7 +96,7 @@ const initialState = {
   selectedDiscipline: null,
   assignedAgent: null,
   workspaceView: "dashboard" as WorkspaceView,
-  currentProject: "Nevada Basin Survey 2026",
+  currentProject: null as string | null,
   processingStatus: "idle" as const,
   theme: "dark" as const,
   isAgentSidebarOpen: false,
@@ -113,13 +113,7 @@ const initialState = {
   activeWorkbenchTabId: null as string | null,
   autoSave: true,
   dirtyFiles: [] as string[],
-  projectFiles: [
-    { name: "line4_ert.dat", type: "file" as const, path: "/nevada-basin-survey-2026/line4_ert.dat" },
-    { name: "basin_gravity.grd", type: "file" as const, path: "/nevada-basin-survey-2026/basin_gravity.grd" },
-    { name: "survey_layout.json", type: "file" as const, path: "/nevada-basin-survey-2026/survey_layout.json" },
-    { name: "inversion_config.yaml", type: "file" as const, path: "/nevada-basin-survey-2026/inversion_config.yaml" },
-    { name: "well_log_bh12.csv", type: "file" as const, path: "/nevada-basin-survey-2026/well_log_bh12.csv" }
-  ] as Array<{ name: string; type: "file" | "folder"; path: string }>,
+  projectFiles: [] as Array<{ name: string; type: "file" | "folder"; path: string }>,
   isOpenFileDialogOpen: false,
   isOpenFolderDialogOpen: false,
   isSaveAsDialogOpen: false,
@@ -316,7 +310,15 @@ export const useAppStore = create<AppState>()(
         currentProject: state.currentProject,
         autoSave: state.autoSave,
         theme: state.theme,
-      })
+      }),
+      version: 1,
+      migrate: (persistedState: any, version: number) => {
+        if (version === 0) {
+          // Force wipe stale state but keep their theme
+          return { ...initialState, theme: persistedState?.theme || "dark" };
+        }
+        return persistedState;
+      },
     }
   )
 );

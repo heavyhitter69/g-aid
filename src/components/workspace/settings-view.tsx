@@ -24,7 +24,7 @@ export function SettingsView() {
   const [fullName, setFullName] = useState("");
   const [institution, setInstitution] = useState("");
   const [role, setRole] = useState<UserRole>("researcher");
-  const [discipline, setDisciplineState] = useState<DisciplineId>("groundwater");
+  const [discipline, setDisciplineState] = useState<DisciplineId>("exploration");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Sync state with store on load
@@ -33,7 +33,7 @@ export function SettingsView() {
       setFullName(user.fullName || "");
       setInstitution(user.institution || "");
       setRole(user.role || "researcher");
-      setDisciplineState(user.discipline || selectedDiscipline || "groundwater");
+      setDisciplineState(user.discipline || selectedDiscipline || "exploration");
     }
   }, [user, selectedDiscipline]);
 
@@ -47,6 +47,8 @@ export function SettingsView() {
       activeFile: null,
       conversations: [{ id: "default", topic: "New Agent", messages: [] }],
       activeConversationId: "default",
+      currentProject: null,
+      projectFiles: [],
     });
     router.push("/signin");
   };

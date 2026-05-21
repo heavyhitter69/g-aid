@@ -16,7 +16,14 @@ import { Mail, ChevronLeft } from "lucide-react";
 
 export default function SignInPage() {
   const router = useRouter();
-  const { setAuthenticated, setUser, onboardingComplete, user: existingUser } = useAppStore();
+  const { 
+    setAuthenticated, 
+    setUser, 
+    onboardingComplete, 
+    user: existingUser,
+    setCurrentProject,
+    setProjectFiles
+  } = useAppStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,6 +57,10 @@ export default function SignInPage() {
     if (hasError) return;
 
     setLoading(true);
+    
+    // Always start with a fresh workspace state on login
+    setCurrentProject(null);
+    setProjectFiles([]);
     
     if (!existingUser) {
       setUser({

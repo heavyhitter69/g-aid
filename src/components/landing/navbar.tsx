@@ -10,22 +10,35 @@ import { useRouter } from "next/navigation";
 import { getAgentForDiscipline } from "@/lib/data";
 
 export function Navbar() {
-  const { setAuthenticated, setUser, setDiscipline, setAgent, completeOnboarding } = useAppStore();
+  const { 
+    setAuthenticated, 
+    setUser, 
+    setDiscipline, 
+    setAgent, 
+    completeOnboarding,
+    setCurrentProject,
+    setProjectFiles
+  } = useAppStore();
   const router = useRouter();
 
   const handleEnterDemo = (e: React.MouseEvent) => {
     e.preventDefault();
+    
+    // Ensure we start with the empty Start Screen, wiping any persisted state
+    setCurrentProject(null);
+    setProjectFiles([]);
+    
     setAuthenticated(true);
     completeOnboarding();
     setUser({
       fullName: "Guest Geophysicist",
       institution: "Global Exploration Corp",
-      email: "guest@geophysics.demo",
-      role: "specialist",
-      discipline: "groundwater",
+      email: "guest@example.com",
+      role: "researcher",
+      discipline: "exploration",
     });
-    setDiscipline("groundwater");
-    setAgent(getAgentForDiscipline("groundwater"));
+    setDiscipline("exploration");
+    setAgent(getAgentForDiscipline("exploration"));
     router.push("/workspace");
   };
 

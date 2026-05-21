@@ -1,13 +1,12 @@
 export type UserRole = "student" | "researcher" | "consultant" | "exploration";
 
 export type DisciplineId =
-  | "seismic"
-  | "resistivity"
-  | "groundwater"
-  | "oil-gas"
-  | "mining"
-  | "gravity-magnetic"
-  | "environmental";
+  | "exploration"
+  | "environmental"
+  | "seismology"
+  | "hydrogeophysics"
+  | "data-analysis"
+  | "geotechnical";
 
 export interface Discipline {
   id: DisciplineId;

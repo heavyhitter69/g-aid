@@ -217,8 +217,8 @@ export function Topbar() {
         </menu>
       </div>
 
-      <div className="absolute left-1/2 -translate-x-1/2 flex items-center text-[12px] text-[#cccccc] pointer-events-none">
-        <span>{currentProject.toLowerCase().replace(/\s+/g, '-')}</span>
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center text-[12px] text-[#cccccc] pointer-events-none font-sans font-medium tracking-wide">
+        <span>{currentProject ? currentProject.toLowerCase().replace(/\s+/g, '-') : "GEOPHYSICS - AGENT ITERATION DOMAIN"}</span>
       </div>
 
       <div className="flex items-center h-full pr-4 gap-1 text-[#cccccc] z-10">
