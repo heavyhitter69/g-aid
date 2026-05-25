@@ -36,7 +36,7 @@ const RELEASES: ReleaseNote[] = [
         <p>
           This release marks the general availability of{" "}
           <span className="text-white font-medium">G-AID 1.0</span>, the first
-          production-ready build of the Geophysical Agent Iteration Domain
+          production-ready build of the Geophysics - Agent Iteration Domain
           platform. It ships with a fully integrated{" "}
           <Link href="#ai-panel" className="text-[#7c9fc2] underline underline-offset-2 hover:text-[#a8c4de] transition-colors">
             AI Agent Panel

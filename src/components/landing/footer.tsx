@@ -180,7 +180,7 @@ export function Footer() {
               className="text-[11px] leading-relaxed font-mono transition-colors duration-200"
               style={{ color: "var(--text-muted)" }}
             >
-              Geophysical Agent<br />Iteration Domain
+              Geophysics - Agent<br />Iteration Domain
             </p>
           </div>
 

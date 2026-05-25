@@ -31,7 +31,7 @@ const DOCS_SECTIONS = [
         content: (
           <div className="space-y-4 text-sm leading-relaxed">
             <p>
-              Welcome to the **Geophysical Agent Iteration Domain (G-AID)**! To begin your first interpretation, you can either launch our cloud-based **Demo Workspace** directly or install G-AID onto your local environment.
+              Welcome to the **Geophysics - Agent Iteration Domain (G-AID)**! To begin your first interpretation, you can either launch our cloud-based **Demo Workspace** directly or install G-AID onto your local environment.
             </p>
             <h4 className="font-bold text-white mt-4">1. Accessing the Workspace</h4>
             <p>

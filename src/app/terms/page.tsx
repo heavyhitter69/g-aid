@@ -21,7 +21,7 @@ const SECTIONS = [
     heading: "2. Description of Service",
     body: (
       <>
-        <p>G-AID (Geophysical Agent Iteration Domain) is an AI-assisted geophysical interpretation platform that provides tools for subsurface data analysis, workflow automation, and multi-agent scientific computing.</p>
+        <p>G-AID (Geophysics - Agent Iteration Domain) is an AI-assisted geophysical interpretation platform that provides tools for subsurface data analysis, workflow automation, and multi-agent scientific computing.</p>
         <p>The Service is provided "as is" and we make no warranties, express or implied, regarding the accuracy of AI-generated interpretations. Users are responsible for validating all outputs against ground-truth data before use in any professional context.</p>
       </>
     ),

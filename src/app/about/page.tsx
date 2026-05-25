@@ -86,7 +86,7 @@ export default function AboutPage() {
             transition={{ duration: 0.4 }}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-mono text-[var(--text-secondary)] mb-6"
           >
-            GEOPHYSICAL AGENT ITERATION DOMAIN
+            GEOPHYSICS - AGENT ITERATION DOMAIN
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 16 }}
