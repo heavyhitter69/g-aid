@@ -42,6 +42,16 @@ export function Navbar() {
     router.push("/workspace");
   };
 
+  const handleHashLinkClick = (e: React.MouseEvent, id: string) => {
+    if (typeof window !== "undefined" && window.location.pathname === "/") {
+      e.preventDefault();
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
@@ -51,13 +61,25 @@ export function Navbar() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Logo />
         <div className="hidden md:flex items-center gap-8 text-sm text-zinc-400">
-          <Link href="#disciplines" className="hover:text-white transition-colors">Disciplines</Link>
-          <Link href="#features" className="hover:text-white transition-colors">Features</Link>
+          <Link 
+            href="/#disciplines" 
+            onClick={(e) => handleHashLinkClick(e, "disciplines")}
+            className="hover:text-white transition-colors"
+          >
+            Disciplines
+          </Link>
+          <Link 
+            href="/#features" 
+            onClick={(e) => handleHashLinkClick(e, "features")}
+            className="hover:text-white transition-colors"
+          >
+            Features
+          </Link>
           <button onClick={handleEnterDemo} className="hover:text-white transition-colors text-zinc-400 bg-transparent border-none p-0 cursor-pointer text-sm font-sans font-medium">Demo Workspace</button>
         </div>
         <div className="flex items-center gap-3">
           <LinkButton href="/signin" variant="ghost" size="sm">Sign In</LinkButton>
-          <LinkButton href="/signup" size="sm">Get Started</LinkButton>
+          <LinkButton href="/download" size="sm">Download</LinkButton>
         </div>
       </nav>
     </motion.header>

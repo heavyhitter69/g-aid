@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* ============================================================
    DARK THEME (default) - Workspace Design System Tokens
    ============================================================ */
@@ -243,7 +247,8 @@ html.light footer[class*="bg-[#181818]"] {
    Comprehensive workspace panel overrides
    ============================================================ */
 /* Short alias for readability */
-html.light .bg-\[\#1e1e1e\] { background-color: var(--ws-panel) !important; }
+html.light .bg-\[\#1e1e1e\],
+html.light .after\:bg-\[\#1e1e1e\]::after { background-color: var(--ws-panel) !important; }
 html.light .bg-\[\#181818\] { background-color: var(--ws-chrome) !important; }
 html.light .bg-\[\#141414\] { background-color: var(--ws-tab-inactive) !important; }
 html.light .bg-\[\#252526\] { background-color: var(--ws-panel-alt) !important; }
@@ -415,5 +420,126 @@ html.light .glass-panel {
 * {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ============================================================
+   Curated by Dev Pill Styles
+   ============================================================ */
+.curated-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.45rem 1.15rem 0.5rem;
+  border-radius: 999px;
+  text-decoration: none;
+  color: rgba(245, 241, 236, 0.92);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(145, 126, 113, 0.12) inset,
+    0 4px 14px rgba(0, 0, 0, 0.12);
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.curated-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(145, 126, 113, 0.45);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(145, 126, 113, 0.2) inset,
+    0 8px 22px rgba(0, 0, 0, 0.18);
+}
+
+.curated-pill:focus-visible {
+  outline: 2px solid rgba(145, 126, 113, 1);
+  outline-offset: 3px;
+}
+
+.curated-pill-inactive {
+  cursor: default;
+  opacity: 0.88;
+  transform: none;
+  box-shadow:
+    0 0 0 1px rgba(145, 126, 113, 0.08) inset,
+    0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.curated-pill-inactive:hover {
+  transform: none;
+  color: rgba(245, 241, 236, 0.92);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(145, 126, 113, 0.12) inset,
+    0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.curated-genie-img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.curated-sep {
+  opacity: 0.5;
+  letter-spacing: 0.08em;
+  font-family: system-ui, sans-serif;
+  font-size: 0.65rem;
+}
+
+.curated-dev-word {
+  font-family: system-ui, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+}
+
+/* Light mode overrides */
+html.light .curated-pill {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05) inset,
+    0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+html.light .curated-pill:hover {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08) inset,
+    0 8px 22px rgba(0, 0, 0, 0.1);
+}
+
+html.light .curated-pill-inactive {
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03) inset,
+    0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+html.light .curated-pill-inactive:hover {
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03) inset,
+    0 2px 10px rgba(0, 0, 0, 0.03);
 }
 

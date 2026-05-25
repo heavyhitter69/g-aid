@@ -6,7 +6,8 @@ export type DisciplineId =
   | "seismology"
   | "hydrogeophysics"
   | "data-analysis"
-  | "geotechnical";
+  | "geotechnical"
+  | "geomatics";
 
 export interface Discipline {
   id: DisciplineId;

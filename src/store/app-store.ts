@@ -20,6 +20,15 @@ export interface WorkbenchTab {
   title: string;
 }
 
+export interface AgentSettings {
+  textSize: "Small" | "Default" | "Large" | "Extra Large";
+  submitWithCtrlEnter: boolean;
+  maxTabCount: { value: number | string; type: "5" | "10" | "Unlimited" | "Custom" };
+  queueMessages: "Send after current message" | "Stop & send right away";
+  agentAutocomplete: boolean;
+  autoApproveModeTransitions: boolean;
+}
+
 interface AppState {
   isAuthenticated: boolean;
   onboardingComplete: boolean;
@@ -36,6 +45,11 @@ interface AppState {
   isChatPanelOpen: boolean;
   isLeftSidebarOpen: boolean;
   activeLeftSidebarTab: string;
+  leftSidebarWidth: number;
+  aiPanelWidth: number;
+  agentSidebarWidth: number;
+  layoutMode: "editor" | "agent";
+  privacyMode: "share" | "privacy";
   conversations: Conversation[];
   activeConversationId: string;
   activeFile: string | null;
@@ -48,6 +62,8 @@ interface AppState {
   isOpenFolderDialogOpen: boolean;
   isSaveAsDialogOpen: boolean;
   fileContents: Record<string, string>;
+  agentSettings: AgentSettings;
+  setAgentSettings: (settings: Partial<AgentSettings>) => void;
   setAuthenticated: (value: boolean) => void;
   setUser: (user: UserProfile | null) => void;
   patchUser: (partial: Partial<UserProfile>) => void;
@@ -65,6 +81,11 @@ interface AppState {
   toggleLeftSidebar: () => void;
   setLeftSidebarOpen: (value: boolean) => void;
   setActiveLeftSidebarTab: (tab: string) => void;
+  setLeftSidebarWidth: (width: number) => void;
+  setAIPanelWidth: (width: number) => void;
+  setAgentSidebarWidth: (width: number) => void;
+  setLayoutMode: (mode: "editor" | "agent") => void;
+  setPrivacyMode: (mode: "share" | "privacy") => void;
   setActiveConversationId: (id: string) => void;
   setActiveFile: (file: string | null) => void;
   openWorkbenchTab: (id: string, type: "file" | "settings" | "view", title: string) => void;
@@ -104,6 +125,11 @@ const initialState = {
   isChatPanelOpen: false,
   isLeftSidebarOpen: true,
   activeLeftSidebarTab: "explorer",
+  leftSidebarWidth: 250,
+  aiPanelWidth: 350,
+  agentSidebarWidth: 320,
+  layoutMode: "editor" as const,
+  privacyMode: "share" as const,
   conversations: [
     { id: "default", topic: "New Agent", messages: [] }
   ] as Conversation[],
@@ -118,12 +144,21 @@ const initialState = {
   isOpenFolderDialogOpen: false,
   isSaveAsDialogOpen: false,
   fileContents: {} as Record<string, string>,
+  agentSettings: {
+    textSize: "Default" as const,
+    submitWithCtrlEnter: false,
+    maxTabCount: { value: 5, type: "5" as const },
+    queueMessages: "Send after current message" as const,
+    agentAutocomplete: true,
+    autoApproveModeTransitions: false,
+  },
 };
 
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       ...initialState,
+      setAgentSettings: (settings) => set((s) => ({ agentSettings: { ...s.agentSettings, ...settings } })),
       setAuthenticated: (value) => set({ isAuthenticated: value }),
       setUser: (user) => set({ user }),
       patchUser: (partial) =>
@@ -145,6 +180,11 @@ export const useAppStore = create<AppState>()(
       toggleLeftSidebar: () => set((s) => ({ isLeftSidebarOpen: !s.isLeftSidebarOpen })),
       setLeftSidebarOpen: (value) => set({ isLeftSidebarOpen: value }),
       setActiveLeftSidebarTab: (tab) => set({ activeLeftSidebarTab: tab }),
+      setLeftSidebarWidth: (width) => set({ leftSidebarWidth: width }),
+      setAIPanelWidth: (width) => set({ aiPanelWidth: width }),
+      setAgentSidebarWidth: (width) => set({ agentSidebarWidth: width }),
+      setLayoutMode: (mode) => set({ layoutMode: mode }),
+      setPrivacyMode: (mode) => set({ privacyMode: mode }),
       setActiveConversationId: (id) => set({ activeConversationId: id }),
       setActiveFile: (file) => set({ activeFile: file }),
       openWorkbenchTab: (id, type, title) => set((s) => {
@@ -266,6 +306,14 @@ export const useAppStore = create<AppState>()(
         fileContents: { ...s.fileContents, [fileName]: content }
       })),
       addConversation: () => set((s) => {
+        const limit = s.agentSettings?.maxTabCount?.value;
+        if (limit !== "Unlimited" && limit !== undefined) {
+          const limitNum = Number(limit);
+          if (!isNaN(limitNum) && s.conversations.length >= limitNum) {
+            return {}; // Max tabs reached
+          }
+        }
+        
         const newId = Date.now().toString();
         return {
           conversations: [
@@ -310,6 +358,9 @@ export const useAppStore = create<AppState>()(
         currentProject: state.currentProject,
         autoSave: state.autoSave,
         theme: state.theme,
+        layoutMode: state.layoutMode,
+        privacyMode: state.privacyMode,
+        agentSettings: state.agentSettings,
       }),
       version: 1,
       migrate: (persistedState: any, version: number) => {

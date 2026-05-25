@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { DISCIPLINES } from "@/lib/data";
 import {
-  Waves, Zap, Droplets, Fuel, Pickaxe, Compass, Leaf,
+  Waves, Zap, Droplets, Fuel, Pickaxe, Compass, Leaf, Map,
 } from "lucide-react";
 import { hexToRgba, seededUnit } from "@/lib/utils";
 
@@ -17,7 +17,7 @@ function barHeight(disciplineId: string, barIndex: number): number {
 
 const icons: Record<string, React.ElementType> = {
   waves: Waves, zap: Zap, droplets: Droplets, fuel: Fuel,
-  pickaxe: Pickaxe, compass: Compass, leaf: Leaf,
+  pickaxe: Pickaxe, compass: Compass, leaf: Leaf, map: Map,
 };
 
 const DISCIPLINE_IMAGES: Record<string, string> = {
@@ -26,6 +26,8 @@ const DISCIPLINE_IMAGES: Record<string, string> = {
   seismology: "/seis.jpg",
   hydrogeophysics: "/hydro.jpg",
   "data-analysis": "/data.jpg",
+  geotechnical: "/gtech.jpg",
+  geomatics: "/geo.jpg",
 };
 
 export function Disciplines() {
@@ -45,7 +47,7 @@ export function Disciplines() {
             Specialized agents and workflows to assist in branches of applied geophysics
           </p>
         </motion.div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 [&>*:last-child:nth-child(3n+1)]:lg:col-start-2">
           {DISCIPLINES.map((d, i) => {
             const Icon = icons[d.icon] || Waves;
             const cardImage = DISCIPLINE_IMAGES[d.id];
@@ -65,7 +67,7 @@ export function Disciplines() {
                 />
                 <Icon className="h-8 w-8 mb-4 transition-colors" style={{ color: d.color }} />
                 <h3 className="font-semibold text-primary mb-2">{d.name}</h3>
-                <p className="text-sm text-zinc-400 mb-4">{d.description}</p>
+                <p className="text-sm text-zinc-400 mb-4 truncate">{d.description}</p>
                 <div className="relative -mx-6 -mb-6 px-6 pb-6 pt-4 mt-auto flex-1 flex flex-col justify-end">
                   {cardImage && (
                     <div className="absolute inset-0 z-0">

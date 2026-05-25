@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Plus, PanelBottom, MessageSquare, Settings, ChevronRight, Check } from "lucide-react";
+import { Plus, PanelBottom, MessageSquare, Settings, ChevronRight, Check, Zap } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
@@ -222,7 +222,13 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center h-full pr-4 gap-1 text-[#cccccc] z-10">
+        {/* Upgrade to Pro Button */}
+        <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold font-sans transition-all duration-200 border border-[#007acc]/40 bg-gradient-to-r from-[#007acc]/20 to-[#005f9e]/20 text-[#4fc3f7] hover:from-[#007acc]/35 hover:to-[#005f9e]/35 hover:border-[#007acc]/70 hover:text-white hover:shadow-[0_0_12px_rgba(0,122,204,0.3)] shrink-0">
+          Upgrade to Pro
+        </button>
+
         {/* New Agent Button */}
+
         <div className="relative group flex items-center h-full">
           <button 
             onClick={toggleAgentSidebar} 

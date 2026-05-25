@@ -23,7 +23,10 @@ export function Sidebar() {
     activeConversationId,
     setChatPanelOpen,
     closeWorkbenchTab,
-    workbenchTabs
+    workbenchTabs,
+    layoutMode,
+    leftSidebarWidth,
+    setLeftSidebarWidth
   } = useAppStore();
 
   const [explorerOpen, setExplorerOpen] = useState(true);
@@ -37,6 +40,31 @@ export function Sidebar() {
     y: number;
     fileName: string;
   } | null>(null);
+
+  const handleSidebarResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftSidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      // In agent mode the sidebar is on the RIGHT: dragging left grows it
+      const delta = moveEvent.clientX - startX;
+      const newWidth = layoutMode === "agent"
+        ? startWidth - delta
+        : startWidth + delta;
+      setLeftSidebarWidth(Math.max(200, Math.min(newWidth, 600)));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
 
   // Rename States
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
@@ -180,7 +208,20 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-[250px] shrink-0 border-r border-[#2b2b2b] bg-[#181818] flex flex-col text-[#cccccc] text-[11px] font-mono select-none overflow-hidden h-full">
+    <aside 
+      style={{ width: leftSidebarWidth }}
+      className={cn(
+        "shrink-0 bg-[#181818] flex flex-col text-[#cccccc] text-[11px] font-mono select-none overflow-hidden h-full relative z-10",
+        layoutMode === "agent" ? "border-l border-[#2b2b2b]" : "border-r border-[#2b2b2b]"
+      )}
+    >
+      <div 
+        className={cn(
+          "w-1.5 cursor-col-resize absolute top-0 bottom-0 z-50 hover:bg-[#007acc] transition-colors",
+          layoutMode === "agent" ? "-left-[1px]" : "-right-[1px]"
+        )}
+        onMouseDown={handleSidebarResizeStart}
+      />
       {/* Horizontal Icon Bar at top */}
       <div className="h-[40px] border-b border-[#2b2b2b] flex items-center px-3 gap-1 relative z-20 shrink-0 select-none">
         
@@ -230,7 +271,7 @@ export function Sidebar() {
             onClick={() => setLeftSidebarOpen(false)}
             className="p-1.5 rounded hover:bg-[#2d2d2d] text-[#858585] hover:text-[#cccccc] transition-colors"
           >
-            <PanelLeftClose className="h-4 w-4 stroke-[1.5]" />
+            <PanelLeftClose className={cn("h-4 w-4 stroke-[1.5]", layoutMode === "agent" && "rotate-180")} />
           </button>
           <div className="absolute top-[105%] right-0 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
             Close sidebar

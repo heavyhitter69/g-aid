@@ -1,8 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Download } from "lucide-react";
 import { LinkButton } from "@/components/ui/link-button";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useAppStore } from "@/store/app-store";
+import { getAgentForDiscipline } from "@/lib/data";
 
 function GlobeViz() {
   return (
@@ -54,6 +59,49 @@ function GlobeViz() {
 }
 
 export function Hero() {
+  const { 
+    setAuthenticated, 
+    setUser, 
+    setDiscipline, 
+    setAgent, 
+    completeOnboarding,
+    setCurrentProject,
+    setProjectFiles
+  } = useAppStore();
+
+  const router = useRouter();
+  const [os, setOs] = useState("Windows");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      if (userAgent.indexOf("win") !== -1) setOs("Windows");
+      else if (userAgent.indexOf("mac") !== -1) setOs("macOS");
+      else if (userAgent.indexOf("linux") !== -1) setOs("Linux");
+    }
+  }, []);
+
+  const handleEnterDemo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Ensure we start with the empty Start Screen, wiping any persisted state
+    setCurrentProject(null);
+    setProjectFiles([]);
+    
+    setAuthenticated(true);
+    completeOnboarding();
+    setUser({
+      fullName: "Guest Geophysicist",
+      institution: "Global Exploration Corp",
+      email: "guest@example.com",
+      role: "researcher",
+      discipline: "exploration",
+    });
+    setDiscipline("exploration");
+    setAgent(getAgentForDiscipline("exploration"));
+    router.push("/workspace");
+  };
+
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16">
       <div className="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
@@ -96,9 +144,12 @@ export function Hero() {
             transition={{ delay: 0.75 }}
             className="flex flex-wrap gap-4"
           >
-            <LinkButton href="/signup" size="lg">
-              Launch Platform <ChevronRight className="h-4 w-4" />
+            <LinkButton href="/download" size="lg" variant="default" className="gap-2">
+              Download for {os} <Download className="h-4 w-4" />
             </LinkButton>
+            <Button onClick={handleEnterDemo} size="lg" variant="outline">
+              Launch Demo Workspace <ChevronRight className="h-4 w-4" />
+            </Button>
           </motion.div>
         </motion.div>
         <motion.div

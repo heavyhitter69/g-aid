@@ -3,6 +3,7 @@ import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
 import { Disciplines } from "@/components/landing/disciplines";
 import { CTA } from "@/components/landing/cta";
+import { Footer } from "@/components/landing/footer";
 
 export default function Home() {
   return (
@@ -12,9 +13,7 @@ export default function Home() {
       <Disciplines />
       <Features />
       <CTA />
-      <footer className="py-12 px-6 border-t border-white/5 text-center text-zinc-500 text-sm font-mono">
-        &copy; 2026 GEOPHYSICAL AGENT INTERFACE. ALL RIGHTS RESERVED.
-      </footer>
+      <Footer />
     </main>
   );
 }

@@ -61,6 +61,16 @@ export const DISCIPLINES: Discipline[] = [
     datasets: ["MASW profiles", "Seismic refraction", "GPR"],
     workflows: ["Bedrock mapping", "Void detection", "Soil stiffness"],
   },
+  {
+    id: "geomatics",
+    name: "Geomatics",
+    shortName: "Geomatics",
+    description: "Spatial data acquisition, geodesy, and precision surveying",
+    icon: "map",
+    color: "#7c9fc2",
+    datasets: ["LiDAR point clouds", "GNSS baselines", "Photogrammetry DEMs"],
+    workflows: ["Control network adjustment", "DEM generation", "Change detection"],
+  },
 ];
 
 export const FEATURES = [
@@ -105,6 +115,7 @@ export function getAgentForDiscipline(discipline: DisciplineId): AgentProfile {
     hydrogeophysics: "Hydrogeophysical Characterization Agent",
     "data-analysis": "Geophysical Data Analysis Agent",
     geotechnical: "Geotechnical Engineering Agent",
+    geomatics: "Geomatics & Spatial Analysis Agent",
   };
 
   return {

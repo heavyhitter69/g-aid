@@ -88,7 +88,7 @@ export function FileEditorView() {
   };
 
   return (
-    <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden text-[#cccccc] font-sans select-none border-t border-[#2b2b2b]">
+    <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden text-[#cccccc] font-sans select-none">
       {/* Editor Main Content Area */}
       <div className="flex-1 overflow-y-auto p-6">
         

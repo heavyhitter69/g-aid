@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Plus, Clock, MoreHorizontal, PanelRight, Paperclip, Mic, ChevronDown } from "lucide-react";
+import { MessageSquare, X, Plus, Clock, MoreHorizontal, PanelRight, Paperclip, Mic, ChevronDown, AlertCircle } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
@@ -14,8 +14,16 @@ export function AIPanel() {
     removeConversation, 
     updateConversationTopic, 
     addMessageToConversation, 
-    toggleChatPanel 
+    toggleChatPanel,
+    agentSettings
   } = useAppStore();
+
+  const textSizeClass = {
+    "Small": "text-[10px]",
+    "Default": "text-[12px]",
+    "Large": "text-[14px]",
+    "Extra Large": "text-[16px]"
+  }[agentSettings?.textSize || "Default"];
 
   // Retrieve current active conversation
   const activeConversation = conversations.find(c => c.id === activeConversationId) || conversations[0] || {
@@ -33,6 +41,7 @@ export function AIPanel() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState("Auto");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [showLimitWarning, setShowLimitWarning] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +65,19 @@ export function AIPanel() {
       return "Potential Fields Analysis";
     }
     return msg.length > 25 ? msg.substring(0, 22) + "..." : msg;
+  };
+
+  const handleAddConversation = () => {
+    const limit = agentSettings?.maxTabCount?.value;
+    if (limit !== "Unlimited" && limit !== undefined) {
+      const limitNum = Number(limit);
+      if (!isNaN(limitNum) && conversations.length >= limitNum) {
+        setShowLimitWarning(true);
+        setTimeout(() => setShowLimitWarning(false), 3000);
+        return;
+      }
+    }
+    addConversation();
   };
 
   const handleSend = () => {
@@ -92,9 +114,16 @@ export function AIPanel() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+    if (agentSettings?.submitWithCtrlEnter) {
+      if (e.key === "Enter" && e.ctrlKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    } else {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
     }
   };
 
@@ -122,7 +151,7 @@ export function AIPanel() {
   return (
     <aside className="w-full flex flex-col bg-[#1e1e1e] text-[#cccccc] font-sans h-full select-none">
       {/* Horizontal Tabs Header Bar */}
-      <div className="h-[35px] border-b border-[#2b2b2b] flex items-center bg-[#181818] shrink-0 relative z-20 select-none">
+      <div className="h-[35px] flex items-center bg-[#181818] shrink-0 relative z-20 select-none">
         
         {/* Dynamic List of Conversation Tabs */}
         <div className="flex-1 flex items-center h-full overflow-x-auto scrollbar-none">
@@ -133,10 +162,10 @@ export function AIPanel() {
                 key={conv.id}
                 onClick={() => setActiveConversationId(conv.id)}
                 className={cn(
-                  "h-full flex items-center gap-2 px-3 border-r border-[#2b2b2b] text-[11px] cursor-pointer transition-colors relative group min-w-[100px] max-w-[140px]",
+                  "h-full flex items-center gap-2 px-3 border-r border-[#2b2b2b] text-[11px] cursor-pointer transition-colors relative group min-w-[100px] max-w-[140px] rounded-t-md",
                   isActive 
                     ? "bg-[#1e1e1e] text-white border-t-2 border-[#007acc] font-medium" 
-                    : "bg-[#181818] text-[#858585] hover:bg-[#202020] hover:text-[#cccccc]"
+                    : "bg-[#181818] text-[#858585] hover:bg-[#202020] hover:text-[#cccccc] border-b border-[#2b2b2b]"
                 )}
               >
                 <MessageSquare className="h-3 w-3 shrink-0" />
@@ -153,14 +182,17 @@ export function AIPanel() {
               </div>
             );
           })}
+          
+          {/* Filler div to maintain bottom border across empty space */}
+          <div className="flex-1 h-full border-b border-[#2b2b2b] min-w-[20px]" />
         </div>
 
         {/* Action Controls to the right of the Tabs */}
-        <div className="flex items-center gap-1.5 px-2 text-[#858585] h-full shrink-0 border-l border-[#2b2b2b] select-none">
+        <div className="flex items-center gap-1.5 px-2 text-[#858585] h-full shrink-0 border-l border-b border-[#2b2b2b] select-none">
           {/* New Tab */}
           <div className="relative group flex items-center h-full">
             <button 
-              onClick={addConversation} 
+              onClick={handleAddConversation} 
               className="p-1 rounded hover:bg-white/10 hover:text-[#cccccc] transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -168,6 +200,14 @@ export function AIPanel() {
             <div className="absolute top-[110%] right-0 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
               new tab
             </div>
+
+            {/* Limit Warning Popup */}
+            {showLimitWarning && (
+              <div className="absolute top-[120%] right-0 bg-red-500/10 backdrop-blur-xl border border-red-500/20 text-red-400 text-[10px] px-3 py-2 rounded shadow-2xl z-50 whitespace-nowrap font-sans flex flex-col gap-1 animate-in fade-in slide-in-from-top-2">
+                <span className="font-bold flex items-center gap-1.5"><AlertCircle className="w-3 h-3" /> Max tabs reached</span>
+                <span className="text-red-400/80">You can increase this limit in Settings &gt; Agents.</span>
+              </div>
+            )}
           </div>
 
           {/* Conversation History */}
@@ -321,7 +361,8 @@ export function AIPanel() {
               <div 
                 key={idx} 
                 className={cn(
-                  "flex flex-col max-w-[85%] rounded-lg p-2.5 text-[12px] leading-relaxed shadow-sm font-sans",
+                  "flex flex-col max-w-[85%] rounded-lg p-2.5 leading-relaxed shadow-sm font-sans",
+                  textSizeClass,
                   msg.sender === "user" 
                     ? "bg-[#007acc] text-white ml-auto" 
                     : "bg-[#252526] text-[#cccccc] mr-auto border border-[#3c3c3c]"
@@ -336,7 +377,7 @@ export function AIPanel() {
           )}
 
           {isGenerating && (
-            <div className="bg-[#252526] text-[#cccccc] mr-auto border border-[#3c3c3c] rounded-lg p-2.5 text-[12px] leading-relaxed max-w-[85%] flex items-center gap-2">
+            <div className={cn("bg-[#252526] text-[#cccccc] mr-auto border border-[#3c3c3c] rounded-lg p-2.5 leading-relaxed max-w-[85%] flex items-center gap-2", textSizeClass)}>
               <div className="h-1.5 w-1.5 bg-[#858585] rounded-full animate-bounce" />
               <div className="h-1.5 w-1.5 bg-[#858585] rounded-full animate-bounce [animation-delay:0.2s]" />
               <div className="h-1.5 w-1.5 bg-[#858585] rounded-full animate-bounce [animation-delay:0.4s]" />
