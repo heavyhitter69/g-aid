@@ -29,7 +29,19 @@ export function Topbar() {
   
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  const fileMenuItems = [
+  // Flat interface — all properties optional so any property access is safe
+  // after `item.type === "divider"` early-return guard in the render loop
+  interface MenuItem {
+    type?: "divider";
+    label?: string;
+    shortcut?: string;
+    action?: string;
+    disabled?: boolean;
+    hasChevron?: boolean;
+    isToggle?: boolean;
+  }
+
+  const fileMenuItems: MenuItem[] = [
     { label: "Open File...", shortcut: "Ctrl+O", action: "open-file" },
     { label: "Open Folder...", shortcut: "Ctrl+M Ctrl+O", action: "open-folder" },
     { label: "Open Workspace from File..." },
@@ -56,7 +68,7 @@ export function Topbar() {
     { label: "Exit" }
   ];
 
-  const editMenuItems = [
+  const editMenuItems: MenuItem[] = [
     { label: "Undo", shortcut: "Ctrl+Z" },
     { label: "Redo", shortcut: "Ctrl+Y" },
     { type: "divider" },

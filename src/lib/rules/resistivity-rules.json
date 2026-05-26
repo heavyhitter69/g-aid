@@ -1,0 +1,165 @@
+[
+  {
+    "id": "ert-low-resistivity-aquifer",
+    "domain": "resistivity",
+    "name": "Layered Low Resistivity — Aquifer",
+    "description": "Continuous subhorizontal low-resistivity layer consistent with saturated zone or aquifer.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "resistivity" },
+      { "type": "anomaly_shape", "value": "layered", "modality": "resistivity" },
+      { "type": "dataset_present", "value": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "groundwater_aquifer",
+      "hypothesisStatement": "Subhorizontal low-resistivity zone is consistent with a {{entity}}. Resistivity values and continuity suggest saturated granular or fractured material.",
+      "confidenceModifier": 0.14,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Verify resistivity range — freshwater aquifer: 20–100 Ohm.m; saline: <10 Ohm.m", "Compare with borehole logs if available", "IP survey may distinguish clay from water saturation"]
+    }
+  },
+  {
+    "id": "ert-high-resistivity-palaeochannel",
+    "domain": "resistivity",
+    "name": "Elongated High Resistivity — Palaeochannel",
+    "description": "Elongated resistive body within lower-resistivity host — likely dry gravel-filled palaeochannel.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "positive", "modality": "resistivity" },
+      { "type": "anomaly_shape", "value": "elongated", "modality": "resistivity" },
+      { "type": "dataset_present", "value": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "palaeochannel",
+      "hypothesisStatement": "Elongated resistive body is consistent with a {{entity}} — dry coarse-grained fill (gravel/sand) commonly produces 300–2000 Ohm.m contrast against finer-grained host.",
+      "confidenceModifier": 0.11,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Extend profile along channel axis to map continuity", "Drill to confirm grain size and saturation state"]
+    }
+  },
+  {
+    "id": "ert-conductive-shear",
+    "domain": "resistivity",
+    "name": "Vertical Conductive Zone — Fault or Shear",
+    "description": "Near-vertical low-resistivity zone cutting through host — fault gouge, graphite, or sulphide shear zone.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "resistivity" },
+      { "type": "anomaly_shape", "value": "linear", "modality": "resistivity" },
+      { "type": "gradient_character", "value": "sharp", "modality": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "shear_zone",
+      "hypothesisStatement": "Sub-vertical conductive zone with sharp lateral gradients is consistent with a {{entity}} or fault zone. Graphitic, clay-rich, or sulphide-bearing shear fabric are common causes.",
+      "confidenceModifier": 0.13,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["IP chargeability survey to distinguish graphite (non-chargeable) from sulphide (chargeable)", "Cross-reference with magnetic lineaments"]
+    }
+  },
+  {
+    "id": "ert-resistive-intrusion",
+    "domain": "resistivity",
+    "name": "Circular Resistive Body — Intrusion",
+    "description": "Circular high-resistivity anomaly — massive crystalline rock, silicified zone, or unaltered intrusion.",
+    "priority": 7,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "positive", "modality": "resistivity" },
+      { "type": "anomaly_shape", "value": "circular", "modality": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "mafic_intrusion",
+      "hypothesisStatement": "Circular resistive anomaly is consistent with a massive {{entity}} or silicified zone. Massive unaltered crystalline rocks commonly have resistivity >1000 Ohm.m.",
+      "confidenceModifier": 0.08,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Coincident magnetic data recommended to confirm lithological interpretation", "Inversion required to constrain geometry at depth"]
+    }
+  },
+  {
+    "id": "ert-weathered-layer",
+    "domain": "resistivity",
+    "name": "Surface Conductive Layer — Regolith",
+    "description": "Thin surface conductive layer overlying resistive basement — typical weathered regolith profile.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "resistivity" },
+      { "type": "anomaly_shape", "value": "layered", "modality": "resistivity" },
+      { "type": "dataset_present", "value": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "weathered_layer",
+      "hypothesisStatement": "Near-surface conductive layer is consistent with a clay-rich {{entity}}. This is a commonly observed two-layer response: conductive regolith over resistive fresh basement.",
+      "confidenceModifier": 0.12,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Estimate regolith thickness from inversion depth-to-basement", "Account for static shift effects if surface resistivity is very low"]
+    }
+  },
+  {
+    "id": "ert-inversion-nonuniqueness-warning",
+    "domain": "resistivity",
+    "name": "Inversion Non-Uniqueness Warning",
+    "description": "ERT inversion has inherent equivalence — multiple models may fit the same data.",
+    "priority": 10,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "conductive_zone",
+      "hypothesisStatement": "Processing assumption: ERT inversion is non-unique. Thin conductive layers and thick less-conductive layers may produce equivalent responses. Depth estimates carry inherent uncertainty of ±15–30%.",
+      "confidenceModifier": -0.08,
+      "epistemicType": "processing_assumption",
+      "additionalRecommendations": ["Use depth-of-investigation (DOI) index to flag poorly constrained regions", "Borehole constraints significantly reduce non-uniqueness"]
+    }
+  },
+  {
+    "id": "ert-suppression-warning",
+    "domain": "resistivity",
+    "name": "Suppression Effect Warning",
+    "description": "Overlying conductive layer may suppress response from deeper resistive features.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "resistivity" },
+      { "type": "dataset_quality", "modality": "resistivity", "threshold": 5, "operator": "lt", "value": 5 }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "conductive_zone",
+      "hypothesisStatement": "Uncertainty warning: a conductive surface layer may suppress detection of deeper resistive targets. Features below the conductor may be underestimated or invisible to the survey.",
+      "confidenceModifier": -0.15,
+      "epistemicType": "uncertainty_warning",
+      "additionalRecommendations": ["Consider TEM or CSAMT for greater depth penetration through conductive cover", "Increase electrode spacing to improve depth sensitivity"]
+    }
+  },
+  {
+    "id": "ert-hydrothermal-alteration",
+    "domain": "resistivity",
+    "name": "Alteration Zone — Variable Resistivity",
+    "description": "Irregular resistivity variation with distinct zones — consistent with hydrothermal alteration zoning.",
+    "priority": 7,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "irregular", "modality": "resistivity" },
+      { "type": "dataset_present", "value": "resistivity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "hydrothermal_system",
+      "hypothesisStatement": "Irregular resistivity pattern with resistive core and conductive halo is consistent with a {{entity}} — silicic core is resistive; argillic alteration halo is conductive.",
+      "confidenceModifier": 0.07,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["IP survey critical — sulphide mineralisation in alteration zone produces chargeability anomaly", "Cross-reference magnetic demagnetisation zones"]
+    }
+  }
+]

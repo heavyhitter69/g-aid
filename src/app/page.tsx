@@ -4,10 +4,12 @@ import { Features } from "@/components/landing/features";
 import { Disciplines } from "@/components/landing/disciplines";
 import { CTA } from "@/components/landing/cta";
 import { Footer } from "@/components/landing/footer";
+import { ParticleField } from "@/components/landing/particle-field";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-black relative">
+      <ParticleField />
       <Navbar />
       <Hero />
       <Disciplines />

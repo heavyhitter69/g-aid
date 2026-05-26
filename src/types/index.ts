@@ -54,7 +54,44 @@ export type WorkspaceView =
   | "datasets"
   | "settings"
   | "reports"
-  | "file-editor";
+  | "file-editor"
+  | "hypotheses"
+  | "plan-review";
+
+// Re-export all scientific types for convenience
+export type {
+  AgentDomain,
+  AgentId,
+  ActorId,
+  DataModality,
+  HypothesisEpistemicType,
+  ScientificEventType,
+  ScientificEvent,
+  GeoDataset,
+  DataQualityMetrics,
+  ConfidenceProvenance,
+  HypothesisNode,
+  EpistemicBranch,
+  ScientificTool,
+  ToolExecutionRecord,
+  AgentCapability,
+  StateOpportunity,
+  ExecutionDAG,
+  DAGNode,
+  DAGNodeStatus,
+  InferenceRule,
+  GeologicalEntity,
+  SpatialCompatibilityReport,
+  AgentContext,
+  InterpretationEntry,
+  ScientificProjectSnapshot,
+  StreamPreamble,
+  ActivityEntry,
+  HypothesisNodeViewModel,
+  DatasetCardViewModel,
+  OpportunityChipViewModel,
+  DAGViewModel,
+} from "./scientific";
 
 export interface AIInsight {
   id: string;

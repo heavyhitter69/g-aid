@@ -765,7 +765,7 @@ export default function WorkspacePage() {
                     disabled={!newFileName}
                     onClick={() => {
                       if (!newFileName) return;
-                      addProjectFile(newFileName, "file", `/${currentProject.toLowerCase().replace(/\s+/g, '-')}/${newFileName}`);
+                      addProjectFile(newFileName, "file", `/${(currentProject ?? "workspace").toLowerCase().replace(/\s+/g, '-')}/${newFileName}`);
                       openWorkbenchTab(`file:${newFileName}`, "file", newFileName);
                       setNewFileName("");
                       setOpenFileDialogOpen(false);
@@ -908,7 +908,7 @@ export default function WorkspacePage() {
                   disabled={!saveAsName}
                   onClick={() => {
                     if (!saveAsName) return;
-                    addProjectFile(saveAsName, "file", `/${currentProject.toLowerCase().replace(/\s+/g, '-')}/${saveAsName}`);
+                    addProjectFile(saveAsName, "file", `/${(currentProject ?? "workspace").toLowerCase().replace(/\s+/g, '-')}/${saveAsName}`);
                     saveFile(saveAsName); // save changes
                     openWorkbenchTab(`file:${saveAsName}`, "file", saveAsName);
                     setSaveAsDialogOpen(false);

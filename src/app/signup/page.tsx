@@ -142,8 +142,8 @@ export default function SignUpPage() {
       discipline: pickedDiscipline,
     });
     setAuthenticated(true);
-    setDiscipline(pickedDiscipline);
-    const agent = getAgentForDiscipline(pickedDiscipline);
+    setDiscipline(pickedDiscipline!);
+    const agent = getAgentForDiscipline(pickedDiscipline!);
     setAgent(agent);
     setOnboardingStep("welcome");
     router.push("/onboarding");

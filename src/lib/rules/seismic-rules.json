@@ -1,0 +1,122 @@
+[
+  {
+    "id": "seis-reflector-basin",
+    "domain": "seismic",
+    "name": "Parallel Reflectors — Sedimentary Sequence",
+    "description": "Parallel to sub-parallel reflectors consistent with layered sedimentary sequence.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "layered", "modality": "seismic" },
+      { "type": "dataset_present", "value": "seismic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "sedimentary_basin",
+      "hypothesisStatement": "Parallel seismic reflectors are consistent with a stratified {{entity}}. Reflector continuity and amplitude indicate depositional layering with acoustic impedance contrasts.",
+      "confidenceModifier": 0.13,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Velocity analysis required for depth conversion", "Amplitude extraction along key horizons recommended"]
+    }
+  },
+  {
+    "id": "seis-basement-reflection",
+    "domain": "seismic",
+    "name": "Strong Basal Reflector — Basement Contact",
+    "description": "Strong laterally continuous basal reflection consistent with sediment-basement contact.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "positive", "modality": "seismic" },
+      { "type": "gradient_character", "value": "sharp", "modality": "seismic" },
+      { "type": "dataset_present", "value": "seismic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "crystalline_basement",
+      "hypothesisStatement": "Strong basal reflector is consistent with the {{entity}} surface — high acoustic impedance contrast at sediment-basement contact.",
+      "confidenceModifier": 0.12,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Tie to borehole for depth calibration", "Compare basement depth map with gravity modelling results"]
+    }
+  },
+  {
+    "id": "seis-fault-terminations",
+    "domain": "seismic",
+    "name": "Reflector Terminations — Fault",
+    "description": "Abrupt termination and/or offset of reflectors consistent with faulting.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "linear", "modality": "seismic" },
+      { "type": "dataset_present", "value": "seismic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "fault",
+      "hypothesisStatement": "Reflector terminations and lateral offsets are consistent with a {{entity}}. Displacement magnitude and geometry require horizon flattening for kinematic analysis.",
+      "confidenceModifier": 0.11,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Measure throw on key horizons to constrain fault kinematics", "Cross-reference with gravity gradient lineaments"]
+    }
+  },
+  {
+    "id": "seis-velocity-uncertainty",
+    "domain": "seismic",
+    "name": "Velocity Model Dependency Warning",
+    "description": "All depth conversions and structural interpretations are dependent on the velocity model.",
+    "priority": 10,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "seismic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "sedimentary_basin",
+      "hypothesisStatement": "Processing assumption: depth conversion of seismic reflectors is velocity-model dependent. Without well calibration, depth uncertainty is typically ±5–15%. Lateral velocity variations introduce additional structural ambiguity.",
+      "confidenceModifier": -0.10,
+      "epistemicType": "processing_assumption",
+      "additionalRecommendations": ["Tie to nearest well with sonic log for velocity calibration", "Perform sensitivity analysis on velocity model"]
+    }
+  },
+  {
+    "id": "seis-multiple-warning",
+    "domain": "seismic",
+    "name": "Multiple Attenuation Required",
+    "description": "Marine or near-surface multiples may be misinterpreted as primary geological reflectors.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "seismic" },
+      { "type": "acquisition_method", "value": "marine" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "sedimentary_basin",
+      "hypothesisStatement": "Uncertainty warning: marine seismic data requires robust multiple attenuation before structural interpretation. Water-bottom multiples at twice the water depth are commonly mistaken for sub-seafloor geology.",
+      "confidenceModifier": -0.12,
+      "epistemicType": "uncertainty_warning",
+      "additionalRecommendations": ["Apply SRME (Surface Related Multiple Elimination) before interpretation", "Verify suspected geological reflectors are not at multiple periods of shallower events"]
+    }
+  },
+  {
+    "id": "seis-fold-structure",
+    "domain": "seismic",
+    "name": "Converging Reflectors — Fold Structure",
+    "description": "Reflectors that converge or thicken laterally consistent with fold geometry.",
+    "priority": 7,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "seismic" },
+      { "type": "anomaly_shape", "value": "irregular", "modality": "seismic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "fold_axis",
+      "hypothesisStatement": "Reflector convergence and lateral thickening are consistent with a {{entity}}. Isopach mapping of key horizons recommended to characterize fold geometry.",
+      "confidenceModifier": 0.09,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Map fold hinge geometry in 3D if adequate line spacing", "Consider structural restoration to verify kinematics"]
+    }
+  }
+]

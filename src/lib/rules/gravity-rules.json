@@ -1,0 +1,120 @@
+[
+  {
+    "id": "grav-low-basin",
+    "domain": "gravity",
+    "name": "Regional Bouguer Low — Sedimentary Basin",
+    "description": "Broad regional Bouguer low consistent with thick low-density sedimentary fill.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "gravity" },
+      { "type": "anomaly_shape", "value": "irregular", "modality": "gravity" },
+      { "type": "dataset_present", "value": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "sedimentary_basin",
+      "hypothesisStatement": "Regional Bouguer low is consistent with a {{entity}} — low-density sedimentary fill (ρ ≈ 2.2–2.5 g/cm³) produces negative anomaly relative to surrounding crystalline basement.",
+      "confidenceModifier": 0.13,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Regional-residual separation required before local feature interpretation", "Forward model to estimate basin thickness"]
+    }
+  },
+  {
+    "id": "grav-high-mafic",
+    "domain": "gravity",
+    "name": "Residual Bouguer High — Dense Body",
+    "description": "Residual gravity high after regional removal indicates local dense body — mafic intrusion or basement high.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "positive", "modality": "gravity" },
+      { "type": "dataset_present", "value": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "gravity_high",
+      "hypothesisStatement": "Residual gravity high is consistent with a locally dense body. Candidate interpretations include a {{entity}}, greenstone belt fragment, or basement high (ρ > 2.8 g/cm³).",
+      "confidenceModifier": 0.10,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Regional-residual separation critical — confirm residual is not regional signal", "Coincident magnetic data required to distinguish mafic from felsic high-density rocks"]
+    }
+  },
+  {
+    "id": "grav-felsic-low",
+    "domain": "gravity",
+    "name": "Residual Gravity Low — Felsic Intrusion",
+    "description": "Residual gravity low consistent with felsic (granitic) intrusion.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "gravity" },
+      { "type": "coincident_anomaly", "value": "negative", "modality": "magnetic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "felsic_intrusion",
+      "hypothesisStatement": "Coincident residual gravity and magnetic lows are consistent with a {{entity}} — low density (ρ ≈ 2.6 g/cm³) and low susceptibility signature.",
+      "confidenceModifier": 0.14,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Euler deconvolution recommended to estimate depth to source", "Consider isostatic correction to remove crustal compensation effects"]
+    }
+  },
+  {
+    "id": "grav-bouguer-correction-warning",
+    "domain": "gravity",
+    "name": "Terrain Correction Required",
+    "description": "Gravity data in rugged terrain requires robust terrain correction — incomplete correction creates artefacts.",
+    "priority": 10,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "gravity_high",
+      "hypothesisStatement": "Processing assumption: Bouguer and terrain corrections must be verified before geological interpretation. Incomplete terrain correction in rugged topography can produce artefacts of ±5–20 mGal — larger than many geological signals.",
+      "confidenceModifier": -0.06,
+      "epistemicType": "processing_assumption",
+      "additionalRecommendations": ["Confirm DEM resolution matches survey grid spacing", "Apply complete Bouguer correction including terrain correction to at least 167 km radius"]
+    }
+  },
+  {
+    "id": "grav-regional-residual-separation",
+    "domain": "gravity",
+    "name": "Regional-Residual Separation Required",
+    "description": "Without regional-residual separation, local anomalies cannot be isolated from crustal/lithospheric signals.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "sedimentary_basin",
+      "hypothesisStatement": "Processing assumption: regional-residual separation is required before interpreting local gravity anomalies. The choice of separation wavelength is subjective and significantly affects residual anomaly shape and amplitude.",
+      "confidenceModifier": -0.07,
+      "epistemicType": "processing_assumption",
+      "additionalRecommendations": ["Apply upward continuation at multiple heights to define regional field", "Polynomial surface fitting is an alternative — document method in report"]
+    }
+  },
+  {
+    "id": "grav-density-uncertainty",
+    "domain": "gravity",
+    "name": "Density Contrast Uncertainty",
+    "description": "Without density measurements, all gravity interpretations carry inherent density ambiguity.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "gravity_high",
+      "hypothesisStatement": "Uncertainty warning: without direct density measurements (core samples, wireline logs), density contrasts are estimated from literature values. Uncertainty in density contrast of ±0.1 g/cm³ propagates to depth estimate uncertainty of ±20–30%.",
+      "confidenceModifier": -0.09,
+      "epistemicType": "uncertainty_warning",
+      "additionalRecommendations": ["Sample nearby outcrop for bulk density measurements", "Well log density data dramatically reduces this uncertainty"]
+    }
+  }
+]

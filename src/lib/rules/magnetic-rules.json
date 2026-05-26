@@ -1,0 +1,174 @@
+[
+  {
+    "id": "mag-circular-high-grav-high",
+    "domain": "magnetic",
+    "name": "Circular Magnetic + Gravity High",
+    "description": "Coincident circular magnetic and gravity highs suggest dense, magnetic body — classic mafic intrusion signature.",
+    "priority": 10,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "circular", "modality": "magnetic" },
+      { "type": "anomaly_polarity", "value": "positive", "modality": "magnetic" },
+      { "type": "coincident_anomaly", "value": "positive", "modality": "gravity" },
+      { "type": "gradient_character", "value": "sharp", "modality": "magnetic" }
+    ],
+    "exclusions": [
+      { "type": "remanence_flag", "value": true },
+      { "type": "cultural_noise_probability", "threshold": 0.6, "value": true }
+    ],
+    "conclusion": {
+      "geologicalEntityId": "mafic_intrusion",
+      "hypothesisStatement": "Anomaly pattern is consistent with a {{entity}}. Coincident magnetic and gravity highs with circular geometry and sharp gradients support this interpretation.",
+      "confidenceModifier": 0.15,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Consider analytic signal to constrain depth estimate", "Bouguer correction required to isolate residual gravity"]
+    }
+  },
+  {
+    "id": "mag-linear-elongated-high",
+    "domain": "magnetic",
+    "name": "Linear Elongated Magnetic High",
+    "description": "Linear elongated magnetic high consistent with dyke or BIF horizon.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "elongated", "modality": "magnetic" },
+      { "type": "anomaly_polarity", "value": "positive", "modality": "magnetic" },
+      { "type": "dataset_present", "value": "magnetic" }
+    ],
+    "exclusions": [
+      { "type": "cultural_noise_probability", "threshold": 0.7, "value": true }
+    ],
+    "conclusion": {
+      "geologicalEntityId": "dyke",
+      "hypothesisStatement": "Linear elongated magnetic high is consistent with a {{entity}} or linear magnetic unit. Orientation analysis recommended to constrain emplacement direction.",
+      "confidenceModifier": 0.10,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Run RTP to remove inclination bias", "Extract lineament azimuth for structural analysis"]
+    }
+  },
+  {
+    "id": "mag-linear-low-shear",
+    "domain": "magnetic",
+    "name": "Linear Magnetic Low — Shear Zone",
+    "description": "Linear magnetic low in otherwise magnetic terrane suggests magnetite destruction along a shear zone.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "linear", "modality": "magnetic" },
+      { "type": "anomaly_polarity", "value": "negative", "modality": "magnetic" },
+      { "type": "dataset_present", "value": "magnetic" }
+    ],
+    "exclusions": [
+      { "type": "remanence_flag", "value": true }
+    ],
+    "conclusion": {
+      "geologicalEntityId": "shear_zone",
+      "hypothesisStatement": "Linear magnetic low is consistent with a {{entity}} — magnetite destruction along ductile deformation zone is a common cause of this pattern.",
+      "confidenceModifier": 0.12,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Coincident resistivity survey recommended to detect graphitic/sulphide shear fabric", "Check orientation against known structural trends"]
+    }
+  },
+  {
+    "id": "mag-demagnetisation-alteration",
+    "domain": "magnetic",
+    "name": "Demagnetisation Halo",
+    "description": "Broad irregular magnetic low in mineralised terrane suggests alteration halo with magnetite destruction.",
+    "priority": 7,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_polarity", "value": "negative", "modality": "magnetic" },
+      { "type": "anomaly_shape", "value": "irregular", "modality": "magnetic" },
+      { "type": "dataset_present", "value": "magnetic" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "alteration_halo",
+      "hypothesisStatement": "Irregular magnetic low is consistent with an {{entity}} — hydrothermal alteration commonly destroys magnetite, producing this pattern.",
+      "confidenceModifier": 0.08,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Analytic signal may resolve deeper magnetic sources beneath demagnetised zone"]
+    }
+  },
+  {
+    "id": "mag-felsic-intrusion-low",
+    "domain": "magnetic",
+    "name": "Circular Magnetic Low — Felsic Intrusion",
+    "description": "Circular magnetic low with coincident gravity low suggests felsic (granitic) intrusion.",
+    "priority": 8,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "anomaly_shape", "value": "circular", "modality": "magnetic" },
+      { "type": "anomaly_polarity", "value": "negative", "modality": "magnetic" },
+      { "type": "coincident_anomaly", "value": "negative", "modality": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "felsic_intrusion",
+      "hypothesisStatement": "Coincident circular magnetic and gravity lows are consistent with a {{entity}} — low-density, low-susceptibility granitoid body.",
+      "confidenceModifier": 0.13,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Euler deconvolution may estimate depth to source", "Gravity modelling recommended for volume estimate"]
+    }
+  },
+  {
+    "id": "mag-rtp-instability-warning",
+    "domain": "magnetic",
+    "name": "RTP Instability Risk",
+    "description": "Airborne magnetic data acquired near magnetic equator — RTP filter may be unstable.",
+    "priority": 9,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "magnetic" },
+      { "type": "acquisition_method", "value": "airborne" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "magnetic_high",
+      "hypothesisStatement": "Processing assumption: if survey latitude is within ±15° of magnetic equator, RTP filter is potentially unstable. Analytic signal (inclination-independent) is recommended as primary derivative.",
+      "confidenceModifier": -0.05,
+      "epistemicType": "processing_assumption",
+      "additionalRecommendations": ["Use analytic signal instead of RTP for low-latitude surveys", "Specify inclination/declination values before proceeding"]
+    }
+  },
+  {
+    "id": "mag-cultural-noise-warning",
+    "domain": "magnetic",
+    "name": "Cultural Noise Risk",
+    "description": "Discrete, non-geological short-wavelength anomalies may indicate cultural interference.",
+    "priority": 6,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "cultural_noise_probability", "threshold": 0.5, "value": true }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "magnetic_high",
+      "hypothesisStatement": "Uncertainty warning: cultural noise (pipelines, fences, vehicles) may be contributing to short-wavelength magnetic anomalies. Interpretation confidence is reduced until cultural contamination is assessed.",
+      "confidenceModifier": -0.20,
+      "epistemicType": "uncertainty_warning",
+      "additionalRecommendations": ["Apply microlevelling if not already done", "Cross-reference anomaly locations with infrastructure maps"]
+    }
+  },
+  {
+    "id": "mag-contact-aureole",
+    "domain": "magnetic",
+    "name": "Contact Aureole Magnetic High Ring",
+    "description": "Annular or asymmetric magnetic high surrounding a central magnetic low — may indicate metamorphic aureole around felsic body.",
+    "priority": 7,
+    "version": "1.0.0",
+    "conditions": [
+      { "type": "dataset_present", "value": "magnetic" },
+      { "type": "coincident_anomaly", "value": "negative", "modality": "gravity" }
+    ],
+    "exclusions": [],
+    "conclusion": {
+      "geologicalEntityId": "contact_aureole",
+      "hypothesisStatement": "Magnetic pattern is consistent with a {{entity}} — magnetite generation during contact metamorphism produces high adjacent to the intrusion.",
+      "confidenceModifier": 0.06,
+      "epistemicType": "interpretation",
+      "additionalRecommendations": ["Map gradient zones to define intrusion boundary", "Field validation of magnetite content at gradient zone"]
+    }
+  }
+]
