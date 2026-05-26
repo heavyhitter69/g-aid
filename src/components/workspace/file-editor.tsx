@@ -2,8 +2,20 @@
 
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/app-store";
-import { X, Play, RefreshCw, Save, Database, Table, Map, Braces, Settings2, FileText, CheckCircle2, AlertCircle, Layers, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Sparkles, Plus, Trash2, Filter, ArrowUpDown, Sigma, Eye, ZoomIn, ZoomOut, RotateCw, Printer, Download, Maximize2, Terminal, Code2, Info, ChevronRight } from "lucide-react";
+import { fetchFileText } from "@/lib/supabase/storage";
+import { readRegisteredFile, hasRegisteredFile } from "@/lib/file-registry";
+import { X, Play, RefreshCw, Save, Database, Table, Map, Braces, Settings2, FileText, CheckCircle2, AlertCircle, Layers, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Sparkles, Eye, ZoomIn, ZoomOut, RotateCw, Printer, Download, Maximize2, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TextEditor } from "@/components/workspace/text-editor";
+import { SpreadsheetView } from "@/components/workspace/spreadsheet-view";
+
+const DEMO_MOCK_FILES = [
+  "line4_ert.dat",
+  "basin_gravity.grd",
+  "survey_layout.json",
+  "inversion_config.yaml",
+  "well_log_bh12.csv",
+];
 
 export function FileEditorView() {
   const { 
@@ -13,7 +25,8 @@ export function FileEditorView() {
     autoSave,
     setFileDirty,
     fileContents,
-    setFileContent
+    setFileContent,
+    currentProject,
   } = useAppStore();
   const [inversionLoading, setInversionLoading] = useState(false);
   const [inversionProgress, setInversionProgress] = useState<string[]>([]);
@@ -21,6 +34,47 @@ export function FileEditorView() {
   const [rmsError, setRmsError] = useState(14.8);
   const [contourThreshold, setContourThreshold] = useState(50);
   const [activeJsonTab, setActiveJsonTab] = useState<"code" | "schema">("code");
+  const [isFetchingContent, setIsFetchingContent] = useState(false);
+
+  // Lazy-load file content when a tab is opened
+  useEffect(() => {
+    if (!activeFile) return;
+    if (fileContents[activeFile] !== undefined) return; // already loaded
+
+    setIsFetchingContent(true);
+
+    (async () => {
+      // 1. Try local file registry first (files opened from disk this session)
+      if (hasRegisteredFile(activeFile)) {
+        const text = await readRegisteredFile(activeFile);
+        if (text !== null) {
+          setFileContent(activeFile, text);
+          setIsFetchingContent(false);
+          return;
+        }
+      }
+
+      // 2. Try Supabase Storage (for files uploaded by authenticated users)
+      const fileEntry = useAppStore.getState().projectFiles.find(
+        (f) => f.id === activeFile && f.path && !f.path.startsWith("/local/")
+      );
+      if (fileEntry) {
+        const text = await fetchFileText(fileEntry.path).catch(() => null);
+        if (text !== null) {
+          setFileContent(activeFile, text);
+        }
+      }
+
+      setIsFetchingContent(false);
+    })();
+  }, [activeFile]);
+
+  // Reset states when active file changes
+  useEffect(() => {
+    setInversionLoading(false);
+    setInversionProgress([]);
+    setInversionDone(false);
+  }, [activeFile]);
 
   // Word Editor States
   const [wordBold, setWordBold] = useState(false);
@@ -28,10 +82,6 @@ export function FileEditorView() {
   const [wordUnderline, setWordUnderline] = useState(false);
   const [wordAlign, setWordAlign] = useState<"left" | "center" | "right">("left");
   const [wordFontSize, setWordFontSize] = useState("12pt");
-
-  // Spreadsheet Editor States
-  const [excelFormula, setExcelFormula] = useState("");
-  const [selectedCell, setSelectedCell] = useState<string | null>(null);
 
   // PDF Viewer States
   const [pdfZoom, setPdfZoom] = useState(100);
@@ -51,6 +101,55 @@ export function FileEditorView() {
       <div className="flex-1 bg-[#1e1e1e] flex items-center justify-center text-[#858585] text-xs font-sans">
         Select a survey file from the Explorer to view and edit its parameters.
       </div>
+    );
+  }
+
+  // Loading spinner while fetching content from Supabase Storage
+  if (isFetchingContent) {
+    return (
+      <div className="flex-1 bg-[#1e1e1e] flex flex-col items-center justify-center gap-3 text-[#858585]">
+        <Loader2 className="h-6 w-6 animate-spin text-[#007acc]" />
+        <span className="text-xs font-mono">Loading {activeFile}...</span>
+      </div>
+    );
+  }
+
+  const ext = activeFile.split(".").pop()?.toLowerCase() || "";
+  const isDemoMock =
+    DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined;
+  const isWordDoc = ["doc", "docx", "odt", "rtf"].includes(ext);
+  const isSpreadsheet = ["csv", "tsv", "xls", "xlsx"].includes(ext);
+  const isPdf = ext === "pdf";
+  const useSpreadsheet =
+    isSpreadsheet &&
+    !(DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined);
+  const useTextEditor =
+    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf;
+
+  if (useSpreadsheet) {
+    return (
+      <SpreadsheetView
+        filePath={activeFile}
+        content={fileContents[activeFile] ?? ""}
+        onChange={(value) => {
+          setFileDirty(activeFile, true);
+          setFileContent(activeFile, value);
+        }}
+      />
+    );
+  }
+
+  if (useTextEditor) {
+    return (
+      <TextEditor
+        filePath={activeFile}
+        content={fileContents[activeFile] ?? ""}
+        projectName={currentProject}
+        onChange={(value) => {
+          setFileDirty(activeFile, true);
+          setFileContent(activeFile, value);
+        }}
+      />
     );
   }
 
@@ -578,12 +677,7 @@ geotechnical_priors:
         )}
 
         {/* Custom Fallback Raw File Editor */}
-        {(!["line4_ert.dat", "basin_gravity.grd", "survey_layout.json", "inversion_config.yaml", "well_log_bh12.csv"].includes(activeFile) || fileContents[activeFile] !== undefined) && (() => {
-          const ext = activeFile.split('.').pop()?.toLowerCase() || '';
-          const isWordDoc = ["doc", "docx", "odt", "rtf"].includes(ext);
-          const isExcel = ["xls", "xlsx", "csv", "tsv"].includes(ext);
-          const isPdf = ["pdf"].includes(ext);
-
+        {(!DEMO_MOCK_FILES.includes(activeFile) || fileContents[activeFile] !== undefined) && (() => {
           if (isWordDoc) {
             return (
               <div className="flex-1 flex flex-col h-full bg-[#f3f2f1] text-[#333333] font-sans rounded-lg overflow-hidden border border-[#dad9d8]">
@@ -694,168 +788,6 @@ geotechnical_priors:
                     )}
                     style={{ fontSize: wordFontSize, textAlign: wordAlign }}
                   />
-                </div>
-              </div>
-            );
-          }
-
-          if (isExcel) {
-            let rows: string[][] = [];
-            const rawText = fileContents[activeFile] || "";
-
-            try {
-              if (rawText.trim().startsWith("[")) {
-                const parsed = JSON.parse(rawText);
-                if (Array.isArray(parsed)) {
-                  rows = parsed.map(row => {
-                    if (Array.isArray(row)) {
-                      return row.map(cell => cell !== null && cell !== undefined ? String(cell) : "");
-                    }
-                    return [];
-                  });
-                }
-              }
-            } catch (err) {
-              console.error("Not JSON spreadsheet, parsing as CSV");
-            }
-
-            if (rows.length === 0) {
-              if (rawText.trim() !== "") {
-                const lines = rawText.split(/\r?\n/).filter(r => r.trim() !== '');
-                rows = lines.map(line => {
-                  const cells: string[] = [];
-                  let insideQuotes = false;
-                  let currentCell = "";
-                  
-                  for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                      insideQuotes = !insideQuotes;
-                    } else if (char === ',' && !insideQuotes) {
-                      cells.push(currentCell.trim());
-                      currentCell = "";
-                    } else {
-                      currentCell += char;
-                    }
-                  }
-                  cells.push(currentCell.trim());
-                  return cells;
-                });
-              } else {
-                rows = [
-                  ["Station", "Easting", "Northing", "Resistivity_OhmM", "Depth_m"],
-                  ["ST_01", "284501.2", "4392100.5", "104.2", "5.0"],
-                  ["ST_02", "284511.4", "4392110.8", "112.5", "5.0"],
-                  ["ST_03", "284521.8", "4392120.1", "98.7", "10.0"],
-                  ["ST_04", "284532.1", "4392130.4", "105.4", "10.0"],
-                  ["ST_05", "284542.5", "4392140.7", "124.9", "15.0"],
-                  ["ST_06", "284552.9", "4392150.9", "152.1", "15.0"]
-                ];
-              }
-            }
-
-            const handleCellChange = (rowIndex: number, colIndex: number, val: string) => {
-              const updated = [...rows];
-              if (!updated[rowIndex]) updated[rowIndex] = [];
-              
-              while (updated[rowIndex].length <= colIndex) {
-                updated[rowIndex].push("");
-              }
-              updated[rowIndex][colIndex] = val;
-              
-              if (rawText.trim().startsWith("[")) {
-                setFileDirty(activeFile, true);
-                setFileContent(activeFile, JSON.stringify(updated));
-              } else {
-                const newCSV = updated.map(r => r.join(',')).join('\n');
-                setFileDirty(activeFile, true);
-                setFileContent(activeFile, newCSV);
-              }
-            };
-
-            return (
-              <div className="flex-1 flex flex-col h-full bg-[#f3f2f1] text-[#333333] font-sans rounded-lg overflow-hidden border border-[#dad9d8]">
-                {/* Excel Ribbon Header */}
-                <div className="bg-[#107c41] text-white px-4 py-1.5 flex items-center justify-between text-xs font-semibold shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Table className="h-4 w-4" />
-                    <span>Microsoft Excel Online - {activeFile}</span>
-                  </div>
-                  <div className="text-[10px] text-white/80">Editing Mode</div>
-                </div>
-
-                {/* Formula Bar */}
-                <div className="bg-[#f3f2f1] border-b border-[#dad9d8] px-3 py-1 flex items-center gap-2 shrink-0 select-none text-[11px]">
-                  <button className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-[#eae8e6] cursor-pointer border-none text-[#107c41] font-semibold bg-transparent">
-                    <Plus className="h-3.5 w-3.5" /> Row
-                  </button>
-                  <button className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-[#eae8e6] cursor-pointer border-none text-zinc-700 bg-transparent">
-                    <Filter className="h-3.5 w-3.5" /> Filter
-                  </button>
-                  <button className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-[#eae8e6] cursor-pointer border-none text-zinc-700 bg-transparent">
-                    <ArrowUpDown className="h-3.5 w-3.5" /> Sort
-                  </button>
-                  <div className="h-4 w-[1px] bg-[#dad9d8] mx-1" />
-                  <span className="text-[#858585] font-mono select-none">fx</span>
-                  <input 
-                    type="text" 
-                    placeholder="Enter formula or cell value (e.g. =AVERAGE(D1:D6))" 
-                    value={excelFormula} 
-                    onChange={(e) => setExcelFormula(e.target.value)}
-                    className="flex-1 bg-white border border-[#dad9d8] rounded px-2 py-0.5 text-xs outline-none text-[#333333]" 
-                  />
-                </div>
-
-                {/* Excel Sheet Grid */}
-                <div className="flex-1 overflow-auto bg-white p-4">
-                  <table className="border-collapse w-full border border-[#d1d1d1] text-xs">
-                    <thead>
-                      <tr className="bg-[#f3f2f1]">
-                        <th className="border border-[#d1d1d1] w-8 h-6 select-none" />
-                        {Array.from({ length: Math.max(6, rows[0]?.length || 6) }).map((_, colIdx) => (
-                          <th key={colIdx} className="border border-[#d1d1d1] px-3 h-6 text-center select-none font-semibold text-zinc-700 min-w-[100px]">
-                            {String.fromCharCode(65 + colIdx)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: Math.max(12, rows.length) }).map((_, rowIdx) => (
-                        <tr key={rowIdx} className="hover:bg-zinc-50">
-                          <td className="border border-[#d1d1d1] bg-[#f3f2f1] text-center select-none text-[#858585] font-semibold h-6">
-                            {rowIdx + 1}
-                          </td>
-                          {Array.from({ length: Math.max(6, rows[0]?.length || 6) }).map((_, colIdx) => {
-                            const val = rows[rowIdx]?.[colIdx] || "";
-                            return (
-                              <td key={colIdx} className="border border-[#d1d1d1] p-0 h-6">
-                                <input 
-                                  type="text"
-                                  value={val}
-                                  onChange={(e) => handleCellChange(rowIdx, colIdx, e.target.value)}
-                                  onFocus={() => {
-                                    setSelectedCell(`${String.fromCharCode(65 + colIdx)}${rowIdx + 1}`);
-                                    setExcelFormula(val);
-                                  }}
-                                  className="w-full h-full border-none outline-none px-2 font-mono text-[11px] bg-transparent text-zinc-800 focus:bg-emerald-50 focus:ring-1 focus:ring-emerald-600 focus:text-black"
-                                />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Bottom stats banner */}
-                <div className="bg-[#f3f2f1] border-t border-[#dad9d8] px-4 py-1 text-[10px] text-zinc-600 flex justify-between shrink-0 font-sans select-none">
-                  <div>Selected Cell: <strong className="text-[#107c41] font-mono">{selectedCell || "None"}</strong></div>
-                  <div className="flex gap-4">
-                    <span>Average: <strong className="text-zinc-800 font-mono">116.3</strong></span>
-                    <span>Sum: <strong className="text-zinc-800 font-mono">697.8</strong></span>
-                    <span>Count: <strong className="text-zinc-800 font-mono">6</strong></span>
-                  </div>
                 </div>
               </div>
             );
@@ -1040,68 +972,7 @@ geotechnical_priors:
             );
           }
 
-          // Fallback Code IDE / Programming Languages Editor
-          const codeLines = (fileContents[activeFile] || "").split("\n");
-          return (
-            <div className="flex-1 flex flex-col h-full bg-[#1e1e1e] text-[#cccccc] font-sans border border-[#2b2b2b] rounded-lg overflow-hidden select-none">
-              {/* IDE Editor Header */}
-              <div className="bg-[#252526] border-b border-[#2b2b2b] px-4 py-1.5 flex items-center justify-between text-xs shrink-0 select-none">
-                <div className="flex items-center gap-2">
-                  <Code2 className="h-4 w-4 text-[#9cdcfe]" />
-                  <span>Interactive Editor - {activeFile}</span>
-                  <span className="text-[10px] bg-white/5 border border-white/10 rounded px-1.5 text-zinc-400 font-mono uppercase">{ext || "TXT"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-white/10 text-xs font-semibold text-zinc-400 hover:text-white cursor-pointer border-none bg-transparent">
-                    <Info className="h-3.5 w-3.5" /> Language Diagnostics: OK
-                  </button>
-                </div>
-              </div>
-
-              {/* IDE Workspace Area */}
-              <div className="flex-1 flex overflow-hidden min-h-[300px]">
-                {/* Line Numbers column */}
-                <div className="bg-[#1e1e1e] border-r border-[#2b2b2b] w-12 pt-4 flex flex-col items-center select-none font-mono text-[10px] text-zinc-600 text-right pr-2 space-y-[2px] leading-relaxed shrink-0">
-                  {Array.from({ length: Math.max(1, codeLines.length) }).map((_, i) => (
-                    <div key={i}>{i + 1}</div>
-                  ))}
-                </div>
-
-                {/* Raw Code Editor Text Area */}
-                <textarea 
-                  key={activeFile}
-                  value={fileContents[activeFile] !== undefined ? fileContents[activeFile] : `# Code Buffer: ${activeFile}
-# File Type: ${ext.toUpperCase()} Source File
-
-def main():
-    print("Initializing Geophysical analysis grid...")
-    data = load_survey_points()
-    print("Parsed structural layers successfully.")
-
-if __name__ == "__main__":
-    main()`}
-                  onChange={(e) => {
-                    setFileDirty(activeFile, true);
-                    setFileContent(activeFile, e.target.value);
-                  }}
-                  className="flex-1 p-4 font-mono text-xs text-[#d7ba7d] bg-[#1b1b1c] outline-none border-none resize-none leading-relaxed min-h-[220px]"
-                />
-              </div>
-
-              {/* simulated output console */}
-              <div className="h-28 bg-[#1e1e1e] border-t border-[#2b2b2b] shrink-0 p-3 font-mono text-[11px] text-[#4ec9b0] flex flex-col">
-                <div className="flex items-center gap-2 border-b border-[#2b2b2b] pb-1.5 mb-1.5 text-[9px] text-[#858585] uppercase tracking-wider">
-                  <Terminal className="h-3.5 w-3.5" />
-                  <span>Script Execution Console</span>
-                </div>
-                <div className="flex-1 overflow-y-auto space-y-1 select-text">
-                  <div><span className="text-[#007acc]">&gt;</span> python {activeFile}</div>
-                  <div className="text-zinc-500">[{new Date().toLocaleTimeString()}] Executing diagnostic check on compiler grid...</div>
-                  <div className="text-cyan-400">Parsing successful. 0 syntax errors detected in {activeFile}.</div>
-                </div>
-              </div>
-            </div>
-          );
+          return null;
         })()}
 
       </div>

@@ -7,7 +7,6 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app-store";
-import { getAgentForDiscipline } from "@/lib/data";
 
 function GlobeViz() {
   return (
@@ -59,16 +58,7 @@ function GlobeViz() {
 }
 
 export function Hero() {
-  const { 
-    setAuthenticated, 
-    setUser, 
-    setDiscipline, 
-    setAgent, 
-    completeOnboarding,
-    setCurrentProject,
-    setProjectFiles
-  } = useAppStore();
-
+  const { setCurrentProject, setProjectFiles } = useAppStore();
   const router = useRouter();
   const [os, setOs] = useState("Windows");
 
@@ -83,22 +73,8 @@ export function Hero() {
 
   const handleEnterDemo = (e: React.MouseEvent) => {
     e.preventDefault();
-    
-    // Ensure we start with the empty Start Screen, wiping any persisted state
     setCurrentProject(null);
     setProjectFiles([]);
-    
-    setAuthenticated(true);
-    completeOnboarding();
-    setUser({
-      fullName: "Guest Geophysicist",
-      institution: "Global Exploration Corp",
-      email: "guest@example.com",
-      role: "researcher",
-      discipline: "exploration",
-    });
-    setDiscipline("exploration");
-    setAgent(getAgentForDiscipline("exploration"));
     router.push("/workspace");
   };
 

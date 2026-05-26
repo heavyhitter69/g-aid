@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/store/app-store";
 import { X, Search, Settings as SettingsIcon, LogOut, User, Building, Compass, Check, AlertCircle, ChevronDown, ChevronUp, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,7 @@ const roleLabels: Record<string, string> = {
 };
 
 export function SettingsView() {
-  const { user, selectedDiscipline, setUser, setDiscipline, setAgent, setAuthenticated, theme, setTheme, layoutMode, setLayoutMode, privacyMode, setPrivacyMode, agentSettings, setAgentSettings } = useAppStore();
+  const { user, isAuthenticated, selectedDiscipline, setUser, setDiscipline, setAgent, setAuthenticated, theme, setTheme, layoutMode, setLayoutMode, privacyMode, setPrivacyMode, agentSettings, setAgentSettings } = useAppStore();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"general" | "account" | "agent">("general"); // Default to general tab
   const [isPrivacyDropdownOpen, setIsPrivacyDropdownOpen] = useState(false);
@@ -93,7 +94,8 @@ export function SettingsView() {
         {/* Settings Sidebar */}
         <div className="w-[250px] shrink-0 overflow-y-auto py-4 px-3 flex flex-col justify-between">
           <div className="space-y-4">
-            {/* User Profile Mini Header */}
+          {/* User profile — only shown when signed in */}
+          {isAuthenticated && user?.email && (
             <div className="flex items-center gap-3 px-2 py-1.5 rounded">
               <div className="h-8 w-8 rounded-full bg-[#333333] flex items-center justify-center text-[#cccccc] font-medium text-sm border border-zinc-700">
                 {(fullName || user?.fullName || "G").charAt(0)}
@@ -103,10 +105,11 @@ export function SettingsView() {
                   {fullName || user?.fullName || "Geophysicist"}
                 </span>
                 <span className="text-[10px] text-[#858585] truncate w-[140px]">
-                  {user?.email || "user@geophysics.ai"}
+                  {user?.email}
                 </span>
               </div>
             </div>
+          )}
 
             <div className="relative px-2">
               <Search className="absolute left-4 top-1.5 h-3.5 w-3.5 text-[#858585]" />
@@ -150,14 +153,31 @@ export function SettingsView() {
             </div>
           </div>
 
-          {/* Quick Sign Out at the Bottom */}
-          <div className="px-2 pt-4 border-t border-[#2b2b2b] mt-auto">
-            <button 
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded text-[12px] text-[#ef4444] hover:bg-[#ef4444]/15 hover:text-[#f87171] transition-all font-medium border border-transparent hover:border-[#ef4444]/20 cursor-pointer"
-            >
-              <LogOut className="h-4 w-4 shrink-0" /> Sign Out
-            </button>
+          {/* Bottom area: sign-in CTAs or sign-out */}
+          <div className="px-2 pt-4 border-t border-[#2b2b2b] mt-auto space-y-2">
+            {isAuthenticated ? (
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded text-[12px] text-[#ef4444] hover:bg-[#ef4444]/15 hover:text-[#f87171] transition-all font-medium border border-transparent hover:border-[#ef4444]/20 cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 shrink-0" /> Sign Out
+              </button>
+            ) : (
+              <>
+                <Link
+                  href="/signin"
+                  className="w-full flex items-center justify-center gap-2 px-2.5 py-2 rounded text-[12px] text-[#cccccc] hover:text-white bg-[#252526] hover:bg-[#2d2d2d] border border-[#3c3c3c] hover:border-[#555] transition-all font-medium"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="w-full flex items-center justify-center gap-2 px-2.5 py-2 rounded text-[12px] text-white bg-[#007acc] hover:bg-[#0062a3] border border-transparent transition-all font-medium"
+                >
+                  Sign Up for Free
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -349,6 +369,34 @@ export function SettingsView() {
             <>
               <h2 className="text-[16px] font-bold text-[#cccccc] mb-6">Account Settings</h2>
 
+              {!isAuthenticated ? (
+                /* Not signed in — show auth CTAs */
+                <div className="flex flex-col items-center justify-center py-16 gap-6 text-center">
+                  <div className="h-14 w-14 rounded-full bg-[#252526] border border-[#3c3c3c] flex items-center justify-center">
+                    <User className="h-6 w-6 text-[#555555]" />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#cccccc] mb-1">You&apos;re browsing the demo</p>
+                    <p className="text-[12px] text-[#858585] max-w-[280px] leading-relaxed mx-auto">
+                      Create a free account to save your workspace preferences, discipline, and agent settings across sessions.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 w-full max-w-[240px]">
+                    <Link
+                      href="/signup"
+                      className="w-full flex items-center justify-center py-2.5 rounded text-[13px] text-white bg-[#007acc] hover:bg-[#0062a3] border border-transparent transition-all font-semibold"
+                    >
+                      Sign Up for Free
+                    </Link>
+                    <Link
+                      href="/signin"
+                      className="w-full flex items-center justify-center py-2.5 rounded text-[13px] text-[#cccccc] hover:text-white bg-[#252526] hover:bg-[#2d2d2d] border border-[#3c3c3c] hover:border-[#555] transition-all font-semibold"
+                    >
+                      Sign In
+                    </Link>
+                  </div>
+                </div>
+              ) : (
               <section className="space-y-6">
                 <div className="flex justify-between items-center">
                   <div>
@@ -486,6 +534,7 @@ export function SettingsView() {
                   </div>
                 </form>
               </section>
+              )}
             </>
           ) : activeTab === "agent" ? (
             <>

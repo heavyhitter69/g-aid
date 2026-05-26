@@ -1,22 +1,26 @@
 "use client";
 
 import Image from "next/image";
-import { FolderOpen, DownloadCloud, TerminalSquare, Box } from "lucide-react";
+import { FolderOpen, DownloadCloud, TerminalSquare, Clock, Folder } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 
-export function DashboardView() {
-  const { currentProject, setCurrentProject, setProjectFiles } = useAppStore();
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
-  const handleOpenDemoProject = () => {
-    setCurrentProject("Nevada Basin Survey 2026");
-    setProjectFiles([
-      { name: "line4_ert.dat", type: "file", path: "/nevada-basin-survey-2026/line4_ert.dat" },
-      { name: "basin_gravity.grd", type: "file", path: "/nevada-basin-survey-2026/basin_gravity.grd" },
-      { name: "survey_layout.json", type: "file", path: "/nevada-basin-survey-2026/survey_layout.json" },
-      { name: "inversion_config.yaml", type: "file", path: "/nevada-basin-survey-2026/inversion_config.yaml" },
-      { name: "well_log_bh12.csv", type: "file", path: "/nevada-basin-survey-2026/well_log_bh12.csv" }
-    ]);
-  };
+export function DashboardView() {
+  const { currentProject, recentProjects } = useAppStore();
+
+  const openPicker = () => document.getElementById("native-folder-picker")?.click();
 
   if (currentProject) {
     // Show keyboard shortcuts when a project IS opened
@@ -65,7 +69,7 @@ export function DashboardView() {
         {/* Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
           <button 
-            onClick={handleOpenDemoProject}
+            onClick={() => document.getElementById("native-folder-picker")?.click()}
             className="flex flex-col items-start p-5 bg-[var(--ws-panel-alt)] hover:bg-[var(--ws-panel-hover)] border border-[var(--ws-border)] rounded-xl transition-colors cursor-pointer text-left group"
           >
             <FolderOpen className="h-5 w-5 text-[#cccccc] group-hover:text-white mb-3" />
@@ -85,33 +89,39 @@ export function DashboardView() {
         <div>
           <h3 className="text-[#858585] text-xs font-semibold mb-4 px-2">Recent projects</h3>
           <div className="flex flex-col">
-            <div 
-              onClick={handleOpenDemoProject}
-              className="flex justify-between items-center py-2 px-2 hover:bg-[var(--ws-panel-hover)] rounded cursor-pointer transition-colors group"
-            >
-              <span className="text-[#cccccc] group-hover:text-white text-sm font-medium">Nevada Basin Survey 2026</span>
-              <span className="text-[#555555] group-hover:text-[#858585] text-xs font-mono hidden sm:block">
-                C:\Projects\nevada-basin-survey
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2 px-2 hover:bg-[var(--ws-panel-hover)] rounded cursor-pointer transition-colors group">
-              <span className="text-[#cccccc] group-hover:text-white text-sm font-medium">geophysics-demo2.0</span>
-              <span className="text-[#555555] group-hover:text-[#858585] text-xs font-mono hidden sm:block">
-                C:\Users\sarko\Documents\geophysics-demo2.0
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2 px-2 hover:bg-[var(--ws-panel-hover)] rounded cursor-pointer transition-colors group">
-              <span className="text-[#cccccc] group-hover:text-white text-sm font-medium">genie-dev</span>
-              <span className="text-[#555555] group-hover:text-[#858585] text-xs font-mono hidden sm:block">
-                C:\Users\sarko\Documents\genie-dev
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2 px-2 hover:bg-[var(--ws-panel-hover)] rounded cursor-pointer transition-colors group">
-              <span className="text-[#cccccc] group-hover:text-white text-sm font-medium">JOEY THE BRAND</span>
-              <span className="text-[#555555] group-hover:text-[#858585] text-xs font-mono hidden sm:block">
-                C:\Users\sarko\Documents\joey-the-brand
-              </span>
-            </div>
+            {recentProjects.length > 0 ? (
+              recentProjects.map((proj) => (
+                <div
+                  key={`${proj.name}-${proj.openedAt}`}
+                  onClick={openPicker}
+                  className="flex justify-between items-center py-2.5 px-2 hover:bg-[var(--ws-panel-hover)] rounded cursor-pointer transition-colors group"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Folder className="h-4 w-4 text-[#555555] group-hover:text-[#858585] shrink-0" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[#cccccc] group-hover:text-white text-sm font-medium truncate">
+                        {proj.name}
+                      </span>
+                      <span className="text-[#444444] text-[10px] flex items-center gap-1.5">
+                        <Clock className="h-2.5 w-2.5" />
+                        {timeAgo(proj.openedAt)}
+                        {proj.fileCount > 0 && (
+                          <span className="ml-1">&middot; {proj.fileCount} file{proj.fileCount === 1 ? "" : "s"}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[#555555] group-hover:text-[#858585] text-xs font-mono hidden sm:block truncate ml-4 max-w-[45%] text-right">
+                    {proj.path}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="py-6 text-center">
+                <p className="text-[#555555] text-xs">No recent projects</p>
+                <p className="text-[#444444] text-[10px] mt-1">Open a folder to get started</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

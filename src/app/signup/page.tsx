@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useAppStore } from "@/store/app-store";
+import { createClient } from "@/lib/supabase/client";
 import { getAgentForDiscipline, DISCIPLINES } from "@/lib/data";
 import type { DisciplineId, UserRole } from "@/types";
 import {
@@ -113,7 +114,7 @@ export default function SignUpPage() {
     setDisciplineError(null);
   };
 
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setInstitutionError(null);
@@ -133,20 +134,54 @@ export default function SignUpPage() {
 
     setCreating(true);
 
-    // Commit user to store
-    setUser({
-      fullName: fullName.trim(),
-      institution: institution.trim(),
-      email: email.trim(),
-      role,
-      discipline: pickedDiscipline,
-    });
-    setAuthenticated(true);
-    setDiscipline(pickedDiscipline!);
-    const agent = getAgentForDiscipline(pickedDiscipline!);
-    setAgent(agent);
-    setOnboardingStep("welcome");
-    router.push("/onboarding");
+    try {
+      const supabase = createClient();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name:   fullName.trim(),
+            institution: institution.trim(),
+            role,
+            discipline:  pickedDiscipline,
+          },
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        setCreating(false);
+        return;
+      }
+
+      // If email confirmation is required, data.user will exist but session may be null
+      const sbUser = data.user;
+      setUser({
+        fullName:    fullName.trim(),
+        institution: institution.trim(),
+        email:       sbUser?.email ?? email.trim(),
+        role,
+        discipline:  pickedDiscipline,
+      });
+      setAuthenticated(!!data.session);
+      setDiscipline(pickedDiscipline!);
+      const agent = getAgentForDiscipline(pickedDiscipline!);
+      setAgent(agent);
+      setOnboardingStep("welcome");
+
+      if (!data.session) {
+        // Email confirmation required — let the user know
+        setError("Check your email to confirm your account, then sign in.");
+        setCreating(false);
+        return;
+      }
+
+      router.push("/onboarding");
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+      setCreating(false);
+    }
   };
 
   return (

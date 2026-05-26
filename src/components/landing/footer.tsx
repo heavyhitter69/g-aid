@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAppStore } from "@/store/app-store";
 import { useRouter } from "next/navigation";
-import { getAgentForDiscipline } from "@/lib/data";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -83,13 +82,6 @@ export function Footer() {
   const { 
     theme, 
     setTheme,
-    setAuthenticated, 
-    setUser, 
-    setDiscipline, 
-    setAgent, 
-    completeOnboarding,
-    setCurrentProject,
-    setProjectFiles
   } = useAppStore();
   
   const router = useRouter();
@@ -103,22 +95,6 @@ export function Footer() {
   const handleEnterDemo = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!mounted) return;
-    
-    // Ensure we start with the empty Start Screen, wiping any persisted state
-    setCurrentProject(null);
-    setProjectFiles([]);
-    
-    setAuthenticated(true);
-    completeOnboarding();
-    setUser({
-      fullName: "Guest Geophysicist",
-      institution: "Global Exploration Corp",
-      email: "guest@example.com",
-      role: "researcher",
-      discipline: "exploration",
-    });
-    setDiscipline("exploration");
-    setAgent(getAgentForDiscipline("exploration"));
     router.push("/workspace");
   };
 

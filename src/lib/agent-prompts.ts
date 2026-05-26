@@ -214,7 +214,7 @@ function formatOrchestratorResponse(
   // Detect conversational / non-geophysical input
   const isGreeting = /^(hi|hello|hey|howdy|greetings|good\s(morning|afternoon|evening)|what's up|sup|yo)\b/.test(lowerQuery);
   const isHelp = /\b(help|what can you do|what do you do|how does this work|capabilities|features)\b/.test(lowerQuery);
-  const isStatus = /\b(status|state|summary|overview|what.*(loaded|have))\b/.test(lowerQuery);
+  const isAnalyzeAll = /\b(analy[sz]e\s+(all|every|the|these|my|loaded)|process\s+(all|every|the)|scan\s+(all|every|the)|review\s+(all|every|the)|examine\s+(all|every|the))\b/.test(lowerQuery);
 
   if (isGreeting) {
     return [
@@ -249,14 +249,33 @@ function formatOrchestratorResponse(
     ].join("\n");
   }
 
+  // ── "Analyze all files" intent — produce per-dataset structured analysis ──
+  if (isAnalyzeAll && datasets.length > 0) {
+    return formatDatasetAnalysis(datasets, activeHypotheses, provenance, query);
+  }
+
   // Default coordination summary (for ambiguous / multi-step queries)
-  return [
+  const lines: string[] = [
     `## Coordination Summary`,
     ``,
     `**Query:** ${query.slice(0, 120)}${query.length > 120 ? "…" : ""}`,
     ``,
-    `**Datasets available:** ${datasets.length > 0 ? datasets.map((d) => d.modality.toUpperCase()).join(", ") : "None — upload data to begin domain analysis"}`,
-    ``,
+  ];
+
+  if (datasets.length > 0) {
+    lines.push(`**Datasets available:** ${datasets.length}`);
+    for (const ds of datasets) {
+      const snr = ds.qualityMetrics.signalToNoise;
+      const qualLabel = snr !== null ? (snr >= 20 ? "Good" : snr >= 10 ? "Moderate" : "Poor") : "Unknown";
+      lines.push(`- **${ds.name}** [${ds.modality.toUpperCase()}] — Quality: ${qualLabel}, CRS: ${ds.crs}`);
+    }
+    lines.push(``);
+  } else {
+    lines.push(`**Datasets available:** None — upload data to begin domain analysis`);
+    lines.push(``);
+  }
+
+  lines.push(
     `**Active hypotheses:** ${activeHypotheses.length > 0
       ? `${activeHypotheses.length} (confidence range ${Math.min(...activeHypotheses.map((h) => h.confidence * 100)).toFixed(0)}–${Math.max(...activeHypotheses.map((h) => h.confidence * 100)).toFixed(0)}%)`
       : "None yet"}`,
@@ -264,7 +283,118 @@ function formatOrchestratorResponse(
     datasets.length === 0
       ? `**Recommendation:** Load geophysical datasets and describe the anomaly or ask for a specific interpretation. Type \`/plan\` to start a workflow.`
       : `**Next step:** Specialist agents have analysed available data. Review interpretations and activate proactive opportunities using the chips above.`,
-  ].join("\n");
+  );
+
+  return lines.join("\n");
+}
+
+// ── Per-dataset analysis formatter ────────────────────────────────────────────
+
+function formatDatasetAnalysis(
+  datasets: GeoDataset[],
+  hypotheses: HypothesisNode[],
+  provenance: ConfidenceProvenance,
+  query: string
+): string {
+  const lines: string[] = [
+    `## Multi-Dataset Analysis`,
+    ``,
+    `Analysed **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** across ${[...new Set(datasets.map((d) => d.modality))].length} geophysical modalit${[...new Set(datasets.map((d) => d.modality))].length === 1 ? "y" : "ies"}.`,
+    ``,
+  ];
+
+  // Extract any file context snippets from the query
+  const hasFileContext = query.includes("--- File Context ---");
+
+  for (const ds of datasets) {
+    const snr = ds.qualityMetrics.signalToNoise;
+    const qualLabel = snr !== null ? (snr >= 20 ? "Good" : snr >= 10 ? "Moderate" : "Poor") : "Unknown";
+    const coverage = ds.qualityMetrics.coveragePercent;
+    const hasSpatial = ds.spatialExtent.minLat !== 0 || ds.spatialExtent.maxLat !== 0;
+
+    lines.push(`### ${ds.name}`);
+    lines.push(``);
+    lines.push(`- **Modality:** ${ds.modality.toUpperCase()}`);
+    lines.push(`- **Acquisition:** ${ds.acquisitionMethod}`);
+    lines.push(`- **Units:** ${ds.units} | **CRS:** ${ds.crs}`);
+    lines.push(`- **Data Quality:** ${qualLabel} (SNR: ${snr?.toFixed(1) ?? "N/A"} dB)`);
+    if (coverage !== null) {
+      lines.push(`- **Coverage:** ${coverage.toFixed(0)}%`);
+    }
+    if (hasSpatial) {
+      lines.push(`- **Spatial Extent:** Lat ${ds.spatialExtent.minLat.toFixed(4)}–${ds.spatialExtent.maxLat.toFixed(4)}, Lon ${ds.spatialExtent.minLon.toFixed(4)}–${ds.spatialExtent.maxLon.toFixed(4)}`);
+    }
+    if (ds.fileSize) {
+      const sizeMB = (ds.fileSize / (1024 * 1024));
+      lines.push(`- **File Size:** ${sizeMB >= 1 ? sizeMB.toFixed(1) + " MB" : (ds.fileSize / 1024).toFixed(1) + " KB"}`);
+    }
+    lines.push(``);
+
+    // Modality-specific observations
+    switch (ds.modality) {
+      case "magnetic":
+        lines.push(`**Magnetic Assessment:**`);
+        lines.push(`- Total Magnetic Intensity (TMI) data detected`);
+        if (hasSpatial && Math.abs(ds.spatialExtent.minLat) < 20) {
+          lines.push(`- ⚠️ Low magnetic latitude detected — RTP instability risk is elevated. Consider using analytic signal instead.`);
+        }
+        lines.push(`- Recommend: Apply RTP, compute analytic signal, extract lineaments for structural interpretation`);
+        break;
+      case "resistivity":
+        lines.push(`**Resistivity Assessment:**`);
+        lines.push(`- Electrical resistivity / ERT data detected`);
+        lines.push(`- ⚠️ Inversion non-uniqueness is an inherent limitation — multiple models may fit the data`);
+        lines.push(`- Recommend: Run 2D smooth-model inversion, compute DOI index, identify conductive/resistive targets`);
+        break;
+      case "gravity":
+        lines.push(`**Gravity Assessment:**`);
+        lines.push(`- Gravity survey data detected`);
+        lines.push(`- Recommend: Apply Bouguer correction, perform regional-residual separation, identify density anomalies`);
+        break;
+      case "seismic":
+        lines.push(`**Seismic Assessment:**`);
+        lines.push(`- Seismic survey data detected`);
+        lines.push(`- Recommend: Process reflections, pick horizons, build velocity model for depth conversion`);
+        break;
+      default:
+        lines.push(`**General Assessment:**`);
+        lines.push(`- ${ds.modality} data loaded and ready for domain-specific analysis`);
+    }
+    lines.push(``);
+    lines.push(`---`);
+    lines.push(``);
+  }
+
+  // Overall confidence
+  const confPct = (provenance.derivedConfidence * 100).toFixed(0);
+  const confLabel = confidenceToLanguage(provenance.derivedConfidence);
+  lines.push(`**Overall Confidence: ${confPct}% (${confLabel})**`);
+  lines.push(`*Basis: data quality ${((provenance.dataQualityScore ?? 0.5) * 100).toFixed(0)}% · spatial coverage ${((provenance.spatialCoverage ?? 0.5) * 100).toFixed(0)}%*`);
+  lines.push(``);
+
+  // Cross-method opportunities
+  const modalities = [...new Set(datasets.map((d) => d.modality))];
+  if (modalities.length > 1) {
+    lines.push(`**Cross-Method Opportunities:**`);
+    lines.push(`- ${modalities.length} independent geophysical methods available for integrated interpretation`);
+    lines.push(`- Multi-method agreement analysis is possible — this significantly improves interpretation confidence`);
+    lines.push(`- Type \`/plan\` to generate a multi-method processing workflow`);
+  } else {
+    lines.push(`**Recommended Next Steps:**`);
+    lines.push(`- Consider acquiring complementary geophysical data (different modality) to reduce interpretation ambiguity`);
+    lines.push(`- Ask specific questions about anomalies or features visible in the data`);
+    lines.push(`- Type \`/plan\` to generate a processing workflow for this dataset`);
+  }
+
+  if (hypotheses.length > 0) {
+    lines.push(``);
+    lines.push(`**Active Hypotheses:** ${hypotheses.length}`);
+    for (const h of hypotheses.slice(0, 5)) {
+      lines.push(`- [${(h.confidence * 100).toFixed(0)}%] ${h.statement.slice(0, 150)}`);
+    }
+  }
+
+  return lines.join("\n");
 }
 
 

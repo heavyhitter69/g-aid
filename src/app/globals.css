@@ -422,6 +422,39 @@ html.light .glass-panel {
   scrollbar-width: none;
 }
 
+/* Restores and styles scrollbars for CSV files in the spreadsheet container */
+.spreadsheet-container::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
+}
+
+.spreadsheet-container::-webkit-scrollbar-track {
+  background: #f0f0f0 !important;
+  border-left: 1px solid #d4d4d4 !important;
+  border-top: 1px solid #d4d4d4 !important;
+}
+
+.spreadsheet-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1 !important;
+  border-radius: 4px !important;
+  border: 2px solid #f0f0f0 !important;
+}
+
+.spreadsheet-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8 !important;
+}
+
+.spreadsheet-container::-webkit-scrollbar-corner {
+  background: #f0f0f0 !important;
+}
+
+.spreadsheet-container {
+  -ms-overflow-style: auto !important;
+  scrollbar-width: auto !important;
+  scrollbar-color: #c1c1c1 #f0f0f0 !important;
+}
+
 /* ============================================================
    Curated by Dev Pill Styles
    ============================================================ */

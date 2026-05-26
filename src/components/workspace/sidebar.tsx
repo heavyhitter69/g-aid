@@ -4,6 +4,8 @@ import { ChevronRight, ChevronDown, ChevronUp, Files, Search, GitBranch, Wrench,
 import { useAppStore } from "@/store/app-store";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ExplorerTree } from "@/components/workspace/explorer-tree";
+import type { ProjectFile } from "@/types/project";
 
 export function Sidebar() {
   const { 
@@ -38,7 +40,7 @@ export function Sidebar() {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    fileName: string;
+    fileId: string;
   } | null>(null);
 
   const handleSidebarResizeStart = (e: React.MouseEvent) => {
@@ -101,17 +103,18 @@ export function Sidebar() {
   // Context Menu actions:
   const handleAddFileToChat = () => {
     if (!contextMenu) return;
-    const name = contextMenu.fileName;
-    const fileContentText = fileContents[name] || `[Empty File]`;
+    const fileId = contextMenu.fileId;
+    const displayName = fileId.split("/").pop() ?? fileId;
+    const fileContentText = fileContents[fileId] || `[Empty File]`;
     
     addMessageToConversation(activeConversationId, {
       sender: "user",
-      text: `Please analyze this file: ${name}. Here is its content:\n\n${fileContentText.slice(0, 1000)}`
+      text: `Please analyze this file: ${displayName}. Here is its content:\n\n${fileContentText.slice(0, 1000)}`
     });
     
     addMessageToConversation(activeConversationId, {
       sender: "agent",
-      text: `I have analyzed the parameters inside **${name}**. Let me know if you would like me to formulate a 2D resistivity calculation model or check spacing tolerances!`
+      text: `I have analyzed the parameters inside **${displayName}**. Let me know if you would like me to formulate a 2D resistivity calculation model or check spacing tolerances!`
     });
     
     setChatPanelOpen(true);
@@ -120,8 +123,9 @@ export function Sidebar() {
 
   const handleAddFileToNewChat = () => {
     if (!contextMenu) return;
-    const name = contextMenu.fileName;
-    const fileContentText = fileContents[name] || `[Empty File]`;
+    const fileId = contextMenu.fileId;
+    const displayName = fileId.split("/").pop() ?? fileId;
+    const fileContentText = fileContents[fileId] || `[Empty File]`;
     
     addConversation();
     
@@ -129,14 +133,14 @@ export function Sidebar() {
       const latestState = useAppStore.getState();
       const newActiveId = latestState.activeConversationId;
       
-      updateConversationTopic(newActiveId, `Analysis of ${name}`);
+      updateConversationTopic(newActiveId, `Analysis of ${displayName}`);
       addMessageToConversation(newActiveId, {
         sender: "user",
-        text: `I've opened a dedicated session for: ${name}. File context:\n\n${fileContentText.slice(0, 1000)}`
+        text: `I've opened a dedicated session for: ${displayName}. File context:\n\n${fileContentText.slice(0, 1000)}`
       });
       addMessageToConversation(newActiveId, {
         sender: "agent",
-        text: `Welcome to a brand-new focus thread on **${name}**. I've indexed the soil boundary intervals. What operations would you like to run?`
+        text: `Welcome to a brand-new focus thread on **${displayName}**. I've indexed the soil boundary intervals. What operations would you like to run?`
       });
     }, 100);
 
@@ -151,46 +155,54 @@ export function Sidebar() {
 
   const handleCopy = () => {
     if (!contextMenu) return;
-    const name = contextMenu.fileName;
-    const text = fileContents[name] || "";
+    const fileId = contextMenu.fileId;
+    const text = fileContents[fileId] || "";
     navigator.clipboard.writeText(text);
     setContextMenu(null);
   };
 
   const handleCopyPath = () => {
     if (!contextMenu) return;
-    const name = contextMenu.fileName;
-    const path = `/local-uploads/${name}`;
-    navigator.clipboard.writeText(path);
+    const fileId = contextMenu.fileId;
+    const entry = projectFiles.find((f) => f.id === fileId);
+    navigator.clipboard.writeText(entry?.path ?? fileId);
     setContextMenu(null);
   };
 
   const handleRenameInitiate = () => {
     if (!contextMenu) return;
-    setRenameTarget(contextMenu.fileName);
-    setRenameValue(contextMenu.fileName);
+    setRenameTarget(contextMenu.fileId);
+    setRenameValue(contextMenu.fileId.split("/").pop() ?? contextMenu.fileId);
     setContextMenu(null);
   };
 
   const handleRenameSubmit = () => {
     if (!renameTarget || !renameValue.trim()) return;
-    
-    const updatedFiles = projectFiles.map(file => {
-      if (file.name === renameTarget) {
-        return { ...file, name: renameValue, path: `/local-uploads/${renameValue}` };
+
+    const newId = renameTarget.includes("/")
+      ? `${renameTarget.replace(/[^/]+$/, "")}${renameValue}`
+      : renameValue;
+
+    const updatedFiles = projectFiles.map((file) => {
+      if (file.id === renameTarget) {
+        return {
+          ...file,
+          id: newId,
+          name: renameValue,
+          path: file.path.replace(renameTarget, newId),
+        };
       }
       return file;
     });
     setProjectFiles(updatedFiles);
 
     if (fileContents[renameTarget] !== undefined) {
-      setFileContent(renameValue, fileContents[renameTarget]);
+      setFileContent(newId, fileContents[renameTarget]);
     }
 
     const tabId = `file:${renameTarget}`;
-    const newTabId = `file:${renameValue}`;
-    const isTabOpen = workbenchTabs.some(t => t.id === tabId);
-    if (isTabOpen) {
+    const newTabId = `file:${newId}`;
+    if (workbenchTabs.some((t) => t.id === tabId)) {
       closeWorkbenchTab(tabId);
       openWorkbenchTab(newTabId, "file", renameValue);
     }
@@ -200,11 +212,25 @@ export function Sidebar() {
 
   const handleDelete = () => {
     if (!contextMenu) return;
-    const name = contextMenu.fileName;
-    const updated = projectFiles.filter(file => file.name !== name);
-    setProjectFiles(updated);
-    closeWorkbenchTab(`file:${name}`);
+    const fileId = contextMenu.fileId;
+    setProjectFiles(projectFiles.filter((file) => file.id !== fileId));
+    closeWorkbenchTab(`file:${fileId}`);
     setContextMenu(null);
+  };
+
+  const handleOpenFile = (file: ProjectFile) => {
+    openWorkbenchTab(`file:${file.id}`, "file", file.name);
+  };
+
+  const handleFileContextMenu = (e: React.MouseEvent, fileId: string) => {
+    e.preventDefault();
+    const menuWidth = 250;
+    const menuHeight = 310;
+    let posX = e.clientX;
+    let posY = e.clientY;
+    if (posX + menuWidth > window.innerWidth) posX = window.innerWidth - menuWidth - 10;
+    if (posY + menuHeight > window.innerHeight) posY = window.innerHeight - menuHeight - 10;
+    setContextMenu({ x: Math.max(10, posX), y: Math.max(10, posY), fileId });
   };
 
   return (
@@ -350,88 +376,24 @@ export function Sidebar() {
                   <p className="text-[10px] text-[#858585] leading-relaxed">
                     You have not yet opened a folder.
                   </p>
-                  <button className="bg-[#007acc] hover:bg-[#0062a3] text-white py-1.5 px-3 rounded text-xs font-medium transition-colors w-fit border-none cursor-pointer">
+                  <button
+                    onClick={() => document.getElementById("native-folder-picker")?.click()}
+                    className="bg-[#007acc] hover:bg-[#0062a3] text-white py-1.5 px-3 rounded text-xs font-medium transition-colors w-fit border-none cursor-pointer">
                     Open Folder
                   </button>
                 </div>
               )}
               
               {explorerOpen && currentProject && (
-                <div className="pl-4 py-1 flex flex-col gap-0.5">
-                  {projectFiles.map((file) => {
-                    let Icon = FileText;
-                    let color = "text-[#9cdcfe]";
-                    if (file.name.endsWith(".dat")) {
-                      Icon = Table;
-                      color = "text-[#4fc1ff]";
-                    } else if (file.name.endsWith(".grd")) {
-                      Icon = Layers;
-                      color = "text-[#4ec9b0]";
-                    } else if (file.name.endsWith(".json")) {
-                      Icon = Braces;
-                      color = "text-[#d7ba7d]";
-                    } else if (file.name.endsWith(".yaml") || file.name.endsWith(".yml")) {
-                      Icon = FileCode;
-                      color = "text-[#ce9178]";
-                    } else if (file.name.endsWith(".csv")) {
-                      Icon = FileText;
-                      color = "text-[#9cdcfe]";
-                    }
-                    
-                    const isRenaming = renameTarget === file.name;
-
-                    return (
-                      <div key={file.name} className="relative group w-full">
-                        {isRenaming ? (
-                          <input 
-                            type="text"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onBlur={handleRenameSubmit}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleRenameSubmit();
-                              if (e.key === "Escape") setRenameTarget(null);
-                            }}
-                            autoFocus
-                            className="bg-[#3c3c3c] text-white border border-[#007acc] rounded px-1 py-0.5 text-xs outline-none w-[90%] font-sans ml-4"
-                          />
-                        ) : (
-                          <button
-                            onClick={() => {
-                              openWorkbenchTab(`file:${file.name}`, "file", file.name);
-                            }}
-                            onContextMenu={(e) => {
-                              e.preventDefault();
-                              const menuWidth = 250;
-                              const menuHeight = 310;
-                              let posX = e.clientX;
-                              let posY = e.clientY;
-                              
-                              if (posX + menuWidth > window.innerWidth) {
-                                posX = window.innerWidth - menuWidth - 10;
-                              }
-                              if (posY + menuHeight > window.innerHeight) {
-                                posY = window.innerHeight - menuHeight - 10;
-                              }
-                              
-                              posX = Math.max(10, posX);
-                              posY = Math.max(10, posY);
-
-                              setContextMenu({
-                                x: posX,
-                                y: posY,
-                                fileName: file.name
-                              });
-                            }}
-                            className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[#2a2d2e] text-[#cccccc] hover:text-white text-left font-sans text-xs font-normal border-none bg-transparent cursor-pointer transition-colors"
-                          >
-                            <Icon className={cn("h-3.5 w-3.5 shrink-0", color)} />
-                            <span className="truncate">{file.name}</span>
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="pl-1 py-1">
+                  <p className="px-3 pb-1 text-[9px] text-[#555555]">
+                    {projectFiles.length} file{projectFiles.length === 1 ? "" : "s"}
+                  </p>
+                  <ExplorerTree
+                    files={projectFiles}
+                    onOpenFile={handleOpenFile}
+                    onContextMenu={handleFileContextMenu}
+                  />
                 </div>
               )}
             </div>

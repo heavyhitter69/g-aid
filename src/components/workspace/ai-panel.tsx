@@ -20,6 +20,7 @@ import { useAgentStore } from "@/store/agent-store";
 import { cn } from "@/lib/utils";
 import type { StreamPreamble, OpportunityChipViewModel, HypothesisEpistemicType, AgentId } from "@/types/scientific";
 import { AgentActivity } from "@/components/workspace/agent-activity";
+import { summariseFileForAgent } from "@/lib/auto-ingest";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -455,7 +456,9 @@ export function AIPanel() {
     updateConversationTopic,
     addMessageToConversation,
     toggleChatPanel,
-    agentSettings
+    agentSettings,
+    fileContents,
+    projectFiles
   } = useAppStore();
 
   const scientificState = useScientificState();
@@ -554,11 +557,22 @@ export function AIPanel() {
     }]);
 
     try {
+      // Build file content summaries for the orchestrator
+      const fileSummaries = projectFiles
+        .filter((f) => fileContents[f.id])
+        .slice(0, 20)
+        .map((f) => summariseFileForAgent(f.id, fileContents[f.id]))
+        .join("\n\n");
+
+      const enrichedMessage = fileSummaries
+        ? `${userMsg}\n\n--- File Context ---\n${fileSummaries}`
+        : userMsg;
+
       const response = await fetch("/api/agent/orchestrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMsg,
+          message: enrichedMessage,
           sessionId: activeConversation.id,
           mode: selectedMode === "Plan" ? "plan" : "interpret",
           snapshotData: scientificState.snapshot,
@@ -874,9 +888,16 @@ export function AIPanel() {
                 <Zap className="h-5 w-5 text-[#007acc]" />
               </div>
               <p className="text-[11px] font-medium text-[#cccccc]">G-AID Scientific Engine</p>
-              <p className="text-[10px] max-w-[220px] leading-relaxed">
-                Upload datasets to activate proactive opportunities, or describe your geophysical anomaly to begin analysis.
-              </p>
+              {scientificState.snapshot.datasets.length > 0 ? (
+                <p className="text-[10px] max-w-[220px] leading-relaxed">
+                  <span className="text-[#4ec9a0] font-semibold">{scientificState.snapshot.datasets.length} dataset{scientificState.snapshot.datasets.length > 1 ? "s" : ""} loaded.</span>{" "}
+                  Describe your anomaly or type a query to begin AI-powered analysis.
+                </p>
+              ) : (
+                <p className="text-[10px] max-w-[220px] leading-relaxed">
+                  Upload datasets to activate proactive opportunities, or describe your geophysical anomaly to begin analysis.
+                </p>
+              )}
               <div className="flex gap-2 mt-2 flex-wrap justify-center">
                 {["Magnetic anomaly analysis", "ERT aquifer target", "Multi-method integration"].map((hint) => (
                   <button

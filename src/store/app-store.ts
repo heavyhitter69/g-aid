@@ -7,6 +7,7 @@ import type {
   UserProfile,
   WorkspaceView,
 } from "@/types";
+import type { ProjectFile } from "@/types/project";
 
 export interface Conversation {
   id: string;
@@ -29,6 +30,13 @@ export interface AgentSettings {
   autoApproveModeTransitions: boolean;
 }
 
+export interface RecentProject {
+  name: string;
+  path: string;      // best-effort — may be relative for browser-picked folders
+  openedAt: string;  // ISO 8601
+  fileCount: number;
+}
+
 interface AppState {
   isAuthenticated: boolean;
   onboardingComplete: boolean;
@@ -38,6 +46,7 @@ interface AppState {
   assignedAgent: AgentProfile | null;
   workspaceView: WorkspaceView;
   currentProject: string | null;
+  recentProjects: RecentProject[];
   processingStatus: "idle" | "running" | "complete";
   theme: "light" | "dark";
   isAgentSidebarOpen: boolean;
@@ -57,7 +66,7 @@ interface AppState {
   activeWorkbenchTabId: string | null;
   autoSave: boolean;
   dirtyFiles: string[];
-  projectFiles: Array<{ name: string; type: "file" | "folder"; path: string }>;
+  projectFiles: ProjectFile[];
   isOpenFileDialogOpen: boolean;
   isOpenFolderDialogOpen: boolean;
   isSaveAsDialogOpen: boolean;
@@ -95,9 +104,9 @@ interface AppState {
   setFileDirty: (fileName: string, isDirty: boolean) => void;
   saveFile: (fileName: string) => void;
   saveAllFiles: () => void;
-  setProjectFiles: (files: Array<{ name: string; type: "file" | "folder"; path: string }>) => void;
-  addProjectFile: (name: string, type: "file" | "folder", path: string) => void;
-  setCurrentProject: (projectName: string | null) => void;
+  setProjectFiles: (files: ProjectFile[]) => void;
+  addProjectFile: (file: ProjectFile) => void;
+  setCurrentProject: (projectName: string | null, path?: string, fileCount?: number) => void;
   setOpenFileDialogOpen: (value: boolean) => void;
   setOpenFolderDialogOpen: (value: boolean) => void;
   setSaveAsDialogOpen: (value: boolean) => void;
@@ -118,6 +127,7 @@ const initialState = {
   assignedAgent: null,
   workspaceView: "dashboard" as WorkspaceView,
   currentProject: null as string | null,
+  recentProjects: [] as RecentProject[],
   processingStatus: "idle" as const,
   theme: "dark" as const,
   isAgentSidebarOpen: false,
@@ -139,7 +149,7 @@ const initialState = {
   activeWorkbenchTabId: null as string | null,
   autoSave: true,
   dirtyFiles: [] as string[],
-  projectFiles: [] as Array<{ name: string; type: "file" | "folder"; path: string }>,
+  projectFiles: [] as ProjectFile[],
   isOpenFileDialogOpen: false,
   isOpenFolderDialogOpen: false,
   isSaveAsDialogOpen: false,
@@ -291,14 +301,25 @@ export const useAppStore = create<AppState>()(
       })),
       saveAllFiles: () => set({ dirtyFiles: [] }),
       setProjectFiles: (files) => set({ projectFiles: files }),
-      addProjectFile: (name, type, path) => set((s) => {
-        const exists = s.projectFiles.some(f => f.name === name);
-        if (exists) return {};
+      addProjectFile: (file) => set((s) => {
+        if (s.projectFiles.some((f) => f.id === file.id)) return {};
+        return { projectFiles: [...s.projectFiles, file] };
+      }),
+      setCurrentProject: (projectName, path, fileCount) => set((s) => {
+        if (!projectName) return { currentProject: null };
+        // Deduplicate by name, prepend new entry, cap at 10
+        const entry: RecentProject = {
+          name: projectName,
+          path: path ?? projectName,
+          openedAt: new Date().toISOString(),
+          fileCount: fileCount ?? 0,
+        };
+        const filtered = s.recentProjects.filter((p) => p.name !== projectName);
         return {
-          projectFiles: [...s.projectFiles, { name, type, path }]
+          currentProject: projectName,
+          recentProjects: [entry, ...filtered].slice(0, 10),
         };
       }),
-      setCurrentProject: (projectName) => set({ currentProject: projectName }),
       setOpenFileDialogOpen: (value) => set({ isOpenFileDialogOpen: value }),
       setOpenFolderDialogOpen: (value) => set({ isOpenFolderDialogOpen: value }),
       setSaveAsDialogOpen: (value) => set({ isSaveAsDialogOpen: value }),
@@ -356,6 +377,7 @@ export const useAppStore = create<AppState>()(
         selectedDiscipline: state.selectedDiscipline,
         assignedAgent: state.assignedAgent,
         currentProject: state.currentProject,
+        recentProjects: state.recentProjects,
         autoSave: state.autoSave,
         theme: state.theme,
         layoutMode: state.layoutMode,

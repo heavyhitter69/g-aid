@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PageTransition } from "@/components/shared/page-transition";
 import { useAppStore } from "@/store/app-store";
+import { createClient } from "@/lib/supabase/client";
 import { Mail, ChevronLeft } from "lucide-react";
 
 export default function SignInPage() {
@@ -36,7 +37,7 @@ export default function SignInPage() {
     }
   }, [existingUser]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError(null);
     setPasswordError(null);
@@ -57,30 +58,37 @@ export default function SignInPage() {
     if (hasError) return;
 
     setLoading(true);
-    
-    // Always start with a fresh workspace state on login
-    setCurrentProject(null);
-    setProjectFiles([]);
-    
-    if (!existingUser) {
-      setUser({
-        fullName: "Dr. Alex Chen",
-        institution: "GeoMind Research",
-        email: email || "alex@geomind.ai",
-        role: "researcher",
-        discipline: null,
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
-    } else if (email && email !== existingUser.email) {
+
+      if (error) {
+        setPasswordError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      // Sync Supabase user into app store
+      const sbUser = data.user;
+      setCurrentProject(null);
+      setProjectFiles([]);
       setUser({
-        ...existingUser,
-        email: email,
+        fullName: sbUser.user_metadata?.full_name ?? sbUser.email ?? "User",
+        institution: sbUser.user_metadata?.institution ?? "",
+        email: sbUser.email ?? email,
+        role: sbUser.user_metadata?.role ?? "researcher",
+        discipline: sbUser.user_metadata?.discipline ?? null,
       });
-    }
-    
-    setAuthenticated(true);
-    setTimeout(() => {
+      setAuthenticated(true);
       router.push(onboardingComplete ? "/workspace" : "/onboarding");
-    }, 600);
+    } catch {
+      setPasswordError("An unexpected error occurred. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (

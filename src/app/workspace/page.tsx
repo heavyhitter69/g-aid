@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/workspace/sidebar";
 import { Topbar } from "@/components/workspace/topbar";
@@ -17,6 +17,12 @@ import { useAppStore } from "@/store/app-store";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { ChevronRight, X, Settings, Table, Layers, Braces, FileCode, FileText, Folder, Search, FolderOpen, PanelLeft, Files, GitBranch, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { upsertProject, uploadFile } from "@/lib/supabase/storage";
+import { registerFile, clearRegistry } from "@/lib/file-registry";
+import { relativePathInProject, rootFolderName } from "@/lib/project-tree";
+import { autoIngestFile } from "@/lib/auto-ingest";
+import { useScientificState } from "@/store/scientific-state";
+import type { ProjectFile } from "@/types/project";
 
 export default function WorkspacePage() {
   const router = useRouter();
@@ -62,6 +68,7 @@ export default function WorkspacePage() {
     agentSidebarWidth,
     setAgentSidebarWidth
   } = useAppStore();
+  const ingestDataset = useScientificState((s) => s.ingestDataset);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [saveAsName, setSaveAsName] = useState("");
@@ -167,11 +174,6 @@ export default function WorkspacePage() {
     }
   }, [activeFile, isSaveAsDialogOpen]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/signin");
-    }
-  }, [isAuthenticated, router]);
 
   const renderView = () => {
     switch (workspaceView) {
@@ -217,8 +219,6 @@ export default function WorkspacePage() {
         return <DashboardView />;
     }
   };
-
-  if (!isAuthenticated) return null;
 
   return (
     <ThemeProvider>
@@ -563,104 +563,12 @@ export default function WorkspacePage() {
             }
 
             // Reset projectFiles, project, and tabs to treat as a standalone file workspace
-            setCurrentProject("Standalone File");
-            setProjectFiles([{ name: file.name, type: "file" as const, path: `/local-uploads/${file.name}` }]);
+            setCurrentProject("Standalone File", `/local-uploads/${file.name}`, 1);
+            setProjectFiles([
+              { id: file.name, name: file.name, type: "file", path: `/local-uploads/${file.name}` },
+            ]);
             useAppStore.setState({ workbenchTabs: [] });
             openWorkbenchTab(`file:${file.name}`, "file", file.name);
-          }
-        }}
-      />
-
-      {/* Hidden Native Folder Selector */}
-      <input 
-        type="file" 
-        id="native-folder-picker" 
-        className="hidden" 
-        // @ts-ignore
-        webkitdirectory="" 
-        directory="" 
-        onChange={(e) => {
-          const files = e.target.files;
-          if (files && files.length > 0) {
-            const relativePath = files[0].webkitRelativePath;
-            const folderName = relativePath.split("/")[0] || "Selected Folder";
-            
-            // Smart Filtering: ignore system / compiled / dependency directories to run blazing fast
-            const ignoredFolders = ["node_modules", ".next", ".git", ".gemini", "dist", "build", "out", ".vscode", "tmp", "temp", "cache"];
-            
-            const filteredFiles = Array.from(files).filter((file) => {
-              const parts = file.webkitRelativePath.toLowerCase().split("/");
-              // Ignore matches
-              return !parts.some(part => ignoredFolders.includes(part)) && !file.name.startsWith(".");
-            });
-
-            // Read actual file contents client-side
-            filteredFiles.forEach((file) => {
-              const isDocx = file.name.endsWith(".docx") || file.name.endsWith(".doc");
-              const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
-              const reader = new FileReader();
-
-              if (isDocx) {
-                reader.onload = async (event) => {
-                  const arrayBuffer = event.target?.result as ArrayBuffer;
-                  try {
-                    const mammoth = await import("mammoth");
-                    const result = await mammoth.convertToHtml({ arrayBuffer });
-                    setFileContent(file.name, result.value);
-                  } catch (err) {
-                    console.error("Error parsing docx", err);
-                    setFileContent(file.name, "Error: Could not extract text from Word document.");
-                  }
-                };
-                reader.readAsArrayBuffer(file);
-              } else if (isExcel) {
-                reader.onload = async (event) => {
-                  const arrayBuffer = event.target?.result as ArrayBuffer;
-                  try {
-                    const XLSX = await import("xlsx");
-                    const data = new Uint8Array(arrayBuffer);
-                    const workbook = XLSX.read(data, { type: "array" });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const sheetArray = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    setFileContent(file.name, JSON.stringify(sheetArray));
-                  } catch (err) {
-                    console.error("Error parsing xlsx", err);
-                    setFileContent(file.name, "Error: Could not parse Excel spreadsheet.");
-                  }
-                };
-                reader.readAsArrayBuffer(file);
-              } else {
-                reader.onload = (event) => {
-                  const text = event.target?.result as string;
-                  setFileContent(file.name, text);
-                };
-                reader.readAsText(file);
-              }
-            });
-
-            const mappedFiles = filteredFiles.map((f) => ({
-              name: f.name,
-              type: "file" as const,
-              path: `/${folderName}/${f.webkitRelativePath}`
-            }));
-
-            const uniqueFiles = mappedFiles.filter((file, index, self) =>
-              index === self.findIndex((t) => t.name === file.name)
-            );
-
-            // Cap at 15 items to prevent browser lag and UI freezing
-            const cappedFiles = uniqueFiles.slice(0, 15);
-            
-            setCurrentProject(folderName);
-            setProjectFiles(cappedFiles);
-            
-            // Reset workbench tabs to clean slate for this standalone folder
-            useAppStore.setState({ workbenchTabs: [] });
-
-            if (cappedFiles.length > 0) {
-              openWorkbenchTab(`file:${cappedFiles[0].name}`, "file", cappedFiles[0].name);
-            }
           }
         }}
       />
@@ -709,7 +617,11 @@ export default function WorkspacePage() {
                 <span className="text-[10px] uppercase text-[#858585] font-bold block mb-1">Files in {currentProject}</span>
                 <div className="space-y-0.5 max-h-[180px] overflow-y-auto pr-1">
                   {projectFiles
-                    .filter(f => f.name.toLowerCase().includes(fileSearch.toLowerCase()))
+                    .filter(
+                      (f) =>
+                        f.name.toLowerCase().includes(fileSearch.toLowerCase()) ||
+                        f.id.toLowerCase().includes(fileSearch.toLowerCase())
+                    )
                     .map((file) => {
                       let FileIcon = FileText;
                       let color = "text-[#9cdcfe]";
@@ -732,9 +644,9 @@ export default function WorkspacePage() {
                       
                       return (
                         <button
-                          key={file.name}
+                          key={file.id}
                           onClick={() => {
-                            openWorkbenchTab(`file:${file.name}`, "file", file.name);
+                            openWorkbenchTab(`file:${file.id}`, "file", file.name);
                             setOpenFileDialogOpen(false);
                             setFileSearch("");
                           }}
@@ -765,7 +677,12 @@ export default function WorkspacePage() {
                     disabled={!newFileName}
                     onClick={() => {
                       if (!newFileName) return;
-                      addProjectFile(newFileName, "file", `/${(currentProject ?? "workspace").toLowerCase().replace(/\s+/g, '-')}/${newFileName}`);
+                      addProjectFile({
+                        id: newFileName,
+                        name: newFileName,
+                        type: "file",
+                        path: `/${(currentProject ?? "workspace").toLowerCase().replace(/\s+/g, "-")}/${newFileName}`,
+                      });
                       openWorkbenchTab(`file:${newFileName}`, "file", newFileName);
                       setNewFileName("");
                       setOpenFileDialogOpen(false);
@@ -836,12 +753,13 @@ export default function WorkspacePage() {
                     <button
                       key={proj.name}
                       onClick={() => {
-                        setCurrentProject(proj.name);
+                        setCurrentProject(proj.name, `/${proj.name.toLowerCase().replace(/\s+/g, "-")}`, proj.files.length);
                         // Populate project-specific files dynamically!
-                        const populated = proj.files.map(f => ({
+                        const populated: ProjectFile[] = proj.files.map((f) => ({
+                          id: f,
                           name: f,
                           type: "file" as const,
-                          path: `/${proj.name.toLowerCase().replace(/\s+/g, '-')}/${f}`
+                          path: `/${proj.name.toLowerCase().replace(/\s+/g, "-")}/${f}`,
                         }));
                         setProjectFiles(populated);
                         setOpenFolderDialogOpen(false);
@@ -908,7 +826,12 @@ export default function WorkspacePage() {
                   disabled={!saveAsName}
                   onClick={() => {
                     if (!saveAsName) return;
-                    addProjectFile(saveAsName, "file", `/${(currentProject ?? "workspace").toLowerCase().replace(/\s+/g, '-')}/${saveAsName}`);
+                    addProjectFile({
+                      id: saveAsName,
+                      name: saveAsName,
+                      type: "file",
+                      path: `/${(currentProject ?? "workspace").toLowerCase().replace(/\s+/g, "-")}/${saveAsName}`,
+                    });
                     saveFile(saveAsName); // save changes
                     openWorkbenchTab(`file:${saveAsName}`, "file", saveAsName);
                     setSaveAsDialogOpen(false);
@@ -922,6 +845,133 @@ export default function WorkspacePage() {
           </div>
         </div>
       )}
+
+      {/* ── Hidden native file pickers ── */}
+      {/* Single/multiple file picker — "Open File..." */}
+      <input
+        id="native-file-picker"
+        type="file"
+        multiple
+        accept=".dat,.grd,.csv,.json,.yaml,.yml,.txt,.sgy,.segy,.xyz,.asc,.las"
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          if (!files.length) return;
+
+          const projectName = currentProject ?? files[0].name.replace(/\.[^.]+$/, "");
+          if (!currentProject) setCurrentProject(projectName, `/local/${projectName}`, files.length);
+
+          // ① Register files instantly — zero reading, UI stays responsive
+          files.forEach((file) => {
+            registerFile(file.name, file);
+            addProjectFile({
+              id: file.name,
+              name: file.name,
+              type: "file",
+              path: `/local/${file.name}`,
+            });
+          });
+
+          // ② Auto-ingest files into scientific state (fire-and-forget)
+          files.forEach((file) => {
+            autoIngestFile(file, file.name)
+              .then((dataset) => { if (dataset) ingestDataset(dataset); })
+              .catch(console.warn);
+          });
+
+          // ③ Upload to Supabase in the background (authenticated users only)
+          //    Does NOT block the UI — fire and forget
+          upsertProject(projectName).then((projectId) => {
+            files.forEach((file) => {
+              uploadFile(file, projectId).then((result) => {
+                if (result.storagePath) {
+                  // Update the sidebar path to point at Supabase Storage
+                  addProjectFile({
+                    id: file.name,
+                    name: file.name,
+                    type: "file",
+                    path: result.storagePath,
+                  });
+                }
+              }).catch(console.warn);
+            });
+          });
+
+          e.target.value = "";
+        }}
+      />
+
+      {/* Folder picker — "Open Folder..." (lazy: no bulk FileReader; single state update) */}
+      <input
+        id="native-folder-picker"
+        type="file"
+        // @ts-expect-error – webkitdirectory is not in TS types but works in all modern browsers
+        webkitdirectory=""
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const fileList = e.target.files;
+          if (!fileList?.length) return;
+
+          const ignoredFolders = [
+            "node_modules", ".next", ".git", ".gemini", "dist", "build",
+            "out", ".vscode", "tmp", "temp", "cache",
+          ];
+
+          type DirFile = File & { webkitRelativePath: string };
+          const filtered = Array.from(fileList).filter((file) => {
+            const f = file as DirFile;
+            const parts = f.webkitRelativePath.toLowerCase().split("/");
+            return (
+              !parts.some((part) => ignoredFolders.includes(part)) &&
+              !f.name.startsWith(".")
+            );
+          });
+          if (!filtered.length) {
+            e.target.value = "";
+            return;
+          }
+
+          clearRegistry();
+
+          const entries: ProjectFile[] = filtered.map((file) => {
+            const f = file as DirFile;
+            const id = relativePathInProject(f.webkitRelativePath);
+            registerFile(id, f);
+            return {
+              id,
+              name: f.name,
+              type: "file" as const,
+              path: `/local/${f.webkitRelativePath}`,
+            };
+          });
+
+          // Auto-ingest each file into scientific state (fire-and-forget)
+          filtered.forEach((file) => {
+            const f = file as DirFile;
+            const id = relativePathInProject(f.webkitRelativePath);
+            autoIngestFile(f, id)
+              .then((dataset) => { if (dataset) ingestDataset(dataset); })
+              .catch(console.warn);
+          });
+
+          const folderName = rootFolderName((filtered[0] as DirFile).webkitRelativePath);
+          const folderPath = (filtered[0] as DirFile).webkitRelativePath.split("/")[0] || folderName;
+          setCurrentProject(folderName, folderPath, filtered.length);
+          setProjectFiles(entries);
+          useAppStore.setState({ workbenchTabs: [], fileContents: {} });
+
+          const projectLabel = rootFolderName((filtered[0] as DirFile).webkitRelativePath);
+          upsertProject(projectLabel).then((projectId) => {
+            if (!projectId) return;
+            filtered.forEach((file) => {
+              uploadFile(file, projectId).catch(console.warn);
+            });
+          });
+
+          e.target.value = "";
+        }}
+      />
     </main>
     </ThemeProvider>
   );
