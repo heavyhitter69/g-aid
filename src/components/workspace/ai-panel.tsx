@@ -12,7 +12,7 @@ import {
   MessageSquare, X, Plus, Clock, MoreHorizontal, PanelRight,
   Paperclip, Mic, ChevronDown, AlertCircle, Zap, GitBranch,
   TrendingUp, AlertTriangle, Info, CheckCircle2, Network,
-  BarChart3, Lightbulb, SendHorizontal
+  BarChart3, Lightbulb, SendHorizontal, Search, Trash2
 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useScientificState } from "@/store/scientific-state";
@@ -173,20 +173,38 @@ function StreamingMessage({ content, preamble, isStreaming }: {
     const lines = text.split("\n");
     return lines.map((line, i) => {
       if (line.startsWith("## ")) {
-        return <div key={i} className="font-bold text-[12px] text-white mt-2 mb-1">{line.slice(3)}</div>;
+        return <div key={i} className="font-bold text-[12px] text-[var(--ws-text-bright)] mt-2 mb-1">{line.slice(3)}</div>;
       }
       if (line.startsWith("### ")) {
-        return <div key={i} className="font-semibold text-[11px] text-[#cccccc] mt-1.5 mb-0.5">{line.slice(4)}</div>;
+        return <div key={i} className="font-semibold text-[11px] text-[var(--ws-text-bright)] mt-1.5 mb-0.5">{line.slice(4)}</div>;
       }
       if (line.startsWith("**") && line.endsWith("**")) {
-        return <div key={i} className="font-semibold text-[#cccccc] mt-1">{line.slice(2, -2)}</div>;
+        return <div key={i} className="font-semibold text-[var(--ws-text-bright)] mt-1">{line.slice(2, -2)}</div>;
       }
       if (line.startsWith("- ")) {
-        const text = line.slice(2).replace(/\*\*(.*?)\*\*/g, "$1");
-        return <div key={i} className="flex gap-1.5 text-[#aaaaaa]"><span className="text-[#555] shrink-0">•</span><span>{text}</span></div>;
+        const textStr = line.slice(2).replace(/\*\*(.*?)\*\*/g, "$1");
+        
+        // Handle links in bullet points
+        const linkMatch = textStr.match(/\[(.*?)\]\((.*?)\)/);
+        if (linkMatch) {
+          const preLink = textStr.substring(0, linkMatch.index);
+          const postLink = textStr.substring((linkMatch.index || 0) + linkMatch[0].length);
+          return (
+            <div key={i} className="flex gap-1.5 text-[var(--ws-text)]">
+              <span className="text-[var(--ws-text-muted)] shrink-0">•</span>
+              <span>
+                {preLink}
+                <a href={linkMatch[2]} target="_blank" rel="noreferrer" className="text-[#007acc] hover:underline cursor-pointer">{linkMatch[1]}</a>
+                {postLink}
+              </span>
+            </div>
+          );
+        }
+
+        return <div key={i} className="flex gap-1.5 text-[var(--ws-text)]"><span className="text-[var(--ws-text-muted)] shrink-0">•</span><span>{textStr}</span></div>;
       }
       if (line.startsWith("*") && line.endsWith("*") && !line.startsWith("**")) {
-        return <div key={i} className="text-[#666] italic">{line.slice(1, -1)}</div>;
+        return <div key={i} className="text-[var(--ws-text-muted)] italic">{line.slice(1, -1)}</div>;
       }
       if (line.startsWith("---")) {
         return <div key={i} className="border-t border-[#2b2b2b] my-2" />;
@@ -194,11 +212,30 @@ function StreamingMessage({ content, preamble, isStreaming }: {
       if (line.trim() === "") {
         return <div key={i} className="h-1" />;
       }
+      
+      // Handle inline links outside of bullet points
+      const hasLink = line.match(/\[(.*?)\]\((.*?)\)/);
+      if (hasLink) {
+        const parts = line.split(/(\[.*?\]\(.*?\))/g);
+        return (
+          <div key={i} className="text-[var(--ws-text)] leading-relaxed">
+            {parts.map((part, j) => {
+              const m = part.match(/\[(.*?)\]\((.*?)\)/);
+              if (m) {
+                return <a key={j} href={m[2]} target="_blank" rel="noreferrer" className="text-[#007acc] hover:underline cursor-pointer">{m[1]}</a>;
+              }
+              const subParts = part.split(/\*\*(.*?)\*\*/g);
+              return <span key={j}>{subParts.map((sp, k) => k % 2 === 1 ? <strong key={k} className="text-[var(--ws-text-bright)]">{sp}</strong> : sp)}</span>;
+            })}
+          </div>
+        );
+      }
+
       // Inline bold
       const parts = line.split(/\*\*(.*?)\*\*/g);
       return (
-        <div key={i} className="text-[#aaaaaa] leading-relaxed">
-          {parts.map((part, j) => j % 2 === 1 ? <strong key={j} className="text-[#cccccc]">{part}</strong> : part)}
+        <div key={i} className="text-[var(--ws-text)] leading-relaxed">
+          {parts.map((part, j) => j % 2 === 1 ? <strong key={j} className="text-[var(--ws-text-bright)]">{part}</strong> : part)}
         </div>
       );
     });
@@ -315,7 +352,10 @@ function ThoughtDisclosure({ duration, thought }: { duration: number; thought?: 
         <span>Thought for {duration}s</span>
       </button>
       {open && thought && (
-        <div className="mt-1.5 ml-3 pl-2 border-l border-[#2b2b2b] text-[10px] text-[#555] leading-relaxed italic animate-in fade-in slide-in-from-top-1 duration-200">
+        <div 
+          className="mt-1.5 ml-3 pl-2 border-l border-[#2b2b2b] text-[10px] text-[#555] leading-relaxed italic animate-in fade-in slide-in-from-top-1 duration-200"
+          style={{ whiteSpace: "pre-wrap" }}
+        >
           {thought}
         </div>
       )}
@@ -458,7 +498,10 @@ export function AIPanel() {
     toggleChatPanel,
     agentSettings,
     fileContents,
-    projectFiles
+    projectFiles,
+    isHistoryModalOpen,
+    setHistoryModalOpen,
+    currentProject
   } = useAppStore();
 
   const scientificState = useScientificState();
@@ -486,6 +529,25 @@ export function AIPanel() {
   const [currentStreamId, setCurrentStreamId] = useState<string | null>(null);
   const [hasSentMessage, setHasSentMessage] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+
+
+  // Load conversation messages when switching tabs/conversations
+  useEffect(() => {
+    if (activeConversation) {
+      const loaded = activeConversation.messages.map((m, idx) => ({
+        id: `msg_${activeConversation.id}_${idx}`,
+        sender: m.sender,
+        text: m.text,
+        timestamp: new Date().toISOString(),
+      }));
+      setEnhancedMessages(loaded);
+      setHasSentMessage(loaded.length > 0);
+    } else {
+      setEnhancedMessages([]);
+      setHasSentMessage(false);
+    }
+  }, [activeConversationId]);
 
   const opportunities = scientificState.getOpportunityChipsViewModel();
 
@@ -540,7 +602,6 @@ export function AIPanel() {
     setIsGenerating(true);
     agentStore.setOrchestratorThinking(true);
     agentStore.clearStream();
-    agentStore.clearActivity(); // reset per-response activity log
 
     const agentMsgId = `msg_${Date.now()}_agent`;
     setCurrentStreamId(agentMsgId);
@@ -564,7 +625,11 @@ export function AIPanel() {
         .map((f) => summariseFileForAgent(f.id, fileContents[f.id]))
         .join("\n\n");
 
-      const enrichedMessage = fileSummaries
+      const lowerMsg = userMsg.toLowerCase().trim();
+      const isGreeting = /^(hi|hello|hey|howdy|greetings|good\s(morning|afternoon|evening)|what's up|sup|yo)\b/.test(lowerMsg);
+      const isConversational = isGreeting || lowerMsg === "help" || lowerMsg === "who are you";
+
+      const enrichedMessage = (fileSummaries && !isConversational)
         ? `${userMsg}\n\n--- File Context ---\n${fileSummaries}`
         : userMsg;
 
@@ -576,6 +641,8 @@ export function AIPanel() {
           sessionId: activeConversation.id,
           mode: selectedMode === "Plan" ? "plan" : "interpret",
           snapshotData: scientificState.snapshot,
+          projectName: currentProject || "",
+          guestId: localStorage.getItem("gaid_guest_id") || undefined,
         }),
       });
 
@@ -596,7 +663,7 @@ export function AIPanel() {
       //         "epilogue" → inside \x02...\n JSON block
       type ParseState = "scan" | "preamble" | "text" | "epilogue";
       let state: ParseState = "scan";
-      let jsonBuf = "";
+      let jsonBytes: number[] = [];
       let rawBuf = new Uint8Array(0);
       const dec = new TextDecoder();
 
@@ -609,14 +676,15 @@ export function AIPanel() {
           const byte = rawBuf[i];
 
           if (state === "scan") {
-            if (byte === 0x00) { state = "preamble"; jsonBuf = ""; i++; }
-            else if (byte === 0x02) { state = "epilogue"; jsonBuf = ""; i++; }
+            if (byte === 0x00) { state = "preamble"; jsonBytes = []; i++; }
+            else if (byte === 0x02) { state = "epilogue"; jsonBytes = []; i++; }
             else { i++; } // skip stray bytes in scan mode
 
           } else if (state === "preamble") {
             if (byte === 0x0a) { // \n ends preamble JSON
               try {
-                preamble = JSON.parse(jsonBuf) as StreamPreamble;
+                const jsonStr = dec.decode(new Uint8Array(jsonBytes));
+                preamble = JSON.parse(jsonStr) as StreamPreamble;
                 agentStore.setPreamble(preamble);
                 agentStore.setActiveAgent(preamble.agentId as AgentId);
                 // Only append one activity entry per response
@@ -628,12 +696,13 @@ export function AIPanel() {
                       : "Processing query…",
                     status: "running",
                     relatedToolId: null,
+                    conversationId: activeConversation.id,
                   });
                 }
               } catch { /* malformed preamble — ignore */ }
-              state = "text"; jsonBuf = ""; i++;
+              state = "text"; jsonBytes = []; i++;
             } else {
-              jsonBuf += String.fromCharCode(byte); i++;
+              jsonBytes.push(byte); i++;
             }
 
           } else if (state === "text") {
@@ -663,7 +732,7 @@ export function AIPanel() {
             }
 
             if (end < rawBuf.length && rawBuf[end] === 0x02) {
-              state = "epilogue"; jsonBuf = ""; i = end + 1;
+              state = "epilogue"; jsonBytes = []; i = end + 1;
             } else {
               i = end; // consumed all up to end
               break;   // need more data
@@ -671,9 +740,10 @@ export function AIPanel() {
 
           } else if (state === "epilogue") {
             if (byte === 0x0a) { // \n ends epilogue JSON
-              // Strip leading \n if present
-              const clean = jsonBuf.replace(/^\n/, "");
               try {
+                const jsonStr = dec.decode(new Uint8Array(jsonBytes));
+                // Strip leading \n if present
+                const clean = jsonStr.replace(/^\n/, "");
                 const epilogue = JSON.parse(clean);
                 if (epilogue.hypothesisEvents?.length) {
                   for (const evt of epilogue.hypothesisEvents) {
@@ -686,11 +756,19 @@ export function AIPanel() {
                 if (epilogue.thought) {
                   thought = epilogue.thought;
                 }
+                if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
+                  const state = useAppStore.getState();
+                  const currentFiles = state.projectFiles;
+                  const newFiles = epilogue.projectFilesUpdates.filter((f: any) => !currentFiles.some(existing => existing.id === f.id));
+                  if (newFiles.length > 0) {
+                     state.setProjectFiles([...currentFiles, ...newFiles]);
+                  }
+                }
                 if (activityId) agentStore.completeActivity(activityId);
               } catch { /* malformed epilogue — ignore */ }
-              state = "scan"; jsonBuf = ""; i++;
+              state = "scan"; jsonBytes = []; i++;
             } else {
-              jsonBuf += String.fromCharCode(byte); i++;
+              jsonBytes.push(byte); i++;
             }
           }
         }
@@ -777,7 +855,7 @@ export function AIPanel() {
   const currentModeObj = modes.find(m => m.id === selectedMode) || modes[0];
 
   return (
-    <aside className="w-full flex flex-col bg-[#1e1e1e] text-[#cccccc] font-sans h-full select-none">
+    <aside className="w-full flex flex-col bg-[#1e1e1e] text-[#cccccc] font-sans h-full select-none relative">
       {/* Tabs Header */}
       <div className="h-[35px] flex items-center bg-[#181818] shrink-0 relative z-20 select-none">
         <div className="flex-1 flex items-center h-full overflow-x-auto scrollbar-none">
@@ -822,8 +900,18 @@ export function AIPanel() {
             )}
           </div>
           <div className="relative group flex items-center h-full">
-            <button className="p-1 rounded hover:bg-white/10 hover:text-[#cccccc] transition-colors"><Clock className="h-3.5 w-3.5" /></button>
-            <div className="absolute top-[110%] right-0 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap">conversation history</div>
+            <button 
+              onClick={() => setHistoryModalOpen(!isHistoryModalOpen)} 
+              className={cn(
+                "p-1 rounded transition-colors",
+                isHistoryModalOpen ? "bg-white/10 text-white" : "text-[#858585] hover:bg-white/10 hover:text-[#cccccc]"
+              )}
+            >
+              <Clock className="h-3.5 w-3.5" />
+            </button>
+            {!isHistoryModalOpen && (
+              <div className="absolute top-[110%] right-0 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap">conversation history</div>
+            )}
           </div>
           <div className="relative group flex items-center h-full">
             <button className="p-1 rounded hover:bg-white/10 hover:text-[#cccccc] transition-colors"><MoreHorizontal className="h-3.5 w-3.5" /></button>
@@ -881,36 +969,6 @@ export function AIPanel() {
             </div>
           )}
 
-          {/* Empty state */}
-          {enhancedMessages.length === 0 && opportunities.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center text-[#858585] p-6 space-y-2">
-              <div className="h-10 w-10 rounded-full bg-[#252526] border border-[#3c3c3c] flex items-center justify-center mb-2">
-                <Zap className="h-5 w-5 text-[#007acc]" />
-              </div>
-              <p className="text-[11px] font-medium text-[#cccccc]">G-AID Scientific Engine</p>
-              {scientificState.snapshot.datasets.length > 0 ? (
-                <p className="text-[10px] max-w-[220px] leading-relaxed">
-                  <span className="text-[#4ec9a0] font-semibold">{scientificState.snapshot.datasets.length} dataset{scientificState.snapshot.datasets.length > 1 ? "s" : ""} loaded.</span>{" "}
-                  Describe your anomaly or type a query to begin AI-powered analysis.
-                </p>
-              ) : (
-                <p className="text-[10px] max-w-[220px] leading-relaxed">
-                  Upload datasets to activate proactive opportunities, or describe your geophysical anomaly to begin analysis.
-                </p>
-              )}
-              <div className="flex gap-2 mt-2 flex-wrap justify-center">
-                {["Magnetic anomaly analysis", "ERT aquifer target", "Multi-method integration"].map((hint) => (
-                  <button
-                    key={hint}
-                    onClick={() => setInputVal(hint)}
-                    className="text-[9px] px-2 py-1 rounded border border-[#3c3c3c] text-[#555] hover:text-[#cccccc] hover:border-[#555] transition-colors"
-                  >
-                    {hint}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Messages */}
           {enhancedMessages.map((msg) => (
@@ -921,7 +979,7 @@ export function AIPanel() {
                 textSizeClass,
                 msg.sender === "user"
                   ? "bg-[#007acc] text-white ml-auto max-w-[85%] rounded-lg p-2.5 shadow-sm"
-                  : "text-[#cccccc] mr-auto max-w-full py-1"
+                  : "text-[var(--ws-text)] mr-auto max-w-full py-1"
               )}
             >
               {msg.sender === "user" ? (

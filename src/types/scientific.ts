@@ -543,6 +543,7 @@ export interface ActivityEntry {
   startedAt: string;
   completedAt?: string | null;
   relatedToolId: string | null;
+  conversationId: string;
 }
 
 // ─── View Models (UI-facing, flat shapes) ────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Plus, PanelBottom, MessageSquare, Settings, ChevronRight, Check, Zap } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,8 @@ export function Topbar() {
     toggleAgentSidebar, 
     toggleTerminal, 
     toggleChatPanel, 
+    isChatPanelOpen,
+    setChatPanelOpen,
     setWorkspaceView,
     setActiveLeftSidebarTab,
     setLeftSidebarOpen,
@@ -87,7 +90,9 @@ export function Topbar() {
     <header className="h-[35px] bg-[#181818] border-b border-[#2b2b2b] flex items-center justify-between shrink-0 select-none z-50 relative">
       <div className="flex items-center h-full">
         <div className="px-3 flex items-center select-none">
-          <Image src="/g-aid logo.png" alt="G-AID" width={64} height={22} className="object-contain" priority />
+          <Link href="/">
+            <Image src="/g-aid logo.png" alt="G-AID" width={64} height={22} className="object-contain cursor-pointer" priority />
+          </Link>
         </div>
         <menu className="flex items-center h-full text-[13px] text-[#cccccc] space-x-1 list-none p-0 m-0">
           
@@ -240,18 +245,19 @@ export function Topbar() {
         </button>
 
         {/* New Agent Button */}
-
-        <div className="relative group flex items-center h-full">
-          <button 
-            onClick={toggleAgentSidebar} 
-            className="h-full px-2 hover:bg-white/10 flex items-center justify-center rounded transition-colors"
-          >
-            <Plus className="h-[18px] w-[18px] stroke-[1.5]" />
-          </button>
-          <div className="absolute top-[105%] left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
-            new agent
+        {!isChatPanelOpen && (
+          <div className="relative group flex items-center h-full">
+            <button 
+              onClick={() => setChatPanelOpen(true)} 
+              className="h-full px-2 hover:bg-white/10 flex items-center justify-center rounded transition-colors"
+            >
+              <Plus className="h-[18px] w-[18px] stroke-[1.5]" />
+            </button>
+            <div className="absolute top-[105%] left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
+              new agent
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Toggle Agents Button */}
         <div className="relative group flex items-center h-full">

@@ -54,14 +54,24 @@ export function FileEditorView() {
         }
       }
 
-      // 2. Try Supabase Storage (for files uploaded by authenticated users)
+      // 2. Try Supabase Storage (for files uploaded by authenticated users) or local server
       const fileEntry = useAppStore.getState().projectFiles.find(
-        (f) => f.id === activeFile && f.path && !f.path.startsWith("/local/")
+        (f) => f.id === activeFile
       );
-      if (fileEntry) {
-        const text = await fetchFileText(fileEntry.path).catch(() => null);
-        if (text !== null) {
-          setFileContent(activeFile, text);
+      if (fileEntry && fileEntry.path) {
+        if (!fileEntry.path.startsWith("/local/")) {
+           try {
+             const res = await fetch(fileEntry.path);
+             if (res.ok) {
+               // don't fetch text for images or binary excel
+               if (!activeFile.endsWith(".png") && !activeFile.endsWith(".xlsx")) {
+                 const text = await res.text();
+                 setFileContent(activeFile, text);
+               } else {
+                 setFileContent(activeFile, "[BINARY DATA] Please view this file type externally or use the specialized viewer.");
+               }
+             }
+           } catch (e) {}
         }
       }
 
@@ -118,13 +128,48 @@ export function FileEditorView() {
   const isDemoMock =
     DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined;
   const isWordDoc = ["doc", "docx", "odt", "rtf"].includes(ext);
-  const isSpreadsheet = ["csv", "tsv", "xls", "xlsx"].includes(ext);
+  const isSpreadsheet = ["csv", "tsv", "xls"].includes(ext);
+  const isExcel = ["xlsx"].includes(ext);
   const isPdf = ext === "pdf";
+  const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
   const useSpreadsheet =
     isSpreadsheet &&
     !(DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined);
   const useTextEditor =
-    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf;
+    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf && !isExcel && !isImage;
+
+  if (isImage) {
+    const fileEntry = useAppStore.getState().projectFiles.find(f => f.id === activeFile);
+    const src = fileEntry?.path || "";
+    return (
+      <div className="flex-1 bg-[#1e1e1e] flex items-center justify-center h-full w-full p-8 overflow-auto">
+         {src ? (
+            <img src={src} alt={activeFile} className="max-w-full max-h-full object-contain drop-shadow-2xl border border-[#2b2b2b] rounded-md bg-[#252526] p-2" />
+         ) : (
+            <div className="text-[#858585]">Could not resolve image path.</div>
+         )}
+      </div>
+    );
+  }
+
+  if (isExcel) {
+    const fileEntry = useAppStore.getState().projectFiles.find(f => f.id === activeFile);
+    const src = fileEntry?.path || "";
+    return (
+      <div className="flex-1 bg-[#1e1e1e] flex flex-col items-center justify-center gap-6 h-full p-8 text-[#cccccc] font-sans">
+         <div className="bg-[#217346] w-20 h-20 rounded shadow-xl flex items-center justify-center text-white font-bold text-3xl">X</div>
+         <div className="text-center space-y-2">
+           <h2 className="text-lg text-white font-medium">{activeFile}</h2>
+           <p className="text-sm text-[#858585] max-w-sm mx-auto">This binary Excel workbook cannot be previewed natively in the mock workspace editor.</p>
+         </div>
+         {src && (
+           <a href={src} download target="_blank" rel="noreferrer" className="bg-[#007acc] hover:bg-[#0062a3] px-6 py-2 rounded text-white font-medium transition-colors no-underline">
+             Download File
+           </a>
+         )}
+      </div>
+    );
+  }
 
   if (useSpreadsheet) {
     return (

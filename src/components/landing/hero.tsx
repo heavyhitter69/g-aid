@@ -58,7 +58,7 @@ function GlobeViz() {
 }
 
 export function Hero() {
-  const { setCurrentProject, setProjectFiles } = useAppStore();
+  const { setCurrentProject, setProjectFiles, setAuthenticated, setUser } = useAppStore();
   const router = useRouter();
   const [os, setOs] = useState("Windows");
 
@@ -73,6 +73,8 @@ export function Hero() {
 
   const handleEnterDemo = (e: React.MouseEvent) => {
     e.preventDefault();
+    setAuthenticated(false);
+    setUser(null);
     setCurrentProject(null);
     setProjectFiles([]);
     router.push("/workspace");
@@ -120,7 +122,7 @@ export function Hero() {
             transition={{ delay: 0.75 }}
             className="flex flex-wrap gap-4"
           >
-            <LinkButton href="/download" size="lg" variant="default" className="gap-2">
+            <LinkButton href="/G-AID Setup 0.1.0.exe" size="lg" variant="default" className="gap-2">
               Download for {os} <Download className="h-4 w-4" />
             </LinkButton>
             <Button onClick={handleEnterDemo} size="lg" variant="outline">

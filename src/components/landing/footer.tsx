@@ -82,6 +82,10 @@ export function Footer() {
   const { 
     theme, 
     setTheme,
+    setAuthenticated,
+    setUser,
+    setCurrentProject,
+    setProjectFiles
   } = useAppStore();
   
   const router = useRouter();
@@ -95,6 +99,10 @@ export function Footer() {
   const handleEnterDemo = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!mounted) return;
+    setAuthenticated(false);
+    setUser(null);
+    setCurrentProject(null);
+    setProjectFiles([]);
     router.push("/workspace");
   };
 

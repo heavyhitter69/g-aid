@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useAppStore } from "@/store/app-store";
 
 interface Particle {
   x: number;
@@ -22,6 +23,13 @@ const DAMPING = 0.82;
 const MAX_DISPLACEMENT = 60;
 
 export function ParticleField() {
+  const theme = useAppStore((state) => state.theme);
+  const themeRef = useRef(theme);
+
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouse = useRef({ x: -9999, y: -9999 });
   const particles = useRef<Particle[]>([]);
@@ -32,6 +40,9 @@ export function ParticleField() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    let lastMoveTime = Date.now();
+    let currentStrength = 0;
 
     // Build the particle grid
     function buildGrid() {
@@ -71,6 +82,7 @@ export function ParticleField() {
 
     function onMouseMove(e: MouseEvent) {
       mouse.current = { x: e.clientX, y: e.clientY };
+      lastMoveTime = Date.now();
     }
 
     function onMouseLeave() {
@@ -84,18 +96,32 @@ export function ParticleField() {
       const mx = mouse.current.x;
       const my = mouse.current.y;
 
+      const now = Date.now();
+      const timeSinceLastMove = now - lastMoveTime;
+
+      // targetStrength is 1 if mouse is active (moved in last 150ms), 0 otherwise
+      const targetStrength = timeSinceLastMove < 150 ? 1 : 0;
+
+      // Smoothly interpolate currentStrength toward targetStrength
+      if (targetStrength === 1) {
+        currentStrength += (1 - currentStrength) * 0.15; // fast response to motion
+      } else {
+        currentStrength += (0 - currentStrength) * 0.05; // smooth return to base state when stopped
+      }
+
       for (const p of particles.current) {
         const dx = mx - p.x;
         const dy = my - p.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < MOUSE_RADIUS && dist > 0) {
-          // Attract toward mouse
-          const force = (MOUSE_RADIUS - dist) / MOUSE_RADIUS;
+        if (dist < MOUSE_RADIUS && dist > 0 && currentStrength > 0.01) {
+          // Attract toward mouse, scaled by currentStrength
+          const baseForce = (MOUSE_RADIUS - dist) / MOUSE_RADIUS;
+          const force = baseForce * currentStrength;
           p.vx += (dx / dist) * force * ATTRACTION_STRENGTH * MAX_DISPLACEMENT;
           p.vy += (dy / dist) * force * ATTRACTION_STRENGTH * MAX_DISPLACEMENT;
 
-          // Brighten particles close to mouse
+          // Brighten particles close to mouse, scaled by currentStrength
           p.alpha = Math.min(0.85, p.baseAlpha + force * 0.7);
         } else {
           // Dim back to base
@@ -117,7 +143,11 @@ export function ParticleField() {
         // Draw the dot
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(134, 239, 172, ${p.alpha})`; // green-300 tint
+        if (themeRef.current === "light") {
+          ctx.fillStyle = `rgba(29, 78, 216, ${p.alpha * 1.8})`; // royal blue with higher opacity for light theme visibility
+        } else {
+          ctx.fillStyle = `rgba(147, 197, 253, ${p.alpha})`; // blue-300 tint for dark theme
+        }
         ctx.fill();
       }
 

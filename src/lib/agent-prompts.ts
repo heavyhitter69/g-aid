@@ -213,7 +213,8 @@ function formatOrchestratorResponse(
 
   // Detect conversational / non-geophysical input
   const isGreeting = /^(hi|hello|hey|howdy|greetings|good\s(morning|afternoon|evening)|what's up|sup|yo)\b/.test(lowerQuery);
-  const isHelp = /\b(help|what can you do|what do you do|how does this work|capabilities|features)\b/.test(lowerQuery);
+  const isHelp = /\b(help|what can you do|what do you do|how does this work|capabilities|features|how\s+to\s+upload|how\s+do\s+i\s+upload|how\s+to\s+open|how\s+do\s+i\s+open|how\s+to\s+load|how\s+do\s+i\s+load|how\s+to\s+add|how\s+do\s+i\s+add|how\s+to\s+use|how\s+do\s+i\s+use|how\s+to\s+import|how\s+do\s+i\s+import|how\s+to\s+switch|how\s+do\s+i\s+switch)\b/.test(lowerQuery);
+  const isConversational = /^(how\s+are\s+you|how's\s+it\s+going|how\s+is\s+it\s+going|who\s+are\s+you|what\s+are\s+you|who\s+is\s+this|are\s+you\s+(there|alive|real|human|bot|ai)|thanks|thank\s+you|cool|awesome|great|ok|okay|yes|no|test|hello\s+there)\b/.test(lowerQuery);
   const isAnalyzeAll = /\b(analy[sz]e\s+(all|every|the|these|my|loaded)|process\s+(all|every|the)|scan\s+(all|every|the)|review\s+(all|every|the)|examine\s+(all|every|the))\b/.test(lowerQuery);
 
   if (isGreeting) {
@@ -233,7 +234,78 @@ function formatOrchestratorResponse(
     ].join("\n");
   }
 
+  if (isConversational) {
+    if (lowerQuery.includes("how are you") || lowerQuery.includes("how's it going") || lowerQuery.includes("how is it going")) {
+      return [
+        `I'm doing great, thank you for asking! I am fully calibrated and ready to assist you.`,
+        ``,
+        datasets.length > 0
+          ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded in this workspace. Describe what you'd like to analyze or type \`/plan\` to build a processing pipeline.`
+          : `No geophysical datasets are loaded yet. You can upload datasets using the **Datasets** panel or choose a folder, and I will begin interpreting them.`,
+      ].join("\n");
+    }
+    
+    if (lowerQuery.includes("who are you") || lowerQuery.includes("what are you") || lowerQuery.includes("who is this")) {
+      return [
+        `I am **G-AID**, your AI-native geoscientific operating system.`,
+        ``,
+        `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, seismic) and auto-generating structured workflows. Let me know what data we're looking at, and I can start analyzing!`,
+      ].join("\n");
+    }
+
+    if (lowerQuery.includes("thanks") || lowerQuery.includes("thank you")) {
+      return [
+        `You're very welcome! I'm here to help. Let me know if you want to analyze some geophysical anomalies, plan a processing DAG, or inspect loaded data.`,
+      ].join("\n");
+    }
+
+    if (lowerQuery.includes("ok") || lowerQuery.includes("okay") || lowerQuery.includes("cool") || lowerQuery.includes("awesome") || lowerQuery.includes("great") || lowerQuery.includes("yes") || lowerQuery.includes("no")) {
+      return [
+        `Sounds good! Let me know when you're ready to analyze some data or build a workflow.`,
+      ].join("\n");
+    }
+
+    // Default conversational response fallback
+    return [
+      `I'm here and ready to help! I am your AI-native geoscientific assistant.`,
+      ``,
+      datasets.length > 0
+        ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded. Tell me what geophysical anomalies or inversion tasks you'd like to tackle next.`
+        : `No datasets are loaded yet. Upload your gravity, magnetic, ERT, or seismic data files, and let's get started!`,
+    ].join("\n");
+  }
+
   if (isHelp) {
+    if (/\b(upload|load|import|add)\b/.test(lowerQuery)) {
+      return [
+        `## How to Upload & Load Geophysical Data`,
+        ``,
+        `You can ingest survey files and datasets into G-AID in several quick ways:`,
+        ``,
+        `1. **Open a Local Folder (Recommended)**`,
+        `   * Click **File > Open Folder...** (or press \`Ctrl+M Ctrl+O\`).`,
+        `   * This imports all files inside the folder, maps them in the Explorer tree, and automatically ingests valid geophysical data in the background.`,
+        ``,
+        `2. **Open Individual Files**`,
+        `   * Click **File > Open File...** (or press \`Ctrl+O\`) to pick files from your local drive.`,
+        `   * Supported extensions include \`.dat\`, \`.grd\`, \`.csv\`, \`.json\`, \`.segy\`, \`.las\`, etc.`,
+        ``,
+        `3. **Switch Between Demo Projects**`,
+        `   * Click **File > Open Folder...** and choose one of the built-in geological models (e.g., *Nevada Basin Survey*, *Death Valley*, or *Colorado Aquifer*).`,
+      ].join("\n");
+    }
+
+    if (/\b(open|switch|project|folder)\b/.test(lowerQuery)) {
+      return [
+        `## How to Open Folders & Switch Projects`,
+        ``,
+        `To switch projects or open local workspaces:`,
+        `1. Go to the top menu and select **File > Open Folder...** (\`Ctrl+M Ctrl+O\`).`,
+        `2. You can select a local folder from your computer or switch to one of G-AID's built-in demo datasets listed in the popup modal.`,
+        `3. Once loaded, G-AID's workspace will calibrate its active files, sidebar views, and scientific agents accordingly.`,
+      ].join("\n");
+    }
+
     return [
       `## What G-AID Can Do`,
       ``,
@@ -246,6 +318,63 @@ function formatOrchestratorResponse(
       `**Proactive analysis** — I monitor your scientific state and surface insights automatically when you load datasets.`,
       ``,
       `**Epistemic tracking** — Every hypothesis I generate has full confidence provenance: data quality, cross-method agreement, and spatial coverage scores.`,
+    ].join("\n");
+  }
+
+  // Define geophysical domain keywords to route general queries away from scientific templates
+  const GEOPHYSICAL_KEYWORDS = [
+    "magnetic", "resistivity", "gravity", "seismic", "anomaly", "anomalies", 
+    "fault", "stratigraphy", "basin", "dataset", "datasets", "log", "logs", 
+    "well", "invert", "inversion", "survey", "rock", "geology", "geological", 
+    "geophysical", "earth", "aquifer", "crust", "fault", "mineral", "lineament", 
+    "profile", "depth", "velocity", "field", "workflow", "/plan", "ert", 
+    "segy", "sgy", "grd", "csv", "dat", "borehole", "dike", "intrusion", "basement",
+    "sediment", "conductive", "resistive", "density", "susceptibility", "amplitude"
+  ];
+
+  const isGeophysical = GEOPHYSICAL_KEYWORDS.some(kw => lowerQuery.includes(kw));
+
+  if (!isGeophysical) {
+    if (/\bholiday\b/.test(lowerQuery)) {
+      return [
+        `Today is not a standard national holiday. It is a regular business day, perfect for analyzing geophysical anomalies!`,
+        ``,
+        `Let me know when you'd like to load datasets or start planning a workflow.`,
+      ].join("\n");
+    }
+
+    if (/\b(day|date|today|time|year|month)\b/.test(lowerQuery)) {
+      const today = new Date();
+      const dateString = today.toLocaleDateString("en-US", { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      return [
+        `Today is **${dateString}**.`,
+        ``,
+        `I am G-AID, your AI-native geoscientific assistant. Let me know when you'd like to analyze some geophysical data or plan a processing workflow!`,
+      ].join("\n");
+    }
+
+    if (/\b(calculate|math|plus|minus|\+|\-|\*|\/|\=)\b/.test(lowerQuery) && /\b\d+\b/.test(lowerQuery)) {
+      return [
+        `I'm focused on geoscientific and geophysical analysis rather than general arithmetic, but I can compile highly optimized processing DAGs for you!`,
+        ``,
+        `If you have datasets loaded, describe the anomalies or type \`/plan\` to start.`,
+      ].join("\n");
+    }
+
+    // Default general response fallback for non-geophysical queries
+    return [
+      `I'm here and ready to help! I am G-AID, your AI-native geoscientific assistant.`,
+      ``,
+      `I specialize in magnetic, resistivity, gravity, and seismic data processing, and tracking scientific hypotheses with full epistemic provenance.`,
+      ``,
+      datasets.length > 0
+        ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded. Tell me what geophysical targets you'd like to interpret!`
+        : `No datasets are loaded yet. Upload your survey data using the **Datasets** panel, and I'll begin interpreting them!`,
     ].join("\n");
   }
 

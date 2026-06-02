@@ -7,6 +7,7 @@ import { Topbar } from "@/components/workspace/topbar";
 import { StatusBar } from "@/components/workspace/status-bar";
 import { AIPanel } from "@/components/workspace/ai-panel";
 import { UploadModal } from "@/components/workspace/upload-modal";
+import { ConversationHistoryModal } from "@/components/workspace/conversation-history-modal";
 import { DashboardView } from "@/components/workspace/dashboard-view";
 import { WorkflowBuilder } from "@/components/workflows/workflow-builder";
 import { VisualizationStudio } from "@/components/workspace/visualization-studio";
@@ -44,9 +45,11 @@ export default function WorkspacePage() {
     isOpenFileDialogOpen,
     isOpenFolderDialogOpen,
     isSaveAsDialogOpen,
+    isHistoryModalOpen,
     setOpenFileDialogOpen,
     setOpenFolderDialogOpen,
     setSaveAsDialogOpen,
+    setHistoryModalOpen,
     projectFiles,
     addProjectFile,
     openWorkbenchTab,
@@ -66,13 +69,27 @@ export default function WorkspacePage() {
     aiPanelWidth,
     setAIPanelWidth,
     agentSidebarWidth,
-    setAgentSidebarWidth
+    setAgentSidebarWidth,
+    recentProjects
   } = useAppStore();
   const ingestDataset = useScientificState((s) => s.ingestDataset);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [saveAsName, setSaveAsName] = useState("");
   const [fileSearch, setFileSearch] = useState("");
+
+  // Guest Workspace Guard: prevents authenticated data from bleeding into guest mode
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (recentProjects && recentProjects.length > 0) {
+        useAppStore.setState({ recentProjects: [] });
+      }
+      const sciState = useScientificState.getState();
+      if (sciState.snapshot && sciState.snapshot.datasets.length > 0) {
+        sciState.resetProject();
+      }
+    }
+  }, [isAuthenticated, recentProjects]);
 
   const handleAIPanelResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -883,11 +900,12 @@ export default function WorkspacePage() {
           //    Does NOT block the UI — fire and forget
           upsertProject(projectName).then((projectId) => {
             files.forEach((file) => {
-              uploadFile(file, projectId).then((result) => {
+              const relativePath = relativePathInProject((file as any).webkitRelativePath) || file.name;
+              uploadFile(file, projectId || projectName, relativePath).then((result) => {
                 if (result.storagePath) {
                   // Update the sidebar path to point at Supabase Storage
                   addProjectFile({
-                    id: file.name,
+                    id: relativePath,
                     name: file.name,
                     type: "file",
                     path: result.storagePath,
@@ -972,6 +990,9 @@ export default function WorkspacePage() {
           e.target.value = "";
         }}
       />
+      {isHistoryModalOpen && (
+        <ConversationHistoryModal onClose={() => setHistoryModalOpen(false)} />
+      )}
     </main>
     </ThemeProvider>
   );

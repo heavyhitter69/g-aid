@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/store/app-store";
+import { useScientificState } from "@/store/scientific-state";
 import { X, Search, Settings as SettingsIcon, LogOut, User, Building, Compass, Check, AlertCircle, ChevronDown, ChevronUp, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -57,7 +58,9 @@ export function SettingsView() {
       activeConversationId: "default",
       currentProject: null,
       projectFiles: [],
+      recentProjects: [],
     });
+    useScientificState.getState().resetProject();
     router.push("/signin");
   };
 

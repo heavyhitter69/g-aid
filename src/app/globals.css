@@ -128,10 +128,10 @@ html.light {
   --ws-border-active: #007acc;
 
   /* Text */
-  --ws-text: #374151;
-  --ws-text-bright: #111827;
-  --ws-text-muted: #6b7280;
-  --ws-text-dim: #9ca3af;
+  --ws-text: #111827;
+  --ws-text-bright: #000000;
+  --ws-text-muted: #4b5563;
+  --ws-text-dim: #6b7280;
 
   /* Input / Controls */
   --ws-input-bg: #ffffff;

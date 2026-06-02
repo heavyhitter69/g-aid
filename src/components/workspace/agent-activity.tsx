@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Cpu, Zap, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { useAgentStore } from "@/store/agent-store";
+import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
 const STATUS_CONFIG = {
@@ -38,8 +39,10 @@ function agentLabel(actorId: string): string {
 export function AgentActivity({ collapsed: initialCollapsed = false }: { collapsed?: boolean }) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const { activityLog, isOrchestratorThinking, streamingPreamble, activeAgentId } = useAgentStore();
+  const { activeConversationId } = useAppStore();
 
-  const hasActivity = activityLog.length > 0 || isOrchestratorThinking;
+  const currentActivityLog = activityLog.filter(a => a.conversationId === activeConversationId);
+  const hasActivity = currentActivityLog.length > 0 || isOrchestratorThinking;
 
   if (!hasActivity) return null;
 
@@ -94,7 +97,7 @@ export function AgentActivity({ collapsed: initialCollapsed = false }: { collaps
           )}
 
           {/* Activity entries */}
-          {activityLog.slice(-8).map((entry) => (
+          {currentActivityLog.slice(-8).map((entry) => (
             <ActivityRow
               key={entry.id}
               actorId={entry.actorId}

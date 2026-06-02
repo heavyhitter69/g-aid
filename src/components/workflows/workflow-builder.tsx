@@ -60,79 +60,139 @@ export function WorkflowBuilder() {
     [setEdges]
   );
 
-  const runWorkflow = () => {
+  const [events, setEvents] = useState<any[]>([]);
+
+  const runWorkflow = async () => {
     setRunning(true);
     setProcessingStatus("running");
+    setEvents([]);
+    
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
-        data: { ...n.data, status: n.id === "4" ? "running" : n.data.status },
+        data: { ...n.data, status: "running" },
       }))
     );
-    setTimeout(() => {
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          data: {
-            ...n.data,
-            status: ["1", "2", "3", "4", "5", "6", "7"].includes(n.id as string)
-              ? "complete"
-              : n.data.status,
-          },
-        }))
-      );
-      setProcessingStatus("complete");
+
+    try {
+      const response = await fetch('/api/pipeline/event-stream');
+      
+      if (!response.body) {
+        throw new Error('No readable stream returned');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      let isDone = false;
+      while (!isDone) {
+        const { value, done } = await reader.read();
+        if (done) {
+          isDone = true;
+          break;
+        }
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const eventData = JSON.parse(line.slice(6));
+            setEvents(prev => [...prev, eventData]);
+            
+            if (eventData.type === 'PIPELINE_COMPLETE' || eventData.type === 'PIPELINE_FAILED') {
+              setProcessingStatus(eventData.type === 'PIPELINE_COMPLETE' ? "complete" : "error");
+              setRunning(false);
+              setNodes((nds) =>
+                nds.map((n) => ({
+                  ...n,
+                  data: {
+                    ...n.data,
+                    status: eventData.type === 'PIPELINE_COMPLETE' ? "complete" : "error",
+                  },
+                }))
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Pipeline streaming error:", error);
       setRunning(false);
-    }, 3000);
+      setProcessingStatus("error");
+    }
   };
 
   return (
-    <section className="h-full flex flex-col">
-      <header className="flex items-center justify-between p-4 border-b border-white/5">
+    <section className="h-full flex flex-col relative">
+      <header className="flex items-center justify-between p-4 border-b border-white/5 shrink-0">
         <h2 className="font-semibold text-sm text-white">Workflow Builder</h2>
         <menu className="flex gap-2 list-none p-0 m-0">
           <li><Button variant="outline" size="sm"><Plus className="h-3 w-3" /> Add Node</Button></li>
           <li>
             <Button size="sm" onClick={runWorkflow} disabled={running}>
-              <Play className="h-3 w-3" /> {running ? "Running..." : "Run Workflow"}
+              <Play className="h-3 w-3" /> {running ? "Running..." : "Run Scientific Pipeline"}
             </Button>
           </li>
         </menu>
       </header>
-      <aside className="flex gap-4 p-3 border-b border-white/5 overflow-x-auto">
-        {nodePalette.map((label) => (
-          <motion.span
-            key={label}
-            whileHover={{ scale: 1.05 }}
-            className="shrink-0 text-[10px] px-3 py-1.5 rounded-lg border border-white/5 bg-white/5 cursor-grab font-mono text-zinc-400 hover:border-white/20 hover:text-white transition-all"
+      
+      <div className="flex-1 min-h-0 flex relative">
+        <figure className="flex-1 relative">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            fitView
+            className="bg-transparent"
           >
-            {label}
-          </motion.span>
-        ))}
-      </aside>
-      <figure className="flex-1 min-h-[400px]">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          fitView
-          className="bg-transparent"
-        >
-          <Background color="rgba(255,255,255,0.05)" gap={20} />
-          <Controls className={cn(
-            "!bg-zinc-900 !border-white/10 !shadow-none",
-            "[&>button]:!bg-white/5 [&>button]:!border-white/10 [&>button]:!text-white"
-          )} />
-          <MiniMap
-            nodeColor={() => "#ffffff"}
-            maskColor="rgba(0,0,0,0.8)"
-            className="!bg-zinc-900 !border-white/10"
-          />
-        </ReactFlow>
-      </figure>
+            <Background color="rgba(255,255,255,0.05)" gap={20} />
+            <Controls className={cn(
+              "!bg-zinc-900 !border-white/10 !shadow-none",
+              "[&>button]:!bg-white/5 [&>button]:!border-white/10 [&>button]:!text-white"
+            )} />
+            <MiniMap
+              nodeColor={() => "#ffffff"}
+              maskColor="rgba(0,0,0,0.8)"
+              className="!bg-zinc-900 !border-white/10"
+            />
+          </ReactFlow>
+        </figure>
+        
+        {/* Telemetry Panel */}
+        <aside className="w-[300px] border-l border-white/5 bg-[#141414] shrink-0 flex flex-col h-full overflow-hidden absolute right-0 top-0 bottom-0 z-20 pointer-events-none sm:pointer-events-auto">
+          <div className="p-3 border-b border-white/5 flex items-center justify-between bg-[#1e1e1e]">
+            <span className="text-xs font-semibold text-white uppercase tracking-wider">Scientific Telemetry</span>
+            <span className={cn("w-2 h-2 rounded-full", running ? "bg-green-500 animate-pulse" : "bg-zinc-600")} />
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 font-mono text-[10px]">
+            {events.length === 0 && (
+              <div className="text-zinc-500 text-center mt-4">Waiting for pipeline execution...</div>
+            )}
+            {events.map((evt, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={cn(
+                  "p-2 rounded border break-words",
+                  evt.severity === "fatal" || evt.type === "PIPELINE_FAILED" ? "border-red-900/50 bg-red-900/20 text-red-200" :
+                  evt.severity === "warning" || evt.type === "QC_WARNING" ? "border-yellow-900/50 bg-yellow-900/20 text-yellow-200" :
+                  evt.type === "NODE_COMPLETED" || evt.type === "PIPELINE_COMPLETE" ? "border-green-900/50 bg-green-900/20 text-green-200" :
+                  "border-white/5 bg-white/5 text-zinc-300"
+                )}
+              >
+                <div className="font-bold mb-1 opacity-75">{evt.type} {evt.nodeId ? `[${evt.nodeId}]` : ''}</div>
+                <div>{evt.message}</div>
+                <div className="text-[8px] opacity-50 mt-1">{new Date(evt.timestamp).toLocaleTimeString()}</div>
+              </motion.div>
+            ))}
+          </div>
+        </aside>
+      </div>
     </section>
   );
 }

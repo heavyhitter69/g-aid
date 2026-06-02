@@ -26,39 +26,66 @@ export interface UploadedFile {
  */
 export async function uploadFile(
   file: File,
-  projectId: string | null
+  projectId?: string,
+  relativePath?: string
 ): Promise<UploadedFile> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ── Authenticated upload ──────────────────────────────────────────────────
-  if (user) {
-    const storagePath = `${user.id}/${projectId ?? "unsorted"}/${Date.now()}_${file.name}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, file, {
-        upsert: true,
-        contentType: file.type || "application/octet-stream",
-      });
-
-    if (uploadError) {
-      throw new Error(`Storage upload failed: ${uploadError.message}`);
+  let activeUserId = user?.id;
+  if (!activeUserId) {
+    if (typeof window !== "undefined") {
+      activeUserId = localStorage.getItem("gaid_guest_id") || undefined;
+      if (!activeUserId) {
+        activeUserId = "guest_" + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem("gaid_guest_id", activeUserId);
+      }
+    } else {
+      activeUserId = "guest_unknown";
     }
+  }
 
-    // Insert metadata row
-    if (projectId) {
-      await supabase.from("project_files").insert({
+  const isGuest = !user;
+  const activeBucket = isGuest ? "demo_workspace" : BUCKET;
+  const activeTable = isGuest ? "demo_project_files" : "project_files";
+
+  const filePath = relativePath || file.name;
+  const storagePath = `${activeUserId}/${projectId ?? "unsorted"}/${filePath}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(activeBucket)
+    .upload(storagePath, file, {
+      upsert: true,
+      contentType: file.type || "application/octet-stream",
+    });
+
+  if (uploadError) {
+    throw new Error(`Storage upload failed: ${uploadError.message}`);
+  }
+
+  // Insert metadata row
+  if (projectId) {
+    if (isGuest) {
+      await supabase.from(activeTable).insert({
+        guest_id: activeUserId,
+        project_name: projectId, // For guests, we just use the name instead of a UUID
+        name: file.name,
+        storage_path: storagePath,
+        size_bytes: file.size,
+      });
+    } else {
+      await supabase.from(activeTable).insert({
         project_id: projectId,
-        user_id: user.id,
+        user_id: activeUserId,
         name: file.name,
         storage_path: storagePath,
         size_bytes: file.size,
         mime_type: file.type || null,
       });
     }
+  }
 
     return {
       name: file.name,
@@ -66,29 +93,8 @@ export async function uploadFile(
       sizeBytes: file.size,
       mimeType: file.type,
     };
-  }
-
-  // ── Demo / unauthenticated: read into memory (capped at 2 MB) ─────────────
-  if (file.size > DEMO_SIZE_CAP) {
-    // File too large for in-memory demo — return metadata only, no content
-    return {
-      name: file.name,
-      storagePath: null,
-      sizeBytes: file.size,
-      mimeType: file.type,
-      textContent: `[File too large to preview in demo mode — ${(file.size / 1024 / 1024).toFixed(1)} MB. Sign in to upload large files.]`,
-    };
-  }
-
-  const textContent = await readFileAsText(file);
-  return {
-    name: file.name,
-    storagePath: null,
-    sizeBytes: file.size,
-    mimeType: file.type,
-    textContent,
-  };
 }
+
 
 /**
  * Get a short-lived signed URL for a file in Storage (60 min).
