@@ -1,0 +1,178 @@
+********************************************
+Start import: 2026/04/25 18:24:15.94
+Start import: C:\Users\USER\Downloads\A (16).magdata
+End file C:\Users\USER\Downloads\A (16).magdata
+End importing from files.
+End importing from files.
+Setting PPS alignments.
+Start validating GPS and PPS records.
+Prepare to read datasets
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Index PPS records
+Update GPS timestamps
+No errors found.
+Finish import.
+
+********************************************
+Start import: 2026/04/25 18:26:01.45
+Start import: C:\Users\USER\Downloads\B (14).magdata
+End file C:\Users\USER\Downloads\B (14).magdata
+End importing from files.
+End importing from files.
+Setting PPS alignments.
+Start validating GPS and PPS records.
+Prepare to read datasets
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Deleted 14 invalid PPS records from dataset 5.
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+PPS records edited during import or validation in dataset 5.
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+Checking GPS time breaks
+Index PPS records
+Update GPS timestamps
+No errors found.
+Finish import.
+
+********************************************
+Start import: 2026/04/25 18:27:08.43
+Start import: C:\Users\USER\Downloads\C (13).magdata
+End file C:\Users\USER\Downloads\C (13).magdata
+End importing from files.
+End importing from files.
+Setting PPS alignments.
+Start validating GPS and PPS records.
+Prepare to read datasets
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+PPS records edited during import or validation in dataset 1.
+Checking GPS time breaks
+Reformat PPS timestamps
+Preparing PPS histogram
+Search for GPS distribution.
+Checked GPS time breaks
+Executing PPS/GPS join query.
+Evaluating differences.
+Evaluated max difference.
+Executing histogram query.
+Evaluating histogram differences.
+Finished difference histogram
+Update PPS timestamps
+PPS records edited during import or validation in dataset 2.
+Checking GPS time breaks
+Index PPS records
+Update GPS timestamps
+No errors found.
+Finish import.
+

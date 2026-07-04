@@ -13,6 +13,7 @@ def synchronize_time(payload: dict) -> dict:
     node_id = payload.get("node_id", "time_synchronizer")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
+    out_dir = payload.get("parameters", {}).get("outDir", "")
     
     # We expect base_station_canonical.csv and airborne_cleaned.csv
     base_path = os.path.abspath(os.path.join(out_dir, task_folder, "base_station_canonical.csv"))

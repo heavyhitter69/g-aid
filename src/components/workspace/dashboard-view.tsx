@@ -89,7 +89,7 @@ export function DashboardView() {
         <div>
           <h3 className="text-[#858585] text-xs font-semibold mb-4 px-2">Recent projects</h3>
           <div className="flex flex-col">
-            {recentProjects.length > 0 ? (
+            {(recentProjects?.length ?? 0) > 0 ? (
               recentProjects.map((proj) => (
                 <div
                   key={`${proj.name}-${proj.openedAt}`}

@@ -1,0 +1,8 @@
+{
+  "survey_duration_seconds": 20275.799999952316,
+  "total_samples_processed": 57041,
+  "diurnal_variance_nT": 34.57999999999811,
+  "missing_coordinates": 0,
+  "base_magnetic_field_mean": 32565.80910864114,
+  "corrected_magnetic_field_mean": 32560.16709852124
+}

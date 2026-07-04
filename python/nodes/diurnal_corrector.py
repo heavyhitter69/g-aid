@@ -11,6 +11,7 @@ def compute_correction(payload: dict) -> dict:
     node_id = payload.get("node_id", "diurnal_corrector")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
+    out_dir = payload.get("parameters", {}).get("outDir", "")
     
     interpolated_path = os.path.abspath(os.path.join(out_dir, task_folder, "base_interpolated.csv"))
     

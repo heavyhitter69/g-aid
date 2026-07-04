@@ -133,6 +133,37 @@ export interface SynthesisInput {
   ruleMatchIds: string[];
 }
 
+export function buildOllamaPrompt(input: SynthesisInput): string {
+  const { agentId, query, hypotheses, datasets, provenance } = input;
+  const system = SYSTEM_PROMPTS[agentId] || "You are a helpful geoscientific assistant.";
+  const confPct = (provenance.derivedConfidence * 100).toFixed(0);
+  
+  let prompt = `${system}\n\n`;
+  prompt += `=== Current Context ===\n`;
+  prompt += `User Query: "${query}"\n\n`;
+  
+  if (datasets.length > 0) {
+    prompt += `Loaded Datasets:\n`;
+    datasets.forEach(d => {
+      prompt += `- ${d.name} (${d.modality}, Quality: ${d.qualityMetrics.signalToNoise} SNR)\n`;
+    });
+    prompt += `\n`;
+  } else {
+    prompt += `Loaded Datasets: None\n\n`;
+  }
+
+  if (hypotheses.length > 0) {
+    prompt += `Active Hypotheses (Derived Confidence: ${confPct}%):\n`;
+    hypotheses.forEach(h => {
+      prompt += `- [${h.epistemicType}] ${h.statement}\n`;
+    });
+    prompt += `\n`;
+  }
+
+  prompt += `Instructions: Respond directly to the user's query based on the context above. Use markdown formatting. Provide a structured, scientifically accurate interpretation. Do not include internal monologue.`;
+  return prompt;
+}
+
 export function synthesizeResponse(input: SynthesisInput): string {
   const { agentId, query, hypotheses, datasets, provenance, ruleMatchIds } = input;
   const confLabel = confidenceToLanguage(provenance.derivedConfidence);

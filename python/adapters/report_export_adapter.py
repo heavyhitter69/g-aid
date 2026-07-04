@@ -10,6 +10,7 @@ def export_report(payload: dict) -> dict:
     node_id = payload.get("node_id", "report_export_adapter")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
+    out_dir = payload.get("parameters", {}).get("outDir", "")
     
     events = []
     

@@ -3,8 +3,8 @@ import Image from "next/image";
 const CuratedInner = () => (
   <>
     <Image
-      src="/trademark/emoji-genie-apple.png"
-      alt="Developer emoji"
+      src="/genie-logo.png"
+      alt="Genie Logo"
       width={24}
       height={24}
       className="curated-genie-img"

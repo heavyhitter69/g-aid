@@ -13,6 +13,7 @@ import type { NextRequest } from "next/server";
 import { resolveFromIntent, selectMinimalAgents, resolveFromState } from "@/lib/capability-graph";
 import { buildAgentContext, formatContextForPrompt } from "@/lib/context-engine";
 import { compileDAG } from "@/lib/workflow-planner";
+import { generateImplementationPlan, generateTasksMarkdown, updateTaskProgress, PENDING_APPROVAL } from "./implementation-plan";
 import fs from "fs";
 import path from "path";
 import { synthesizeResponse } from "@/lib/agent-prompts";
@@ -170,37 +171,42 @@ export async function POST(request: NextRequest): Promise<Response> {
           let activeUserId = user?.id || body.guestId;
           
           if (activeUserId && projectName) {
-            const activeBucket = isGuest ? "demo_workspace" : "gaid_workspace";
-            const activeTable = isGuest ? "demo_project_files" : "project_files";
-            
-            // For guests, projectName is the identifier since they don't have project UUIDs
-            if (isGuest) {
-               targetProjectId = projectName;
-               const { data: files } = await supabase
-                 .from(activeTable)
-                 .select("storage_path, name")
-                 .eq("project_name", projectName)
-                 .eq("guest_id", activeUserId)
-                 .like("storage_path", `%${targetFolder}%`);
+            // ALWAYS bypass Supabase and read from local_uploads since buckets are missing
+            if (true) {
+               // Read from local_uploads
+               const localUploadsDir = path.join(process.cwd(), ".tmp", "local_uploads", projectName);
+               if (fs.existsSync(localUploadsDir)) {
+                 const getAllFiles = (dir: string): string[] => {
+                     let results: string[] = [];
+                     const list = fs.readdirSync(dir);
+                     list.forEach((file) => {
+                         const fullPath = path.join(dir, file);
+                         if (fs.statSync(fullPath).isDirectory()) { 
+                             results = results.concat(getAllFiles(fullPath));
+                         } else { 
+                             results.push(fullPath);
+                         }
+                     });
+                     return results;
+                 };
+                 const allFiles = getAllFiles(localUploadsDir);
+                 const matchedFiles = targetFolder ? allFiles.filter(f => f.toLowerCase().includes(targetFolder.toLowerCase())) : allFiles;
                  
-               if (files && files.length > 0) {
-                 usingSupabase = true;
-                 baseDir = path.join(process.cwd(), ".tmp", "executions", body.sessionId || Date.now().toString(), projectName);
-                 
-                 for (const file of files) {
-                    const { data: blob } = await supabase.storage.from(activeBucket).download(file.storage_path);
-                    if (blob) {
-                       const buffer = Buffer.from(await blob.arrayBuffer());
-                       const pathParts = file.storage_path.split("/");
-                       const relativePath = pathParts.slice(2).join("/"); // e.g. DAY 1/BASE.txt
-                       const destPath = path.join(baseDir, relativePath);
-                       
-                       fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                       fs.writeFileSync(destPath, buffer);
-                    }
+                 if (matchedFiles.length > 0) {
+                   usingSupabase = true;
+                   baseDir = path.join(process.cwd(), ".tmp", "executions", body.sessionId || Date.now().toString(), projectName);
+                   for (const f of matchedFiles) {
+                     const relativePath = path.relative(localUploadsDir, f).replace(/\\/g, '/');
+                     const destPath = path.join(baseDir, relativePath);
+                     fs.mkdirSync(path.dirname(destPath), { recursive: true });
+                     fs.copyFileSync(f, destPath);
+                   }
                  }
                }
             } else {
+               const activeBucket = "gaid_workspace";
+               const activeTable = "project_files";
+               
                const { data: project } = await supabase
                  .from("projects")
                  .select("id")
@@ -210,11 +216,11 @@ export async function POST(request: NextRequest): Promise<Response> {
                  
                if (project) {
                  targetProjectId = project.id;
-                 const { data: files } = await supabase
-                   .from(activeTable)
-                   .select("storage_path, name")
-                   .eq("project_id", project.id)
-                   .like("storage_path", `%${targetFolder}%`);
+                 let query = supabase.from(activeTable).select("storage_path, name").eq("project_id", project.id);
+                 if (targetFolder) {
+                   query = query.like("storage_path", `%${targetFolder}%`);
+                 }
+                 const { data: files } = await query;
                    
                  if (files && files.length > 0) {
                    usingSupabase = true;
@@ -248,10 +254,32 @@ export async function POST(request: NextRequest): Promise<Response> {
                   if (fs.existsSync(path.join(process.cwd(), "public", pd, targetFolder))) {
                      projectName = pd;
                      baseDir = path.join(process.cwd(), "public", projectName);
+                     usingSupabase = true; // Pretend we found it
                      break;
                   }
                }
+            } else {
+               usingSupabase = true;
             }
+          }
+
+          if (!usingSupabase) {
+            enqueue("I couldn't find any files for this project. Please upload your survey data files first before running diurnal analysis.\n\n");
+            
+            enqueue(`\x02${JSON.stringify({
+              type: "agent_complete",
+              agentId: "magnetic-agent",
+              thought: "Checked Supabase and local directories for files but none were found for the current project.",
+              hypothesisEvents: [],
+              opportunitiesDetected: 0,
+              agentsDispatched: ["magnetic-agent"],
+              capabilitiesResolved: ["diurnal-correction"],
+              contextTokens: 0,
+              sessionId: body.sessionId || "default"
+            })}\n`);
+            
+            controller.close();
+            return;
           }
           
           // Compute dynamic task folder
@@ -270,97 +298,43 @@ export async function POST(request: NextRequest): Promise<Response> {
 
           enqueue(`\x00${JSON.stringify(planPreamble)}\n`);
           await delay(80);
-          enqueue(`Initiating **Magnetic Diurnal Correction Pipeline** for \`${projectName}/${targetFolder}\`...\nOutput will be saved to \`g-aid output/${taskFolder}\`\n\n`);
-          let projectFilesUpdates: any[] = [];
-          try {
-            const { MagneticPreprocessingPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
-            const pipeline = new MagneticPreprocessingPipeline();
-            let summaryMsg = "";
-            await pipeline.runPipeline([], (event) => {
-              if (event.type === "NODE_PROGRESS") {
-                 const msg = `- ✅ **${event.nodeId || "Pipeline"}**: ${event.message}\n`;
-                 enqueue(msg);
-                 summaryMsg += msg;
-              } else if (event.type === "QC_WARNING") {
-                 const msg = `- ⚠️ **QC ${event.severity?.toUpperCase()}**: ${event.message}\n`;
-                 enqueue(msg);
-                 summaryMsg += msg;
-              }
-            }, { projectName, targetFolder, taskFolder, baseDir, outDir: outputDir });
-            
-            const uriProj = encodeURIComponent(projectName);
-            const uriTask = encodeURIComponent(taskFolder);
-            const treeProj = projectName.toUpperCase();
-            
-            projectFilesUpdates = [
-               { id: `${treeProj}/g-aid output/${taskFolder}/airborne_corrected.csv`, name: "airborne_corrected.csv", type: "file", path: `/${projectName}/g-aid output/${taskFolder}/airborne_corrected.csv` },
-               { id: `${treeProj}/g-aid output/${taskFolder}/mag_map.png`, name: "mag_map.png", type: "file", path: `/${projectName}/g-aid output/${taskFolder}/mag_map.png` },
-               { id: `${treeProj}/g-aid output/${taskFolder}/diurnal_analysis.xlsx`, name: "diurnal_analysis.xlsx", type: "file", path: `/${projectName}/g-aid output/${taskFolder}/diurnal_analysis.xlsx` }
-            ];
-            
-            // Upload artifacts to Supabase if running in cloud mode
-            if (usingSupabase && activeUserId && targetProjectId) {
-               const activeBucket = isGuest ? "demo_workspace" : "gaid_workspace";
-               const activeTable = isGuest ? "demo_project_files" : "project_files";
-               const outPath = path.join(outputDir, taskFolder);
-               
-               if (fs.existsSync(outPath)) {
-                  projectFilesUpdates = [];
-                  const outFiles = fs.readdirSync(outPath);
-                  
-                  for (const fName of outFiles) {
-                     const filePath = path.join(outPath, fName);
-                     const buffer = fs.readFileSync(filePath);
-                     const storagePath = `${activeUserId}/${targetProjectId}/g-aid output/${taskFolder}/${fName}`;
-                     
-                     // Upload to Supabase Storage
-                     await supabase.storage.from(activeBucket).upload(storagePath, buffer, { upsert: true });
-                     
-                     // Insert into metadata table
-                     if (isGuest) {
-                        await supabase.from(activeTable).insert({
-                           guest_id: activeUserId,
-                           project_name: targetProjectId,
-                           name: fName,
-                           storage_path: storagePath,
-                           size_bytes: fs.statSync(filePath).size,
-                        });
-                     } else {
-                        await supabase.from(activeTable).insert({
-                           project_id: targetProjectId,
-                           user_id: activeUserId,
-                           name: fName,
-                           storage_path: storagePath,
-                           size_bytes: fs.statSync(filePath).size,
-                        });
-                     }
-                     
-                     projectFilesUpdates.push({
-                        id: `${treeProj}/g-aid output/${taskFolder}/${fName}`,
-                        name: fName,
-                        type: "file",
-                        path: storagePath
-                     });
-                  }
-               }
-            }
-            
-            enqueue(`\n\n**Pipeline Execution Complete.** Generated artifacts in \`g-aid output/${taskFolder}/\`:\n- [airborne_corrected.csv](/${uriProj}/g-aid%20output/${uriTask}/airborne_corrected.csv)\n- [mag_map.png](/${uriProj}/g-aid%20output/${uriTask}/mag_map.png)\n- [diurnal_analysis.xlsx](/${uriProj}/g-aid%20output/${uriTask}/diurnal_analysis.xlsx)\n\nClick the links above to download and view them directly.`);
-          } catch (e: any) {
-            enqueue(`\n\n❌ **Pipeline Failed**: ${e.message}`);
+          
+          const planMarkdown = generateImplementationPlan(projectName, targetFolder, taskFolder);
+          
+          // Stream plan markdown token by token
+          const tokens = planMarkdown.split(" ");
+          for (const token of tokens) {
+            enqueue(token + " ");
+            await delay(14); // Simulate typing speed
           }
           
+          // Save the task checklist to disk
+          const outTaskDir = path.join(outputDir, taskFolder);
+          fs.mkdirSync(outTaskDir, { recursive: true });
+          const tasksPath = path.join(outTaskDir, "tasks.md");
+          fs.writeFileSync(tasksPath, generateTasksMarkdown(projectName, taskFolder));
+
+          // Register in memory for the approve route to pick up
+          PENDING_APPROVAL[body.sessionId || "default"] = {
+            plan: planMarkdown,
+            taskFolder,
+            outputDir
+          };
+          
+          // Send epilogue with awaitingApproval = true
           enqueue(`\n\x02${JSON.stringify({
             type: "agent_complete",
             agentId: "magnetic-agent",
-            thought: "Detected direct request for diurnal analysis. Executing physical pipeline graph dynamically.",
+            thought: "Generated Diurnal Analysis Implementation Plan. Waiting for user approval.",
             hypothesisEvents: [],
             opportunitiesDetected: 0,
             agentsDispatched: ["magnetic-agent"],
-            capabilitiesResolved: [],
+            capabilitiesResolved: ["diurnal-correction"],
             contextTokens: 0,
-            sessionId,
-            projectFilesUpdates
+            sessionId: body.sessionId || "default",
+            awaitingApproval: true,
+            taskFolder: taskFolder,
+            implementationPlanContent: planMarkdown
           })}\n`);
           controller.close();
           return;

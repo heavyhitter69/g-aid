@@ -13,6 +13,7 @@ def run_qc(payload: dict) -> dict:
     node_id = payload.get("node_id", "qc_engine")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
+    out_dir = payload.get("parameters", {}).get("outDir", "")
     
     corrected_path = os.path.abspath(os.path.join(out_dir, task_folder, "airborne_corrected.csv"))
     

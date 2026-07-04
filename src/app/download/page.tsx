@@ -180,9 +180,6 @@ export default function DownloadPage() {
           className="flex flex-wrap gap-6 mb-8"
         >
           {[
-            { icon: <Shield className="w-4 h-4" />, text: "Windows installer with setup wizard" },
-            { icon: <Check className="w-4 h-4" />, text: "Context menu integration" },
-            { icon: <Download className="w-4 h-4" />, text: "Automatic updates" },
           ].map((feature) => (
             <div
               key={feature.text}
@@ -235,30 +232,6 @@ export default function DownloadPage() {
         </motion.div>
 
         {/* What gets installed */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="mt-8 border border-white/10 rounded-xl overflow-hidden bg-[#141414] px-6 py-5"
-        >
-          <h2 className="text-sm font-semibold text-white mb-3">Windows Installer includes:</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-[13px] text-zinc-500">
-            {[
-              "License agreement acceptance",
-              "Custom installation directory",
-              "Desktop shortcut (optional)",
-              '"Open with G-AID" context menu',
-              "File type associations (.las, .sgy, .csv)",
-              "Add to PATH",
-            ].map((feature) => (
-              <div key={feature} className="flex items-center gap-2">
-                <Check className="w-3 h-3 text-emerald-500/70 shrink-0" />
-                <span>{feature}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
         {/* Footer note */}
         <motion.p
           initial={{ opacity: 0 }}

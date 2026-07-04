@@ -12,7 +12,7 @@ import {
   MessageSquare, X, Plus, Clock, MoreHorizontal, PanelRight,
   Paperclip, Mic, ChevronDown, AlertCircle, Zap, GitBranch,
   TrendingUp, AlertTriangle, Info, CheckCircle2, Network,
-  BarChart3, Lightbulb, SendHorizontal, Search, Trash2
+  BarChart3, Lightbulb, SendHorizontal, Search, Trash2, FileText
 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useScientificState } from "@/store/scientific-state";
@@ -170,7 +170,13 @@ function StreamingMessage({ content, preamble, isStreaming }: {
 }) {
   // Simple markdown-to-JSX: bold, headers, bullet points
   const renderMarkdown = (text: string) => {
-    const lines = text.split("\n");
+    let formattedText = text.replace(/<think>/g, "\n\n> **Thinking Process:**\n> ");
+    formattedText = formattedText.replace(/<\/think>/g, "\n\n---\n\n");
+    
+    // Also prefix any lines inside the think block with `> ` if they don't have it (optional, but helps if think block spans multiple paragraphs)
+    // Actually, DeepSeek just outputs raw text inside <think>. The user will see it line by line. Let's just handle `> ` lines.
+
+    const lines = formattedText.split("\n");
     return lines.map((line, i) => {
       if (line.startsWith("## ")) {
         return <div key={i} className="font-bold text-[12px] text-[var(--ws-text-bright)] mt-2 mb-1">{line.slice(3)}</div>;
@@ -208,6 +214,11 @@ function StreamingMessage({ content, preamble, isStreaming }: {
       }
       if (line.startsWith("---")) {
         return <div key={i} className="border-t border-[#2b2b2b] my-2" />;
+      }
+      if (line.startsWith("> ")) {
+        // blockquote rendering
+        const inner = line.slice(2).replace(/\*\*(.*?)\*\*/g, "$1"); // basic bold strip for thought process
+        return <div key={i} className="border-l-2 border-[#444] pl-3 py-0.5 text-[#888888] italic my-1 leading-relaxed text-[11px]">{inner}</div>;
       }
       if (line.trim() === "") {
         return <div key={i} className="h-1" />;
@@ -286,8 +297,10 @@ interface EnhancedMessage {
   isStreaming?: boolean;
   timestamp: string;
   thinkingStartedAt?: number;
-  thinkingDuration?: number; // seconds
-  thought?: string; // internal reasoning shown in disclosure
+  thinkingDuration?: number;
+  thought?: string;
+  awaitingApproval?: boolean;
+  taskFolder?: string;
 }
 
 // ─── Thinking indicator ───────────────────────────────────────────────────────
@@ -443,7 +456,7 @@ function InputBox({
             </button>
             {modelDropdownOpen && (
               <div className={`absolute left-0 ${anchor} bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-xl w-[160px] py-1 z-50 flex flex-col text-[10px]`}>
-                {["G-AID Simulation", "Gemini 1.5 Pro", "Claude 3.5 Sonnet", "GPT-4o"].map((model) => (
+                {["G-AID Simulation", "DeepSeek-R1", "Llama 3.3", "Qwen 2.5"].map((model) => (
                   <button
                     key={model}
                     onClick={() => { setSelectedModel(model); setModelDropdownOpen(false); }}
@@ -493,6 +506,7 @@ export function AIPanel() {
     setActiveConversationId,
     addConversation,
     removeConversation,
+    hideConversation,
     updateConversationTopic,
     addMessageToConversation,
     toggleChatPanel,
@@ -501,7 +515,10 @@ export function AIPanel() {
     projectFiles,
     isHistoryModalOpen,
     setHistoryModalOpen,
-    currentProject
+    currentProject,
+    setActiveFile,
+    setWorkspaceView,
+    openWorkbenchTab
   } = useAppStore();
 
   const scientificState = useScientificState();
@@ -529,25 +546,39 @@ export function AIPanel() {
   const [currentStreamId, setCurrentStreamId] = useState<string | null>(null);
   const [hasSentMessage, setHasSentMessage] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevConvoIdRef = useRef<string | null>(null);
   
 
-
-  // Load conversation messages when switching tabs/conversations
+  // Load conversation messages when switching tabs/conversations or when background messages complete
   useEffect(() => {
     if (activeConversation) {
-      const loaded = activeConversation.messages.map((m, idx) => ({
-        id: `msg_${activeConversation.id}_${idx}`,
-        sender: m.sender,
-        text: m.text,
-        timestamp: new Date().toISOString(),
-      }));
-      setEnhancedMessages(loaded);
-      setHasSentMessage(loaded.length > 0);
+      const isNewConvo = activeConversation.id !== prevConvoIdRef.current;
+      
+      // Only reload if the store has more messages than our local state, OR if we switched to a different conversation
+      // (This prevents overwriting local streaming state while still picking up finished background tasks)
+      if (isNewConvo || enhancedMessages.length === 0 || activeConversation.messages.length > enhancedMessages.filter(m => !m.isStreaming).length) {
+        const loaded = activeConversation.messages.map((m, idx) => ({
+          id: m.id || `msg_${activeConversation.id}_${idx}`,
+          sender: m.sender,
+          text: m.text,
+          preamble: m.preamble,
+          timestamp: m.timestamp || new Date().toISOString(),
+          thinkingStartedAt: m.thinkingStartedAt,
+          thinkingDuration: m.thinkingDuration,
+          thought: m.thought,
+          awaitingApproval: m.awaitingApproval,
+          taskFolder: m.taskFolder
+        }));
+        setEnhancedMessages(loaded);
+        setHasSentMessage(loaded.length > 0);
+        prevConvoIdRef.current = activeConversation.id;
+      }
     } else {
       setEnhancedMessages([]);
       setHasSentMessage(false);
+      prevConvoIdRef.current = null;
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, activeConversation?.messages.length]);
 
   const opportunities = scientificState.getOpportunityChipsViewModel();
 
@@ -556,6 +587,9 @@ export function AIPanel() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [enhancedMessages, agentStore.streamBuffer]);
+
+  // Listen for pending prompts from other parts of the app
+  const { pendingPrompt, setPendingPrompt, setChatPanelOpen } = useAppStore();
 
   const generateTopic = (msg: string) => {
     const lc = msg.toLowerCase();
@@ -580,11 +614,18 @@ export function AIPanel() {
     addConversation();
   };
 
-  const handleSend = useCallback(async () => {
-    if (!inputVal.trim() || isGenerating) return;
+  const handleSend = useCallback(async (eOrPrompt?: React.MouseEvent | React.FormEvent | string) => {
+    // If it's an event, it will be an object. If it's a direct string, it's a string.
+    const isString = typeof eOrPrompt === "string";
+    if (!isString && eOrPrompt && "preventDefault" in eOrPrompt) {
+      eOrPrompt.preventDefault();
+    }
+    const textToSend = isString ? eOrPrompt : inputVal;
 
-    const userMsg = inputVal.trim();
-    setInputVal("");
+    if (!textToSend.trim() || isGenerating) return;
+
+    const userMsg = textToSend.trim();
+    if (!isString) setInputVal("");
     setHasSentMessage(true);
 
     if (enhancedMessages.length === 0) {
@@ -592,6 +633,15 @@ export function AIPanel() {
     }
 
     const userMsgId = `msg_${Date.now()}_user`;
+    
+    // Persist user message to store immediately
+    addMessageToConversation(activeConversation.id, { 
+      id: userMsgId,
+      sender: "user", 
+      text: userMsg,
+      timestamp: new Date().toISOString()
+    });
+
     setEnhancedMessages(prev => [...prev, {
       id: userMsgId,
       sender: "user",
@@ -643,8 +693,15 @@ export function AIPanel() {
           snapshotData: scientificState.snapshot,
           projectName: currentProject || "",
           guestId: localStorage.getItem("gaid_guest_id") || undefined,
+          model: selectedModel,
         }),
       });
+
+      if (!response.ok) {
+        // Server returned an error (e.g., 404 from diurnal analysis when no files found)
+        const errorJson = await response.json().catch(() => ({ error: `Server error: ${response.status}` }));
+        throw new Error(errorJson.error || `Request failed with status ${response.status}`);
+      }
 
       if (!response.body) throw new Error("No response body");
       agentStore.setOrchestratorThinking(false);
@@ -667,8 +724,14 @@ export function AIPanel() {
       let rawBuf = new Uint8Array(0);
       const dec = new TextDecoder();
 
-      let activityId: string | null = null;
+let activityId: string | null = null;
       let lastTextUpdate = 0; // throttle UI updates to ~60fps
+      interface EpilogueSnapshot {
+        awaitingApproval?: boolean;
+        taskFolder?: string;
+        [key: string]: unknown;
+      }
+      let epilogueSnapshot: EpilogueSnapshot | null = null;
 
       const processRaw = () => {
         let i = 0;
@@ -738,39 +801,48 @@ export function AIPanel() {
               break;   // need more data
             }
 
-          } else if (state === "epilogue") {
-            if (byte === 0x0a) { // \n ends epilogue JSON
-              try {
-                const jsonStr = dec.decode(new Uint8Array(jsonBytes));
-                // Strip leading \n if present
-                const clean = jsonStr.replace(/^\n/, "");
-                const epilogue = JSON.parse(clean);
-                if (epilogue.hypothesisEvents?.length) {
-                  for (const evt of epilogue.hypothesisEvents) {
-                    scientificState.appendEvent("HYPOTHESIS_CREATED", epilogue.agentId, evt.payload);
-                  }
-                }
-                if (epilogue.opportunitiesDetected > 0) {
-                  scientificState.detectAndAppendOpportunities();
-                }
-                if (epilogue.thought) {
-                  thought = epilogue.thought;
-                }
-                if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
-                  const state = useAppStore.getState();
-                  const currentFiles = state.projectFiles;
-                  const newFiles = epilogue.projectFilesUpdates.filter((f: any) => !currentFiles.some(existing => existing.id === f.id));
-                  if (newFiles.length > 0) {
-                     state.setProjectFiles([...currentFiles, ...newFiles]);
-                  }
-                }
-                if (activityId) agentStore.completeActivity(activityId);
-              } catch { /* malformed epilogue — ignore */ }
-              state = "scan"; jsonBytes = []; i++;
-            } else {
-              jsonBytes.push(byte); i++;
-            }
-          }
+} else if (state === "epilogue") {
+             if (byte === 0x0a) { // \n ends epilogue JSON
+               try {
+                 const jsonStr = dec.decode(new Uint8Array(jsonBytes));
+                 // Strip leading \n if present
+                 const clean = jsonStr.replace(/^\n/, "");
+                 const epilogue = JSON.parse(clean);
+                 epilogueSnapshot = epilogue;
+                 if (epilogue.hypothesisEvents?.length) {
+                   for (const evt of epilogue.hypothesisEvents) {
+                     scientificState.appendEvent("HYPOTHESIS_CREATED", epilogue.agentId, evt.payload);
+                   }
+                 }
+                 if (epilogue.opportunitiesDetected > 0) {
+                   scientificState.detectAndAppendOpportunities();
+                 }
+                 if (epilogue.implementationPlanContent) {
+                   useAppStore.getState().setFileContent("Implementation Plan", epilogue.implementationPlanContent);
+                 }
+                 if (epilogue.thought) {
+                   thought = epilogue.thought;
+                 }
+                 if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
+                   const state = useAppStore.getState();
+                   const currentFiles = state.projectFiles;
+                   const newFiles = epilogue.projectFilesUpdates.filter((f: { id: string, content?: string }) => !currentFiles.some(existing => existing.id === f.id));
+                   if (newFiles.length > 0) {
+                      state.setProjectFiles([...currentFiles, ...newFiles]);
+                      newFiles.forEach((f: { id: string, content?: string }) => {
+                        if (f.content) {
+                          state.setFileContent(f.id, f.content);
+                        }
+                      });
+                   }
+                 }
+                 if (activityId) agentStore.completeActivity(activityId);
+               } catch { /* malformed epilogue — ignore */ }
+               state = "scan"; jsonBytes = []; i++;
+             } else {
+               jsonBytes.push(byte); i++;
+             }
+           }
         }
 
         // Consume processed bytes
@@ -798,7 +870,16 @@ export function AIPanel() {
       const thinkingDuration = Math.round((Date.now() - thinkingStart) / 1000);
       setEnhancedMessages(prev =>
         prev.map(m => m.id === agentMsgId
-          ? { ...m, text: accumulatedText, preamble, isStreaming: false, thinkingDuration, thought: thought || undefined }
+          ? { 
+              ...m, 
+              text: accumulatedText, 
+              preamble, 
+              isStreaming: false, 
+              thinkingDuration, 
+              thought: thought || undefined,
+              awaitingApproval: epilogueSnapshot?.awaitingApproval ?? false,
+              taskFolder: epilogueSnapshot?.taskFolder
+            }
           : m
         )
       );
@@ -808,8 +889,18 @@ export function AIPanel() {
       agentStore.setActiveAgent(null);
 
       // Persist to legacy conversation store
-      addMessageToConversation(activeConversation.id, { sender: "user", text: userMsg });
-      addMessageToConversation(activeConversation.id, { sender: "agent", text: accumulatedText });
+      addMessageToConversation(activeConversation.id, { 
+        id: agentMsgId,
+        sender: "agent", 
+        text: accumulatedText,
+        preamble: preamble ?? undefined,
+        thinkingStartedAt: thinkingStart,
+        thinkingDuration,
+        thought: thought || undefined,
+        awaitingApproval: epilogueSnapshot?.awaitingApproval ?? false,
+        taskFolder: epilogueSnapshot?.taskFolder,
+        timestamp: new Date().toISOString()
+      });
 
 
     } catch (err) {
@@ -820,19 +911,157 @@ export function AIPanel() {
           : m
         )
       );
+      addMessageToConversation(activeConversation.id, { 
+        id: agentMsgId,
+        sender: "agent", 
+        text: errorText,
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setIsGenerating(false);
       setCurrentStreamId(null);
       agentStore.setOrchestratorThinking(false);
       agentStore.setStreaming(false);
     }
-  }, [inputVal, isGenerating, activeConversation, selectedMode, scientificState, agentStore]);
+  }, [
+    inputVal, isGenerating, activeConversation, enhancedMessages.length, 
+    addMessageToConversation, agentStore, scientificState, projectFiles, 
+    fileContents, currentProject, selectedMode, updateConversationTopic
+  ]);
+
+  useEffect(() => {
+    if (pendingPrompt && !isGenerating) {
+      const prompt = pendingPrompt;
+      setPendingPrompt(null);
+      setChatPanelOpen(true);
+      // Wait for chat panel to open before sending
+      setTimeout(() => handleSend(prompt), 50);
+    }
+  }, [pendingPrompt, isGenerating, handleSend, setChatPanelOpen, setPendingPrompt]);
+
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (agentSettings?.submitWithCtrlEnter) {
       if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); handleSend(); }
     } else {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    }
+  };
+
+const handleApproveDiurnal = async (sessionId: string) => {
+    const dec = new TextDecoder();
+    const approvalMsgId = `msg_${Date.now()}_approval`;
+    const thinkingStart = Date.now();
+    
+    setEnhancedMessages(prev => [...prev, {
+      id: approvalMsgId,
+      sender: "agent",
+      text: "",
+      preamble: null,
+      isStreaming: true,
+      timestamp: new Date().toISOString(),
+      thinkingStartedAt: thinkingStart,
+    }]);
+    
+    try {
+      const response = await fetch("/api/agent/approve-diurnal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          decision: "approve"
+        }),
+      });
+
+      if (!response.body) throw new Error("No response body");
+      
+      const reader = response.body.getReader();
+      let accumulated = "";
+      let preamble: StreamPreamble | null = null;
+      let rawBuf = new Uint8Array(0);
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const merged = new Uint8Array(rawBuf.length + value.length);
+        merged.set(rawBuf);
+        merged.set(value, rawBuf.length);
+        rawBuf = merged;
+        
+        // Extract preamble and epilogue
+        let pos = 0;
+        while (pos < rawBuf.length) {
+          if (rawBuf[pos] === 0x00) {
+            // Preamble start - find the newline
+            let end = pos + 1;
+            while (end < rawBuf.length && rawBuf[end] !== 0x0a) end++;
+            if (end < rawBuf.length) {
+              const jsonStr = dec.decode(new Uint8Array(rawBuf.slice(pos + 1, end)));
+              try {
+                preamble = JSON.parse(jsonStr) as StreamPreamble;
+              } catch {}
+              pos = end + 1;
+            } else break;
+          } else if (rawBuf[pos] === 0x02) {
+            // Epilogue start - find the newline
+            let end = pos + 1;
+            while (end < rawBuf.length && rawBuf[end] !== 0x0a) end++;
+            if (end < rawBuf.length) {
+              const jsonStr = dec.decode(new Uint8Array(rawBuf.slice(pos + 1, end)));
+              try {
+                const epilogue = JSON.parse(jsonStr.replace(/^\n/, ""));
+                if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
+                   const state = useAppStore.getState();
+                   const currentFiles = state.projectFiles;
+                   const newFiles = epilogue.projectFilesUpdates.filter((f: any) => !currentFiles.some(existing => existing.id === f.id));
+                   if (newFiles.length > 0) {
+                      state.setProjectFiles([...currentFiles, ...newFiles]);
+                   }
+                }
+              } catch (e) {}
+            }
+            pos = end + 1;
+          } else {
+            pos++;
+          }
+        }
+        
+        // Extract text content
+        let textStart = 0;
+        let textEnd = rawBuf.length;
+        if (rawBuf[0] === 0x00) textStart = 1;
+        for (let k = textStart; k < rawBuf.length; k++) {
+          if (rawBuf[k] === 0x02) { textEnd = k; break; }
+        }
+        
+        if (textEnd > textStart) {
+          const slice = rawBuf.slice(textStart, textEnd);
+          const decoded = dec.decode(slice, { stream: true });
+          accumulated += decoded;
+          setEnhancedMessages(prev =>
+            prev.map(m => m.id === approvalMsgId
+              ? { ...m, text: accumulated, preamble, isStreaming: true }
+              : m
+            )
+          );
+        }
+      }
+
+      setEnhancedMessages(prev =>
+        prev.map(m => m.id === approvalMsgId
+          ? { ...m, text: accumulated, preamble, isStreaming: false }
+          : m
+        )
+      );
+
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setEnhancedMessages(prev =>
+        prev.map(m => m.id === approvalMsgId
+          ? { ...m, text: `Approval failed: ${errorMsg}`, isStreaming: false }
+          : m
+        )
+      );
     }
   };
 
@@ -859,7 +1088,7 @@ export function AIPanel() {
       {/* Tabs Header */}
       <div className="h-[35px] flex items-center bg-[#181818] shrink-0 relative z-20 select-none">
         <div className="flex-1 flex items-center h-full overflow-x-auto scrollbar-none">
-          {conversations.map((conv) => {
+          {conversations.filter(c => !c.hidden).map((conv) => {
             const isActive = conv.id === activeConversationId;
             return (
               <div
@@ -875,7 +1104,7 @@ export function AIPanel() {
                 <MessageSquare className="h-3 w-3 shrink-0" />
                 <span className="truncate flex-1">{conv.topic}</span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); removeConversation(conv.id); }}
+                  onClick={(e) => { e.stopPropagation(); hideConversation(conv.id); }}
                   className="p-0.5 rounded hover:bg-[#333333] hover:text-white text-[#858585] shrink-0 transition-colors"
                 >
                   <X className="h-2.5 w-2.5" />
@@ -952,23 +1181,6 @@ export function AIPanel() {
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
-          {/* Opportunities */}
-          {opportunities.length > 0 && enhancedMessages.length === 0 && (
-            <div className="space-y-1.5 mb-2">
-              <div className="text-[9px] text-[#555] uppercase font-semibold tracking-wider">Proactive Opportunities</div>
-              {opportunities.slice(0, 3).map((opp) => (
-                <OpportunityChip
-                  key={opp.id}
-                  opp={opp}
-                  onDismiss={() => scientificState.dismissOpportunity(opp.id)}
-                  onActivate={() => {
-                    setInputVal(`Run analysis: ${opp.title}`);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
 
           {/* Messages */}
           {enhancedMessages.map((msg) => (
@@ -982,38 +1194,54 @@ export function AIPanel() {
                   : "text-[var(--ws-text)] mr-auto max-w-full py-1"
               )}
             >
-              {msg.sender === "user" ? (
-                <p className="whitespace-pre-wrap">{msg.text}</p>
-              ) : (
-                <>
-                  {/* Thought disclosure — shown when done */}
-                  {msg.thinkingDuration !== undefined && !msg.isStreaming && (
-                    <ThoughtDisclosure duration={msg.thinkingDuration} thought={msg.thought} />
-                  )}
-                  {/* Live thinking indicator — shown while streaming with no text yet */}
-                  {msg.isStreaming && msg.thinkingStartedAt && msg.text === "" && (
-                    <ThinkingIndicator startedAt={msg.thinkingStartedAt} />
-                  )}
-                  <StreamingMessage
-                    content={msg.text}
-                    preamble={msg.preamble ?? null}
-                    isStreaming={msg.isStreaming ?? false}
-                  />
-                  {/* Opportunity chips after agent response */}
-                  {!msg.isStreaming && opportunities.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {opportunities.slice(0, 2).map((opp) => (
-                        <OpportunityChip
-                          key={opp.id}
-                          opp={opp}
-                          onDismiss={() => scientificState.dismissOpportunity(opp.id)}
-                          onActivate={() => setInputVal(`Run analysis: ${opp.title}`)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
+{msg.sender === "user" ? (
+                 <p className="whitespace-pre-wrap">{msg.text}</p>
+               ) : (
+                 <>
+                   {/* Thought disclosure — shown when done */}
+                   {msg.thinkingDuration !== undefined && !msg.isStreaming && (
+                     <ThoughtDisclosure duration={msg.thinkingDuration} thought={msg.thought} />
+                   )}
+                   {/* Live thinking indicator — shown while streaming with no text yet */}
+                   {msg.isStreaming && msg.thinkingStartedAt && msg.text === "" && (
+                     <ThinkingIndicator startedAt={msg.thinkingStartedAt} />
+                   )}
+                   <StreamingMessage
+                     content={msg.text}
+                     preamble={msg.preamble ?? null}
+                     isStreaming={msg.isStreaming ?? false}
+                   />
+                   {/* Approval button for diurnal analysis plans */}
+                   {!msg.isStreaming && msg.awaitingApproval && (
+                     <div 
+                       onClick={() => {
+                         openWorkbenchTab("file:Implementation Plan", "file", "Implementation Plan");
+                       }}
+                       className="mt-4 bg-[#1e1e1e] border border-[#2b2b2b] rounded-lg p-3 w-full max-w-sm flex flex-col gap-2 shadow-sm cursor-pointer hover:border-[#3c3c3c] transition-colors"
+                     >
+                       <div className="flex items-center gap-2">
+                         <FileText className="h-4 w-4 text-white" />
+                         <span className="font-semibold text-white text-[13px]">Implementation Plan</span>
+                       </div>
+                       <p className="text-[12px] text-[#cccccc] mb-2 leading-relaxed">
+                         Implementation plan for correcting diurnal variations.
+                       </p>
+                       <div className="flex gap-2">
+                         <button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleApproveDiurnal(activeConversation.id);
+                           }}
+                           className="px-4 py-1.5 text-[12px] font-semibold bg-[#007acc] text-white rounded hover:bg-[#1b8fe3] transition-colors"
+                         >
+                           Proceed
+                         </button>
+                       </div>
+                     </div>
+                   )}
+                   {/* (Opportunities removed) */}
+                 </>
+               )}
             </div>
           ))}
 

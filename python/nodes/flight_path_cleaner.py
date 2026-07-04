@@ -28,6 +28,7 @@ def clean_flight_path(payload: dict) -> dict:
     node_id = payload.get("node_id", "flight_path_cleaner")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
+    out_dir = payload.get("parameters", {}).get("outDir", "")
     
     # We expect airborne_canonical.csv to be in the artifacts
     airborne_path = os.path.abspath(os.path.join(out_dir, task_folder, "airborne_canonical.csv"))

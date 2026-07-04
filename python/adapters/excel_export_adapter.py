@@ -13,6 +13,7 @@ def export_excel(payload: dict) -> dict:
     node_id = payload.get("node_id", "excel_export_adapter")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
+    out_dir = payload.get("parameters", {}).get("outDir", "")
     
     corrected_path = os.path.abspath(os.path.join(out_dir, task_folder, "airborne_corrected.csv"))
     
@@ -22,9 +23,9 @@ def export_excel(payload: dict) -> dict:
     df = pd.read_csv(corrected_path)
     events = []
     
-    out_dir = os.path.abspath(os.path.join())
-    plot_path = os.path.join(out_dir, project_name, "g-aid output", task_folder, "mag_map.png")
-    excel_path = os.path.join(out_dir, "diurnal_analysis.xlsx")
+    # out_dir is already set above from payload
+    plot_path = os.path.join(out_dir, task_folder, "mag_map.png")
+    excel_path = os.path.join(out_dir, task_folder, "diurnal_analysis.xlsx")
     
     # 1. Generate spatial plot using matplotlib
     plt.figure(figsize=(10, 8))

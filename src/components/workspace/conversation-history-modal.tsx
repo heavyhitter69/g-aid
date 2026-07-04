@@ -43,9 +43,9 @@ export function ConversationHistoryModal({ onClose }: ConversationHistoryModalPr
     };
   }, [onClose]);
 
-  // Filter conversations based on search query
+  // Filter conversations based on search query and exclude empty ones
   const filteredConvos = conversations.filter(c =>
-    c.topic.toLowerCase().includes(searchQuery.toLowerCase())
+    c.messages.length > 0 && c.topic.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Keyboard navigation

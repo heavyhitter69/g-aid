@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/app-store";
 import { fetchFileText } from "@/lib/supabase/storage";
 import { readRegisteredFile, hasRegisteredFile } from "@/lib/file-registry";
-import { X, Play, RefreshCw, Save, Database, Table, Map, Braces, Settings2, FileText, CheckCircle2, AlertCircle, Layers, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Sparkles, Eye, ZoomIn, ZoomOut, RotateCw, Printer, Download, Maximize2, ChevronRight, Loader2 } from "lucide-react";
+import { X, Play, RefreshCw, Save, Database, Table, Map, Braces, Settings2, FileText, CheckCircle2, AlertCircle, Layers, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Sparkles, Eye, ZoomIn, ZoomOut, RotateCw, Printer, Download, Maximize2, ChevronRight, Loader2, Copy, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TextEditor } from "@/components/workspace/text-editor";
 import { SpreadsheetView } from "@/components/workspace/spreadsheet-view";
+import { MarkdownViewer } from "@/components/workspace/markdown-viewer";
 
 const DEMO_MOCK_FILES = [
   "line4_ert.dat",
@@ -35,6 +36,8 @@ export function FileEditorView() {
   const [contourThreshold, setContourThreshold] = useState(50);
   const [activeJsonTab, setActiveJsonTab] = useState<"code" | "schema">("code");
   const [isFetchingContent, setIsFetchingContent] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [reviewText, setReviewText] = useState("");
 
   // Lazy-load file content when a tab is opened
   useEffect(() => {
@@ -132,11 +135,94 @@ export function FileEditorView() {
   const isExcel = ["xlsx"].includes(ext);
   const isPdf = ext === "pdf";
   const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
+  const isMd = ext === "md" || ext === "mdx" || activeFile === "Implementation Plan";
   const useSpreadsheet =
     isSpreadsheet &&
     !(DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined);
   const useTextEditor =
-    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf && !isExcel && !isImage;
+    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf && !isExcel && !isImage && !isMd;
+
+  if (isMd) {
+    const isPlan = activeFile === "Implementation Plan";
+    return (
+      <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden">
+        {/* Top toolbar */}
+        <div className="h-[45px] border-b border-[#2b2b2b] shrink-0 bg-[#1e1e1e] flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-[#858585]" />
+            <span className="text-[#cccccc] text-[13px] font-medium">{activeFile}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="p-1.5 text-[#858585] hover:text-[#cccccc] hover:bg-[#2d2d2d] rounded transition-colors" title="Copy">
+              <Copy className="h-4 w-4" />
+            </button>
+            <button className="p-1.5 text-[#858585] hover:text-[#cccccc] hover:bg-[#2d2d2d] rounded transition-colors" title="Download">
+              <Download className="h-4 w-4" />
+            </button>
+             
+            {isPlan && (
+              <div className="flex items-center gap-2 ml-3 relative">
+                <button 
+                  onClick={() => setIsReviewOpen(!isReviewOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-[#007acc] rounded-md text-[#cccccc] text-[13px] hover:bg-[#007acc11] transition-colors bg-[#252526]"
+                >
+                  Review <ChevronDown className="h-3 w-3 text-[#858585]" />
+                </button>
+                <button 
+                  onClick={() => {
+                    useAppStore.getState().setPendingPrompt("I approve the implementation plan, please proceed.");
+                  }}
+                  className="bg-[#007acc] hover:bg-[#1b8fe3] text-white px-4 py-1.5 rounded-md text-[13px] font-bold transition-colors shadow-sm"
+                >
+                  Proceed
+                </button>
+
+                {/* Review Popover */}
+                {isReviewOpen && (
+                  <div className="absolute top-[120%] right-[80px] w-[300px] bg-[#252526] border border-[#3c3c3c] rounded-md shadow-2xl z-50 p-3 flex flex-col gap-2">
+                    <div className="text-[12px] text-[#cccccc] font-semibold mb-1">Submit comment</div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        value={reviewText}
+                        onChange={(e) => setReviewText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && reviewText.trim()) {
+                            useAppStore.getState().setPendingPrompt("Review feedback for the implementation plan: " + reviewText.trim());
+                            setReviewText("");
+                            setIsReviewOpen(false);
+                          }
+                        }}
+                        placeholder="Add a message..." 
+                        autoFocus
+                        className="flex-1 bg-[#1e1e1e] border border-[#3c3c3c] rounded-md px-2.5 py-1.5 text-[13px] text-[#cccccc] placeholder:text-[#555] outline-none focus:border-[#007acc]"
+                      />
+                      <button 
+                        onClick={() => {
+                          if (reviewText.trim()) {
+                            useAppStore.getState().setPendingPrompt("Review feedback for the implementation plan: " + reviewText.trim());
+                            setReviewText("");
+                            setIsReviewOpen(false);
+                          }
+                        }}
+                        disabled={!reviewText.trim()}
+                        className="px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors bg-[#333333] text-[#cccccc] hover:bg-[#444444] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Submit
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <MarkdownViewer content={fileContents[activeFile] || ""} />
+        </div>
+      </div>
+    );
+  }
 
   if (isImage) {
     const fileEntry = useAppStore.getState().projectFiles.find(f => f.id === activeFile);

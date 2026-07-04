@@ -5,7 +5,7 @@ This document captures the exact Next.js implementation and CSS for the "Curated
 ## Dependencies
 
 - **`next/image`**: Standard Next.js component used to render the emoji without browser optimization distorting the transparent edge.
-- **Icon Graphic**: It uses a local asset, e.g., `/emoji-genie-apple.png`.
+- **Icon Graphic**: It uses a local asset, e.g., `/genie-logo.png`.
 
 ## React Implementation
 
@@ -19,8 +19,8 @@ const CuratedInner = () => (
   <>
     <span className={styles.curatedLabel}>Curated by</span>
     <Image
-      src="/emoji-genie-apple.png"
-      alt="Developer emoji"
+      src="/genie-logo.png"
+      alt="Genie Logo"
       width={24}
       height={24}
       className={styles.genieImg}

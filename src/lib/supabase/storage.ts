@@ -48,10 +48,30 @@ export async function uploadFile(
   }
 
   const isGuest = !user;
-  const activeBucket = isGuest ? "demo_workspace" : BUCKET;
-  const activeTable = isGuest ? "demo_project_files" : "project_files";
-
   const filePath = relativePath || file.name;
+  
+  // ALWAYS bypass Supabase storage since the demo buckets are missing
+  if (true) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("project", projectId || "unsorted");
+    formData.append("path", filePath);
+    
+    await fetch("/api/upload", { method: "POST", body: formData }).catch(console.error);
+    
+    const storagePath = `local_uploads/${projectId || "unsorted"}/${filePath}`;
+    
+    return {
+      name: file.name,
+      storagePath,
+      sizeBytes: file.size,
+      mimeType: file.type || "application/octet-stream",
+    };
+  }
+
+  const activeBucket = BUCKET;
+  const activeTable = "project_files";
+
   const storagePath = `${activeUserId}/${projectId ?? "unsorted"}/${filePath}`;
 
   const { error: uploadError } = await supabase.storage
@@ -67,32 +87,22 @@ export async function uploadFile(
 
   // Insert metadata row
   if (projectId) {
-    if (isGuest) {
-      await supabase.from(activeTable).insert({
-        guest_id: activeUserId,
-        project_name: projectId, // For guests, we just use the name instead of a UUID
-        name: file.name,
-        storage_path: storagePath,
-        size_bytes: file.size,
-      });
-    } else {
-      await supabase.from(activeTable).insert({
-        project_id: projectId,
-        user_id: activeUserId,
-        name: file.name,
-        storage_path: storagePath,
-        size_bytes: file.size,
-        mime_type: file.type || null,
-      });
-    }
+    await supabase.from(activeTable).insert({
+      project_id: projectId,
+      user_id: activeUserId,
+      name: file.name,
+      storage_path: storagePath,
+      size_bytes: file.size,
+      mime_type: file.type || null,
+    });
   }
 
-    return {
-      name: file.name,
-      storagePath,
-      sizeBytes: file.size,
-      mimeType: file.type,
-    };
+  return {
+    name: file.name,
+    storagePath,
+    sizeBytes: file.size,
+    mimeType: file.type,
+  };
 }
 
 
@@ -143,30 +153,8 @@ export async function listProjectFiles(projectId: string) {
  * Ensure a project row exists for this user+name combo, returning its id.
  */
 export async function upsertProject(name: string): Promise<string | null> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  // Check if project already exists
-  const { data: existing } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("name", name)
-    .maybeSingle();
-
-  if (existing) return existing.id;
-
-  const { data: created, error } = await supabase
-    .from("projects")
-    .insert({ user_id: user.id, name })
-    .select("id")
-    .single();
-
-  if (error) return null;
-  return created.id;
+  // ALWAYS bypass Supabase since we are using local file storage
+  return name;
 }
 
 /** Upsert profile metadata after sign-in */
