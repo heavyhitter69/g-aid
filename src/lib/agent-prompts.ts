@@ -11,18 +11,16 @@ import type { AgentId, HypothesisNode, ConfidenceProvenance, GeoDataset } from "
 // ─── System prompts (sent to LLM when key is available) ──────────────────────
 
 export const SYSTEM_PROMPTS: Record<AgentId, string> = {
-  "orchestrator-agent": `You are the Orchestrator of a scientific geophysical operating system. Your role is COORDINATION ONLY — not interpretation.
+  "orchestrator-agent": `You are G-AID, an AI-native geoscientific operating system and assistant.
+Your role is to assist the user with geophysical data analysis, workflow planning, and general inquiries.
 
 Your responsibilities:
-1. Parse user intent and map to required capabilities
-2. Select the minimal set of specialist agents
-3. Sequence agent calls correctly
-4. Aggregate agent outputs into a coherent response
-5. Surface proactive opportunities from scientific state
+1. Answer questions about geophysics, structural geology, and data processing.
+2. Provide clear, concise, and helpful conversational responses.
+3. If datasets are loaded, synthesize the context into a coherent interpretation.
+4. Format your output nicely using Markdown.
 
-You DO NOT interpret geophysical data. You DO NOT assign confidence values.
-Confidence is computed deterministically by the ConfidenceProvenance system.
-Your output format: { agents: [...], capabilities: [...], plan: "brief coordination plan" }`,
+You are the face of the application. Speak directly to the user in a natural, helpful tone. Do not output raw JSON unless specifically requested.`,
 
   "magnetic-agent": `You are the Magnetic Agent — a domain specialist in potential field magnetics.
 
@@ -160,7 +158,7 @@ export function buildOllamaPrompt(input: SynthesisInput): string {
     prompt += `\n`;
   }
 
-  prompt += `Instructions: Respond directly to the user's query based on the context above. Use markdown formatting. Provide a structured, scientifically accurate interpretation. Do not include internal monologue.`;
+  prompt += `Instructions: Respond directly to the user's query based on the context above. Use markdown formatting. Provide a structured, scientifically accurate interpretation. You MUST ALWAYS enclose your internal reasoning inside <think>...</think> tags before providing your final response, regardless of how simple the query is.`;
   return prompt;
 }
 
@@ -249,31 +247,12 @@ function formatOrchestratorResponse(
   const isAnalyzeAll = /\b(analy[sz]e\s+(all|every|the|these|my|loaded)|process\s+(all|every|the)|scan\s+(all|every|the)|review\s+(all|every|the)|examine\s+(all|every|the))\b/.test(lowerQuery);
 
   if (isGreeting) {
-    return [
-      `## Welcome to G-AID`,
-      ``,
-      `I'm your AI-native geoscientific operating system. I can:`,
-      ``,
-      `- **Interpret** magnetic, resistivity, gravity, and seismic data`,
-      `- **Plan** multi-step processing workflows as executable DAGs`,
-      `- **Track** hypotheses with full epistemic provenance`,
-      `- **Synthesize** cross-method geological interpretations`,
-      ``,
-      datasets.length > 0
-        ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded. Ask me to interpret them, or type \`/plan\` to compile a workflow.`
-        : `No datasets are loaded yet. Upload geophysical data using the **Datasets** panel, then describe what you're looking at and I'll begin interpreting.`,
-    ].join("\n");
+    return "Hi there! 👋 How can I help you today?";
   }
 
   if (isConversational) {
     if (lowerQuery.includes("how are you") || lowerQuery.includes("how's it going") || lowerQuery.includes("how is it going")) {
-      return [
-        `I'm doing great, thank you for asking! I am fully calibrated and ready to assist you.`,
-        ``,
-        datasets.length > 0
-          ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded in this workspace. Describe what you'd like to analyze or type \`/plan\` to build a processing pipeline.`
-          : `No geophysical datasets are loaded yet. You can upload datasets using the **Datasets** panel or choose a folder, and I will begin interpreting them.`,
-      ].join("\n");
+      return "I'm doing great, thanks for asking! 😊 How about you? What's on your mind today?";
     }
     
     if (lowerQuery.includes("who are you") || lowerQuery.includes("what are you") || lowerQuery.includes("who is this")) {
@@ -364,6 +343,8 @@ function formatOrchestratorResponse(
   ];
 
   const isGeophysical = GEOPHYSICAL_KEYWORDS.some(kw => lowerQuery.includes(kw));
+
+
 
   if (!isGeophysical) {
     if (/\bholiday\b/.test(lowerQuery)) {

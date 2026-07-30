@@ -10,7 +10,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   MessageSquare, X, Plus, Clock, MoreHorizontal, PanelRight,
-  Paperclip, Mic, ChevronDown, AlertCircle, Zap, GitBranch,
+  Paperclip, Mic, ChevronDown, ChevronUp, AlertCircle, Zap, GitBranch,
   TrendingUp, AlertTriangle, Info, CheckCircle2, Network,
   BarChart3, Lightbulb, SendHorizontal, Search, Trash2, FileText
 } from "lucide-react";
@@ -163,10 +163,11 @@ function OpportunityChip({ opp, onDismiss, onActivate }: {
 
 // ─── Streaming markdown renderer ──────────────────────────────────────────────
 
-function StreamingMessage({ content, preamble, isStreaming }: {
+function StreamingMessage({ content, preamble, isStreaming, isThinking }: {
   content: string;
   preamble: StreamPreamble | null;
   isStreaming: boolean;
+  isThinking?: boolean;
 }) {
   // Simple markdown-to-JSX: bold, headers, bullet points
   const renderMarkdown = (text: string) => {
@@ -279,7 +280,7 @@ function StreamingMessage({ content, preamble, isStreaming }: {
       )}
       <div className="space-y-0.5">
         {renderMarkdown(content)}
-        {isStreaming && (
+        {isStreaming && !isThinking && (
           <span className="inline-block h-3 w-1 bg-[#007acc] animate-pulse ml-0.5" />
         )}
       </div>
@@ -305,7 +306,7 @@ interface EnhancedMessage {
 
 // ─── Thinking indicator ───────────────────────────────────────────────────────
 
-const THINKING_PHASES = ["Thinking", "Analyzing", "Synthesizing"] as const;
+const THINKING_PHASES = ["Thinking"] as const;
 
 function ThinkingIndicator({ startedAt }: { startedAt: number }) {
   const [phase, setPhase] = useState(0);
@@ -319,11 +320,6 @@ function ThinkingIndicator({ startedAt }: { startedAt: number }) {
 
   return (
     <div className="flex items-center gap-2.5 py-0.5">
-      {/* Animated orb */}
-      <div className="relative h-4 w-4 shrink-0">
-        <div className="absolute inset-0 rounded-full bg-[#007acc] opacity-20 animate-ping" />
-        <div className="absolute inset-[3px] rounded-full bg-[#007acc]" />
-      </div>
       {/* Phase text */}
       <span
         key={phase}
@@ -348,28 +344,49 @@ function ThinkingIndicator({ startedAt }: { startedAt: number }) {
 
 // ─── Thought disclosure ───────────────────────────────────────────────────────
 
-function ThoughtDisclosure({ duration, thought }: { duration: number; thought?: string }) {
-  const [open, setOpen] = useState(false);
+function ThoughtDisclosure({ duration, thought, isStreaming }: { duration: number; thought?: string; isStreaming?: boolean }) {
+  const [open, setOpen] = useState(isStreaming ?? false);
+
+  useEffect(() => {
+    if (isStreaming) setOpen(true);
+  }, [isStreaming]);
+
+  const formatTime = (secs: number) => {
+    if (secs < 60) return `${secs}s`;
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+  };
+
   return (
     <div className="mb-2">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 text-[10px] text-[#555] hover:text-[#858585] transition-colors group"
+        className="flex items-center gap-1.5 text-[13px] text-[#a0a0a0] hover:text-[#d0d0d0] transition-colors group"
       >
-        <span
-          className="inline-block transition-transform duration-200"
-          style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
-        >
-          ›
-        </span>
-        <span>Thought for {duration}s</span>
+        <span>Thought for {formatTime(duration)}</span>
+        <ChevronDown 
+          className="w-3.5 h-3.5 ml-1 transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
       </button>
       {open && thought && (
         <div 
-          className="mt-1.5 ml-3 pl-2 border-l border-[#2b2b2b] text-[10px] text-[#555] leading-relaxed italic animate-in fade-in slide-in-from-top-1 duration-200"
-          style={{ whiteSpace: "pre-wrap" }}
+          className="mt-3 ml-2 text-[13px] text-[#a0a0a0] leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200 border-l-2 border-[#333] pl-3"
         >
-          {thought}
+          {thought.includes("[1/") ? (
+            <ul className="list-disc space-y-1 pl-4">
+              {thought.split('\n').filter(Boolean).map((line, i) => {
+                const cleanLine = line.replace(/^\[\d+\/\d+\]\s*/, '');
+                return <li key={i}>{cleanLine}</li>;
+              })}
+            </ul>
+          ) : (
+            <div className="whitespace-pre-wrap font-mono text-[12px] opacity-80">{thought}</div>
+          )}
         </div>
       )}
     </div>
@@ -409,23 +426,26 @@ function InputBox({
     : "top-full mt-1";
   const canSend = inputVal.trim().length > 0 && !isGenerating;
   return (
-    <div className="bg-[#252526] border border-[#3c3c3c] rounded-lg p-2 flex flex-col focus-within:border-[#007acc] transition-colors relative">
+    <div className="bg-[#252526] border border-[#3c3c3c] rounded-lg p-2 flex flex-col focus-within:border-[#007acc] transition-colors relative shadow-sm">
       <textarea
         value={inputVal}
         onChange={(e) => setInputVal(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Describe the anomaly, ask for interpretation, or type /plan for a workflow…"
-        className="bg-transparent border-none outline-none resize-none text-[12px] text-[#cccccc] placeholder-[#858585] h-[70px] font-sans leading-relaxed"
+        placeholder="Ask anything, @ to mention, / for actions"
+        className="bg-transparent border-none outline-none resize-none text-[12px] text-[#cccccc] placeholder-[#858585] h-[50px] font-sans leading-relaxed"
       />
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2b2b2b]">
+      <div className="flex items-center justify-between mt-1 pt-1">
         <div className="flex items-center gap-1.5 relative">
+          <button className="text-[#858585] hover:text-[#cccccc] p-1 rounded transition-colors mr-1">
+            <Plus className="h-3.5 w-3.5" />
+          </button>
           <button
             onClick={() => { setDropdownOpen(!dropdownOpen); setModelDropdownOpen(false); }}
-            className="flex items-center gap-1.5 text-[10px] bg-[#333333] hover:bg-[#3e3e42] px-2 py-0.5 rounded text-[#cccccc] border border-[#3c3c3c] transition-colors"
+            className="flex items-center gap-1.5 text-[10px] bg-transparent hover:bg-[#333333] px-1.5 py-0.5 rounded text-[#cccccc] transition-colors"
           >
             {currentModeObj.icon()}
-            <span>{currentModeObj.label}</span>
-            <ChevronDown className="h-2.5 w-2.5 text-[#858585]" />
+            <span className="font-medium text-[#cccccc]">{currentModeObj.label}</span>
+            <ChevronUp className="h-3 w-3 text-[#858585]" />
           </button>
           {dropdownOpen && (
             <div className={`absolute left-0 ${anchor} bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-xl w-[140px] py-1 z-50 flex flex-col text-[12px]`}>
@@ -474,24 +494,55 @@ function InputBox({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[#858585]">
-          <button className="p-1 hover:bg-[#333333] hover:text-[#cccccc] rounded transition-colors"><Paperclip className="h-3.5 w-3.5" /></button>
-          <button className="p-1 hover:bg-[#333333] hover:text-[#cccccc] rounded transition-colors"><Mic className="h-3.5 w-3.5" /></button>
-          <button
-            id="ai-panel-send-btn"
-            onClick={handleSend}
-            disabled={!canSend}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all duration-200",
-              canSend
-                ? "bg-[#007acc] text-white hover:bg-[#1b8fe3] shadow-[0_0_8px_#007acc55] cursor-pointer"
-                : "bg-[#2a2a2a] text-[#444] cursor-not-allowed"
-            )}
+        <button className="text-[#858585] hover:text-[#cccccc] p-1.5 rounded-full transition-colors bg-[#333333] border border-[#3c3c3c]">
+          <Mic className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pending Changes Widget ──────────────────────────────────────────────────
+
+function PendingChangesWidget() {
+  const pendingFileUpdates = useAppStore(state => state.pendingFileUpdates);
+  const applyPendingFileUpdates = useAppStore(state => state.applyPendingFileUpdates);
+  const clearPendingFileUpdates = useAppStore(state => state.clearPendingFileUpdates);
+
+  if (!pendingFileUpdates || pendingFileUpdates.length === 0) return null;
+
+  return (
+    <div className="bg-[#252526] border border-[#3c3c3c] rounded-lg p-2.5 mb-2 shadow-lg animate-in fade-in slide-in-from-bottom-2">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5 text-[#cccccc]" />
+          <span className="text-[12px] font-semibold text-[#cccccc]">{pendingFileUpdates.length} Files Modified</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={clearPendingFileUpdates}
+            className="text-[11px] font-medium text-[#858585] hover:text-[#cccccc] transition-colors"
           >
-            <SendHorizontal className="h-3 w-3" />
-            Send
+            Reject all
+          </button>
+          <button 
+            onClick={applyPendingFileUpdates}
+            className="px-2.5 py-0.5 bg-[#007acc] hover:bg-[#1b8fe3] text-white text-[11px] font-medium rounded transition-colors"
+          >
+            Accept all
           </button>
         </div>
+      </div>
+      <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-1">
+        {pendingFileUpdates.map((file, idx) => (
+          <div key={idx} className="flex items-center justify-between px-2 py-1 bg-[#1e1e1e] rounded border border-[#2b2b2b]">
+            <span className="text-[11px] text-[#cccccc] font-mono truncate max-w-[180px]">{file.id.split('/').pop() || file.id}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-[#4caf50]">+<span className="opacity-0">0</span></span>
+              <span className="text-[10px] text-[#f44336]">-<span className="opacity-0">0</span></span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1196,20 +1247,49 @@ const handleApproveDiurnal = async (sessionId: string) => {
             >
 {msg.sender === "user" ? (
                  <p className="whitespace-pre-wrap">{msg.text}</p>
-               ) : (
+               ) : (() => {
+                 let displayThought = msg.thought || "";
+                 let displayText = msg.text;
+
+                 // Extract <think> from LLM
+                 const thinkMatch = displayText.match(/<think>([\s\S]*?)<\/think>/);
+                 if (thinkMatch) {
+                   const llmThought = thinkMatch[1].trim();
+                   if (llmThought) {
+                     displayThought = llmThought;
+                   }
+                   displayText = displayText.replace(/<think>[\s\S]*?<\/think>/, "").trim();
+                 } else if (displayText.includes("<think>")) {
+                   // Still streaming <think>
+                   const parts = displayText.split("<think>");
+                   const llmThought = parts[1].trim();
+                   if (llmThought) {
+                     displayThought = llmThought;
+                   }
+                   displayText = parts[0].trim();
+                 }
+
+                 const isStreamingThought = msg.isStreaming && !!displayThought && !displayText;
+                 const showThinkingIndicator = msg.isStreaming && msg.thinkingStartedAt && !displayThought && !displayText;
+
+                 return (
                  <>
-                   {/* Thought disclosure — shown when done */}
-                   {msg.thinkingDuration !== undefined && !msg.isStreaming && (
-                     <ThoughtDisclosure duration={msg.thinkingDuration} thought={msg.thought} />
-                   )}
-                   {/* Live thinking indicator — shown while streaming with no text yet */}
-                   {msg.isStreaming && msg.thinkingStartedAt && msg.text === "" && (
-                     <ThinkingIndicator startedAt={msg.thinkingStartedAt} />
+                   {/* Thought disclosure — shown when done or streaming thought */}
+                   {(msg.thinkingDuration !== undefined && !msg.isStreaming && displayThought) ? (
+                     <ThoughtDisclosure duration={msg.thinkingDuration} thought={displayThought} />
+                   ) : (isStreamingThought && displayThought) ? (
+                     <ThoughtDisclosure duration={Math.round((Date.now() - (msg.thinkingStartedAt || Date.now())) / 1000)} thought={displayThought} isStreaming={true} />
+                   ) : null}
+                   
+                   {/* Live thinking indicator — shown while streaming with no text and no thought yet */}
+                   {showThinkingIndicator && (
+                     <ThinkingIndicator startedAt={msg.thinkingStartedAt!} />
                    )}
                    <StreamingMessage
-                     content={msg.text}
+                     content={displayText}
                      preamble={msg.preamble ?? null}
                      isStreaming={msg.isStreaming ?? false}
+                     isThinking={showThinkingIndicator || isStreamingThought}
                    />
                    {/* Approval button for diurnal analysis plans */}
                    {!msg.isStreaming && msg.awaitingApproval && (
@@ -1241,7 +1321,8 @@ const handleApproveDiurnal = async (sessionId: string) => {
                    )}
                    {/* (Opportunities removed) */}
                  </>
-               )}
+                 );
+               })()}
             </div>
           ))}
 
@@ -1253,12 +1334,12 @@ const handleApproveDiurnal = async (sessionId: string) => {
           )}
         </div>
 
-        {/* Agent Activity Monitor */}
-        <AgentActivity />
+        {/* Agent Activity Monitor has been removed to match new sleek IDE style */}
 
         {/* Input box — shown at bottom AFTER first message is sent */}
         {hasSentMessage && (
           <div className="p-3 border-t border-[#2b2b2b] shrink-0 bg-[#1e1e1e] animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <PendingChangesWidget />
             <InputBox
               inputVal={inputVal}
               setInputVal={setInputVal}

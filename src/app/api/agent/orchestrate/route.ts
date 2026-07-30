@@ -16,7 +16,7 @@ import { compileDAG } from "@/lib/workflow-planner";
 import { generateImplementationPlan, generateTasksMarkdown, updateTaskProgress, PENDING_APPROVAL } from "./implementation-plan";
 import fs from "fs";
 import path from "path";
-import { synthesizeResponse } from "@/lib/agent-prompts";
+import { synthesizeResponse, buildOllamaPrompt } from "@/lib/agent-prompts";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { magneticKernel } from "@/lib/kernels/magnetic-kernel";
 import { resistivityKernel } from "@/lib/kernels/resistivity-kernel";
@@ -245,13 +245,23 @@ export async function POST(request: NextRequest): Promise<Response> {
           
           // Fallback: Auto-discover the project name in public/ (helpful for guest testing!)
           if (!usingSupabase) {
-            if (!fs.existsSync(path.join(baseDir, targetFolder))) {
+            const checkHasFiles = (dir: string): boolean => {
+              if (!fs.existsSync(dir)) return false;
+              const items = fs.readdirSync(dir, { withFileTypes: true });
+              for (const item of items) {
+                if (item.isFile()) return true;
+                if (item.isDirectory() && checkHasFiles(path.join(dir, item.name))) return true;
+              }
+              return false;
+            };
+
+            if (!checkHasFiles(path.join(baseDir, targetFolder))) {
                const publicDirs = fs.readdirSync(path.join(process.cwd(), "public"), { withFileTypes: true })
                   .filter(d => d.isDirectory() && d.name !== "g-aid output")
                   .map(d => d.name);
                
                for (const pd of publicDirs) {
-                  if (fs.existsSync(path.join(process.cwd(), "public", pd, targetFolder))) {
+                  if (checkHasFiles(path.join(process.cwd(), "public", pd, targetFolder))) {
                      projectName = pd;
                      baseDir = path.join(process.cwd(), "public", projectName);
                      usingSupabase = true; // Pretend we found it
@@ -262,6 +272,9 @@ export async function POST(request: NextRequest): Promise<Response> {
                usingSupabase = true;
             }
           }
+
+          enqueue(`\x00${JSON.stringify(planPreamble)}\n`);
+          await delay(80);
 
           if (!usingSupabase) {
             enqueue("I couldn't find any files for this project. Please upload your survey data files first before running diurnal analysis.\n\n");
@@ -296,8 +309,6 @@ export async function POST(request: NextRequest): Promise<Response> {
           }
           const taskFolder = `task ${nextTaskNum}`;
 
-          enqueue(`\x00${JSON.stringify(planPreamble)}\n`);
-          await delay(80);
           
           const planMarkdown = generateImplementationPlan(projectName, targetFolder, taskFolder);
           
@@ -325,7 +336,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           enqueue(`\n\x02${JSON.stringify({
             type: "agent_complete",
             agentId: "magnetic-agent",
-            thought: "Generated Diurnal Analysis Implementation Plan. Waiting for user approval.",
+            thought: "",
             hypothesisEvents: [],
             opportunitiesDetected: 0,
             agentsDispatched: ["magnetic-agent"],
@@ -388,31 +399,104 @@ export async function POST(request: NextRequest): Promise<Response> {
         await delay(60);
 
         // ── Phase 2: Response text (no \x01 per token — enter text mode once) ─
-        const responseText = synthesizeResponse({
-          agentId:      primaryAgentId,
-          query:        message,
-          hypotheses:   snapshot.hypothesisGraph.filter((h) => h.status === "active"),
-          datasets:     snapshot.datasets,
-          provenance,
-          ruleMatchIds,
-        });
+        const ollamaUrl = process.env.NEXT_PUBLIC_OLLAMA_URL || "http://127.0.0.1:11434";
+        const ollamaModel = process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1:8b";
+        let usedOllama = false;
+        let generatedThought = "";
+
+        try {
+          const prompt = buildOllamaPrompt({
+            agentId:      primaryAgentId,
+            query:        message,
+            hypotheses:   snapshot.hypothesisGraph.filter((h) => h.status === "active"),
+            datasets:     snapshot.datasets,
+            provenance,
+            ruleMatchIds,
+          });
+
+          const ollamaRes = await fetch(`${ollamaUrl}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: ollamaModel,
+              prompt: prompt,
+              stream: true,
+            })
+          });
+
+          if (!ollamaRes.ok) {
+            throw new Error(`Ollama responded with status: ${ollamaRes.status}`);
+          }
+
+          const reader = ollamaRes.body?.getReader();
+          if (reader) {
+            usedOllama = true;
+            const decoder = new TextDecoder();
+            let hasStartedThinking = false;
+            let hasFinishedThinking = false;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split("\n");
+
+              for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                  const json = JSON.parse(line);
+                  
+                  if (json.thinking) {
+                    if (!hasStartedThinking) {
+                      enqueue("<think>\n");
+                      hasStartedThinking = true;
+                    }
+                    enqueue(json.thinking);
+                  } else if (hasStartedThinking && !hasFinishedThinking && json.response) {
+                    enqueue("\n</think>\n\n");
+                    hasFinishedThinking = true;
+                  }
+
+                  if (json.response) {
+                    enqueue(json.response);
+                  }
+                } catch (e) {
+                  // ignore parse errors for partial lines
+                }
+              }
+            }
+          }
+        } catch (err) {
+          // Fallback to local hardcoded synthesis
+          console.warn("Ollama unavailable, falling back to mock synthesis", err);
+          const responseText = synthesizeResponse({
+            agentId:      primaryAgentId,
+            query:        message,
+            hypotheses:   snapshot.hypothesisGraph.filter((h) => h.status === "active"),
+            datasets:     snapshot.datasets,
+            provenance,
+            ruleMatchIds,
+          });
+
+          // Stream tokens with human-readable cadence
+          const tokens = responseText.split(/(?<= )/);
+          for (const token of tokens) {
+            enqueue(token);
+            const hasNewline = token.includes("\n");
+            await delay(hasNewline ? 25 : 10);
+          }
+        }
 
         // Append proactive opportunity note if any were found
-        const fullText = proactiveOpps.length > 0
-          ? responseText + `\n\n---\n\n**💡 ${proactiveOpps.length} proactive opportunit${proactiveOpps.length === 1 ? "y" : "ies"} detected.** Use the chips in the panel to activate them.`
-          : responseText;
-
-        // Stream tokens with human-readable cadence
-        const tokens = fullText.split(/(?<= )/);  // split keeping trailing space
-        for (const token of tokens) {
-          enqueue(token);
-          // Vary delay: longer after newlines (paragraph beats), shorter for mid-sentence
-          const hasNewline = token.includes("\n");
-          await delay(hasNewline ? 25 : 10);
+        if (proactiveOpps.length > 0) {
+          enqueue(`\n\n---\n\n**💡 ${proactiveOpps.length} proactive opportunit${proactiveOpps.length === 1 ? "y" : "ies"} detected.** Use the chips in the panel to activate them.`);
         }
 
         // ── Phase 3: Epilogue ──────────────────────────────────────────────
+        // We always generate a fallback thought. If the LLM produces its own <think> tags, 
+        // the frontend UI will extract them and overwrite this fallback thought!
         const thought = generateThought(message, primaryAgentId, capabilities, ruleMatchIds, snapshot.datasets.length);
+        
         enqueue(`\n\x02${JSON.stringify({
           type:                   "agent_complete",
           agentId:                primaryAgentId,
@@ -488,9 +572,8 @@ function generateThought(
 
   if (isGreeting) {
     return [
-      `[1/3] Tokenizer matching conversational signature: 'greeting'. Routing away from expert domain kernels.`,
-      `[2/3] Bypassing spatial constraint grids and CRS alignment indexes.`,
-      `[3/3] Render output: Loading greeting & onboarding welcome layout.`
+      `[1/2] Semantic Parsing: Greeting intent detected.`,
+      `[2/2] Action: Generating welcoming response.`
     ].join("\n");
   }
   if (isHelp) {
@@ -502,9 +585,8 @@ function generateThought(
   }
   if (isConversational) {
     return [
-      `[1/3] Linguistic parser evaluated non-geophysical query: 'conversational/general'. Bypassing geophysical rules engine.`,
-      `[2/3] Querying local environment settings and mock schedules.`,
-      `[3/3] Render output: Formulating friendly conversational reply and guiding user towards survey analyses.`
+      `[1/2] Semantic Parsing: Conversational intent detected.`,
+      `[2/2] Action: Generating appropriate conversational response.`
     ].join("\n");
   }
   if (isPlan) {

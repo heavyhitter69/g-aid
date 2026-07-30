@@ -135,6 +135,10 @@ interface AppState {
   setHistoryModalOpen: (value: boolean) => void;
   pendingPrompt: string | null;
   setPendingPrompt: (prompt: string | null) => void;
+  pendingFileUpdates: { id: string, content?: string }[];
+  setPendingFileUpdates: (updates: { id: string, content?: string }[]) => void;
+  clearPendingFileUpdates: () => void;
+  applyPendingFileUpdates: () => void;
 }
 
 const initialState = {
@@ -182,6 +186,8 @@ const initialState = {
     autoApproveModeTransitions: false,
   },
   isHistoryModalOpen: false,
+  pendingPrompt: null,
+  pendingFileUpdates: [] as { id: string, content?: string }[],
 };
 
 export const useAppStore = create<AppState>()(
@@ -415,8 +421,33 @@ export const useAppStore = create<AppState>()(
       })),
       reset: () => set(initialState),
       setHistoryModalOpen: (value) => set({ isHistoryModalOpen: value }),
-      pendingPrompt: null,
-      setPendingPrompt: (prompt) => set({ pendingPrompt: prompt })
+      setPendingPrompt: (prompt) => set({ pendingPrompt: prompt }),
+      setPendingFileUpdates: (updates) => set({ pendingFileUpdates: updates }),
+      clearPendingFileUpdates: () => set({ pendingFileUpdates: [] }),
+      applyPendingFileUpdates: () => set((state) => {
+        const currentFiles = state.projectFiles;
+        const newFiles = state.pendingFileUpdates.filter(f => !currentFiles.some(existing => existing.id === f.id));
+        
+        const newProjectFiles = [...currentFiles, ...newFiles.map(f => ({
+          id: f.id,
+          name: f.id.split('/').pop() || f.id,
+          size: 0,
+          modified: new Date().toISOString()
+        }))];
+
+        const newFileContents = { ...state.fileContents };
+        state.pendingFileUpdates.forEach(f => {
+          if (f.content) {
+            newFileContents[f.id] = f.content;
+          }
+        });
+
+        return {
+          projectFiles: newProjectFiles,
+          fileContents: newFileContents,
+          pendingFileUpdates: [],
+        };
+      }),
     }),
     { 
       name: "gaid-app-store",
