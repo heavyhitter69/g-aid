@@ -4,6 +4,7 @@ const path = require("path");
 const { createServer } = require("http");
 const { parse } = require("url");
 const { spawn } = require("child_process");
+const workspaceFs = require("./workspace-fs");
 
 const PROTOCOL = "gaid";
 const PRODUCTION_PORT = 47821;
@@ -398,6 +399,32 @@ ipcMain.handle("get-auth-base-url", () => authBaseUrl);
 ipcMain.handle("get-pending-auth", () => pendingAuthUrl);
 ipcMain.handle("open-aux-window", async (_event, pathname) => {
   await openAuxWindow(pathname);
+});
+
+ipcMain.handle("pick-folder", async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const result = await dialog.showOpenDialog(win, {
+    title: "Open Folder",
+    properties: ["openDirectory"],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle("index-workspace", async (_event, root) => {
+  return workspaceFs.indexWorkspace(root);
+});
+
+ipcMain.handle("read-workspace-file", async (_event, root, relativePath) => {
+  return workspaceFs.readWorkspaceFile(root, relativePath);
+});
+
+ipcMain.handle("create-workspace-file", async (_event, root, relativePath, content) => {
+  return workspaceFs.writeWorkspaceFile(root, relativePath, content ?? "");
+});
+
+ipcMain.handle("create-workspace-folder", async (_event, root, relativePath) => {
+  return workspaceFs.mkdirWorkspace(root, relativePath);
 });
 
 const gotTheLock = app.requestSingleInstanceLock();

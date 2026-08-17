@@ -6,6 +6,7 @@ import { Settings, ChevronRight, Check } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { isDesktop } from "@/lib/desktop";
+import { openWorkspaceFolder } from "@/lib/open-workspace";
 
 function CursorChatIcon({ className }: { className?: string }) {
   return (
@@ -150,7 +151,7 @@ export function Topbar() {
                         } else if (item.action === "open-file") {
                           document.getElementById("native-file-picker")?.click();
                         } else if (item.action === "open-folder") {
-                          document.getElementById("native-folder-picker")?.click();
+                          void openWorkspaceFolder();
                         } else if (item.action === "save" && activeFile) {
                           saveFile(activeFile);
                         } else if (item.action === "save-as") {

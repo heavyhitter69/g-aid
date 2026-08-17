@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronRight, ChevronDown, ChevronUp, Files, Search, GitBranch, Wrench, Pin, Bug, Table, Layers, Braces, FileCode, FileText, PanelLeftClose } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronUp, Files, Search, GitBranch, Wrench, Pin, Bug, Table, Layers, Braces, FileCode, FileText, PanelLeftClose, FilePlus, FolderPlus, RefreshCw, FoldVertical } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ExplorerTree } from "@/components/workspace/explorer-tree";
 import type { ProjectFile } from "@/types/project";
+import { createWorkspaceEntry, openWorkspaceFolder, refreshWorkspaceIndex } from "@/lib/open-workspace";
 
 export function Sidebar() {
   const { 
@@ -35,6 +36,10 @@ export function Sidebar() {
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [chevronOpen, setChevronOpen] = useState(false);
+  const [collapseSignal, setCollapseSignal] = useState(0);
+  const [creating, setCreating] = useState<"file" | "folder" | null>(null);
+  const [createName, setCreateName] = useState("");
+  const [createError, setCreateError] = useState("");
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -222,6 +227,25 @@ export function Sidebar() {
     openWorkbenchTab(`file:${file.id}`, "file", file.name);
   };
 
+  const beginCreate = (kind: "file" | "folder") => {
+    setExplorerOpen(true);
+    setCreating(kind);
+    setCreateName("");
+    setCreateError("");
+  };
+
+  const submitCreate = async () => {
+    if (!creating) return;
+    try {
+      await createWorkspaceEntry(creating, createName);
+      setCreating(null);
+      setCreateName("");
+      setCreateError("");
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Could not create");
+    }
+  };
+
   const handleFileContextMenu = (e: React.MouseEvent, fileId: string) => {
     e.preventDefault();
     const menuWidth = 250;
@@ -363,13 +387,52 @@ export function Sidebar() {
           <>
             {/* Project Section */}
             <div className="mb-1">
-              <button 
-                onClick={() => setExplorerOpen(!explorerOpen)}
-                className="w-full flex items-center gap-1 px-1 py-1 hover:bg-[#2a2d2e] font-bold text-[#cccccc] text-left border-none bg-transparent cursor-pointer"
-              >
-                {explorerOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-                <span className="uppercase truncate">{currentProject ? currentProject.toUpperCase().replace(/\s+/g, '-') : "NO FOLDER OPENED"}</span>
-              </button>
+              <div className="w-full flex items-center gap-0.5 px-1 py-1 hover:bg-[#2a2d2e]">
+                <button
+                  type="button"
+                  onClick={() => setExplorerOpen(!explorerOpen)}
+                  className="flex-1 min-w-0 flex items-center gap-1 font-bold text-[#cccccc] text-left border-none bg-transparent cursor-pointer"
+                >
+                  {explorerOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="uppercase truncate">{currentProject ? currentProject.toUpperCase().replace(/\s+/g, '-') : "NO FOLDER OPENED"}</span>
+                </button>
+                {currentProject && (
+                  <div className="flex items-center shrink-0 pr-0.5">
+                    <button
+                      type="button"
+                      title="New File"
+                      onClick={() => beginCreate("file")}
+                      className="p-0.5 rounded text-[#858585] hover:text-[#cccccc] hover:bg-[#3d3d3d] border-none bg-transparent cursor-pointer"
+                    >
+                      <FilePlus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="New Folder"
+                      onClick={() => beginCreate("folder")}
+                      className="p-0.5 rounded text-[#858585] hover:text-[#cccccc] hover:bg-[#3d3d3d] border-none bg-transparent cursor-pointer"
+                    >
+                      <FolderPlus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Refresh Explorer"
+                      onClick={() => void refreshWorkspaceIndex()}
+                      className="p-0.5 rounded text-[#858585] hover:text-[#cccccc] hover:bg-[#3d3d3d] border-none bg-transparent cursor-pointer"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Collapse Folders"
+                      onClick={() => setCollapseSignal((n) => n + 1)}
+                      className="p-0.5 rounded text-[#858585] hover:text-[#cccccc] hover:bg-[#3d3d3d] border-none bg-transparent cursor-pointer"
+                    >
+                      <FoldVertical className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
               
               {explorerOpen && !currentProject && (
                 <div className="px-4 py-3 flex flex-col gap-3">
@@ -377,7 +440,7 @@ export function Sidebar() {
                     You have not yet opened a folder.
                   </p>
                   <button
-                    onClick={() => document.getElementById("native-folder-picker")?.click()}
+                    onClick={() => void openWorkspaceFolder()}
                     className="bg-[#007acc] hover:bg-[#0062a3] text-white py-1.5 px-3 rounded text-xs font-medium transition-colors w-fit border-none cursor-pointer">
                     Open Folder
                   </button>
@@ -386,13 +449,33 @@ export function Sidebar() {
               
               {explorerOpen && currentProject && (
                 <div className="pl-1 py-1">
-                  <p className="px-3 pb-1 text-[9px] text-[#555555]">
-                    {projectFiles.length} file{projectFiles.length === 1 ? "" : "s"}
-                  </p>
+                  {creating && (
+                    <div className="px-2 pb-1">
+                      <input
+                        autoFocus
+                        value={createName}
+                        onChange={(e) => setCreateName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void submitCreate();
+                          if (e.key === "Escape") {
+                            setCreating(null);
+                            setCreateName("");
+                            setCreateError("");
+                          }
+                        }}
+                        placeholder={creating === "file" ? "New file name" : "New folder name"}
+                        className="w-full bg-[#3c3c3c] text-[#cccccc] text-xs px-2 py-1 rounded border border-[#007acc] outline-none"
+                      />
+                      {createError && (
+                        <p className="pt-0.5 text-[10px] text-[#f48771]">{createError}</p>
+                      )}
+                    </div>
+                  )}
                   <ExplorerTree
                     files={projectFiles}
                     onOpenFile={handleOpenFile}
                     onContextMenu={handleFileContextMenu}
+                    collapseSignal={collapseSignal}
                   />
                 </div>
               )}

@@ -75,7 +75,9 @@
       "!.next/dev/**/*",
       "!dist_desktop/**/*",
       "!resources/**/*",
-      "!python/**/*"
+      "!python/.venv/**/*",
+      "!python/dist/**/*",
+      "!python/**/__pycache__/**/*"
     ],
     "extraMetadata": {
       "main": "electron/main.js"

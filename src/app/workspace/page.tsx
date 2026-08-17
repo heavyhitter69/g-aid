@@ -24,6 +24,8 @@ import { relativePathInProject, rootFolderName } from "@/lib/project-tree";
 import { autoIngestFile } from "@/lib/auto-ingest";
 import { useScientificState } from "@/store/scientific-state";
 import type { ProjectFile } from "@/types/project";
+import { openWorkspaceFolder, applyWorkspaceIndex } from "@/lib/open-workspace";
+import { isDesktop } from "@/lib/desktop";
 
 export default function WorkspacePage() {
   const router = useRouter();
@@ -92,6 +94,30 @@ export default function WorkspacePage() {
       }
     }
   }, [isAuthenticated, recentProjects]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const restore = () => {
+      const root = useAppStore.getState().workspaceRoot;
+      if (!isDesktop() || !root || !window.gaidDesktop?.indexWorkspace) return;
+      window.gaidDesktop
+        .indexWorkspace(root)
+        .then((index) => {
+          if (cancelled) return;
+          applyWorkspaceIndex(index);
+        })
+        .catch((err) => {
+          console.warn("Could not restore workspace folder:", err);
+          if (!cancelled) useAppStore.getState().setWorkspaceRoot(null, null);
+        });
+    };
+    if (useAppStore.persist.hasHydrated()) restore();
+    const unsub = useAppStore.persist.onFinishHydration(restore);
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, []);
 
   const handleAIPanelResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -754,7 +780,7 @@ export default function WorkspacePage() {
             <div className="p-4 space-y-4">
               <button
                 onClick={() => {
-                  document.getElementById("native-folder-picker")?.click();
+                  void openWorkspaceFolder();
                   setOpenFolderDialogOpen(false);
                 }}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-[#007acc] hover:bg-[#005f9e] text-white text-xs font-bold rounded cursor-pointer transition-colors border-none"

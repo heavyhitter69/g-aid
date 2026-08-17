@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { FolderOpen, DownloadCloud, TerminalSquare, Clock, Folder } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
+import { openWorkspaceAt, openWorkspaceFolder } from "@/lib/open-workspace";
+import { isAbsoluteDiskPath } from "@/lib/workspace-index";
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -20,7 +22,7 @@ function timeAgo(iso: string): string {
 export function DashboardView() {
   const { currentProject, recentProjects } = useAppStore();
 
-  const openPicker = () => document.getElementById("native-folder-picker")?.click();
+  const openPicker = () => void openWorkspaceFolder();
 
   if (currentProject) {
     // Show keyboard shortcuts when a project IS opened
@@ -69,7 +71,7 @@ export function DashboardView() {
         {/* Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
           <button 
-            onClick={() => document.getElementById("native-folder-picker")?.click()}
+            onClick={openPicker}
             className="flex flex-col items-start p-5 bg-[var(--ws-panel-alt)] hover:bg-[var(--ws-panel-hover)] border border-[var(--ws-border)] rounded-xl transition-colors cursor-pointer text-left group"
           >
             <FolderOpen className="h-5 w-5 text-[#cccccc] group-hover:text-white mb-3" />
@@ -93,7 +95,13 @@ export function DashboardView() {
               recentProjects.map((proj) => (
                 <div
                   key={`${proj.name}-${proj.openedAt}`}
-                  onClick={openPicker}
+                  onClick={() => {
+                    if (isAbsoluteDiskPath(proj.path)) {
+                      void openWorkspaceAt(proj.path);
+                    } else {
+                      openPicker();
+                    }
+                  }}
                   className="flex justify-between items-center py-2.5 px-2 hover:bg-[var(--ws-panel-hover)] rounded cursor-pointer transition-colors group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">

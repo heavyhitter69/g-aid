@@ -57,6 +57,8 @@ export function SettingsView() {
       conversations: [{ id: "default", topic: "New Agent", messages: [] }],
       activeConversationId: "default",
       currentProject: null,
+      workspaceRoot: null,
+      workspaceIndex: null,
       projectFiles: [],
       recentProjects: [],
     });

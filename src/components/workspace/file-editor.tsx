@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/app-store";
 import { fetchFileText } from "@/lib/supabase/storage";
 import { readRegisteredFile, hasRegisteredFile } from "@/lib/file-registry";
+import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
 import { X, Play, RefreshCw, Save, Database, Table, Map, Braces, Settings2, FileText, CheckCircle2, AlertCircle, Layers, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Sparkles, Eye, ZoomIn, ZoomOut, RotateCw, Printer, Download, Maximize2, ChevronRight, Loader2, Copy, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TextEditor } from "@/components/workspace/text-editor";
@@ -43,6 +44,7 @@ export function FileEditorView() {
   useEffect(() => {
     if (!activeFile) return;
     if (fileContents[activeFile] !== undefined) return; // already loaded
+    if (isTemporaryWorkspaceFile(activeFile)) return;
 
     setIsFetchingContent(true);
 
@@ -54,6 +56,21 @@ export function FileEditorView() {
           setFileContent(activeFile, text);
           setIsFetchingContent(false);
           return;
+        }
+      }
+
+      // 1b. Desktop workspace: read from the real folder on disk
+      const root = useAppStore.getState().workspaceRoot;
+      if (root && window.gaidDesktop?.readWorkspaceFile) {
+        try {
+          const result = await window.gaidDesktop.readWorkspaceFile(root, activeFile);
+          if (result?.text !== undefined) {
+            setFileContent(activeFile, result.text);
+            setIsFetchingContent(false);
+            return;
+          }
+        } catch (err) {
+          console.warn("Desktop workspace read failed:", err);
         }
       }
 
@@ -135,7 +152,7 @@ export function FileEditorView() {
   const isExcel = ["xlsx"].includes(ext);
   const isPdf = ext === "pdf";
   const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
-  const isMd = ext === "md" || ext === "mdx" || activeFile === "Implementation Plan";
+  const isMd = ext === "md" || ext === "mdx" || activeFile === "Implementation Plan" || activeFile === "Implementation Plan.md" || activeFile === "tasks.md";
   const useSpreadsheet =
     isSpreadsheet &&
     !(DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined);
@@ -143,7 +160,7 @@ export function FileEditorView() {
     !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf && !isExcel && !isImage && !isMd;
 
   if (isMd) {
-    const isPlan = activeFile === "Implementation Plan";
+    const isPlan = activeFile === "Implementation Plan" || activeFile === "Implementation Plan.md" || activeFile === "tasks.md";
     return (
       <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden">
         {/* Top toolbar */}

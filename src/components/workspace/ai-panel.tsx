@@ -22,6 +22,9 @@ import { cn } from "@/lib/utils";
 import type { StreamPreamble, OpportunityChipViewModel, HypothesisEpistemicType, AgentId } from "@/types/scientific";
 import { AgentActivity } from "@/components/workspace/agent-activity";
 import { summariseFileForAgent } from "@/lib/auto-ingest";
+import { formatWorkspaceForAgent } from "@/lib/workspace-index";
+import { applyWorkspaceFileUpdates } from "@/lib/workspace-files";
+import { isTemporaryWorkspaceFile, TEMP_PLAN_ID } from "@/lib/workspace-file-ids";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -527,6 +530,8 @@ export function AIPanel() {
     isHistoryModalOpen,
     setHistoryModalOpen,
     currentProject,
+    workspaceRoot,
+    workspaceIndex,
     setActiveFile,
     setWorkspaceView,
     openWorkbenchTab,
@@ -692,18 +697,34 @@ export function AIPanel() {
     try {
       // Build file content summaries for the orchestrator
       const fileSummaries = projectFiles
-        .filter((f) => fileContents[f.id])
+        .filter((f) => fileContents[f.id] && !isTemporaryWorkspaceFile(f.id) && !isTemporaryWorkspaceFile(f.name))
         .slice(0, 20)
         .map((f) => summariseFileForAgent(f.id, fileContents[f.id]))
         .join("\n\n");
 
+      const workspaceCatalog = formatWorkspaceForAgent(workspaceIndex);
       const lowerMsg = userMsg.toLowerCase().trim();
       const isGreeting = /^(hi|hello|hey|howdy|greetings|good\s(morning|afternoon|evening)|what's up|sup|yo)\b/.test(lowerMsg);
       const isConversational = isGreeting || lowerMsg === "help" || lowerMsg === "who are you";
 
-      const enrichedMessage = (fileSummaries && !isConversational)
-        ? `${userMsg}\n\n--- File Context ---\n${fileSummaries}`
+      const contextBlocks: string[] = [];
+      if (workspaceCatalog && !isConversational) {
+        contextBlocks.push(`--- Workspace ---\n${workspaceCatalog}`);
+      }
+      if (fileSummaries && !isConversational) {
+        contextBlocks.push(`--- File Context ---\n${fileSummaries}`);
+      }
+      const enrichedMessage = contextBlocks.length
+        ? `${userMsg}\n\n${contextBlocks.join("\n\n")}`
         : userMsg;
+
+      const history = activeConversation.messages
+        .filter((m) => m.text && !m.isStreaming)
+        .slice(-8)
+        .map((m) => ({
+          sender: m.sender,
+          text: m.text.slice(0, 3500),
+        }));
 
       const response = await fetch("/api/agent/orchestrate", {
         method: "POST",
@@ -714,6 +735,9 @@ export function AIPanel() {
           mode: selectedMode === "Plan" ? "plan" : "interpret",
           snapshotData: scientificState.snapshot,
           projectName: currentProject || "",
+          workspaceRoot: workspaceRoot || "",
+          workspaceIndex: workspaceIndex || null,
+          history,
           guestId: localStorage.getItem("gaid_guest_id") || undefined,
           model: selectedModel,
         }),
@@ -750,9 +774,11 @@ let activityId: string | null = null;
       interface EpilogueSnapshot {
         awaitingApproval?: boolean;
         taskFolder?: string;
-        [key: string]: unknown;
+        implementationPlanContent?: string;
       }
       let epilogueSnapshot: EpilogueSnapshot | null = null;
+      let planAwaitingApproval = false;
+      let planTaskFolder: string | undefined;
 
       const processRaw = () => {
         let i = 0;
@@ -843,6 +869,8 @@ let activityId: string | null = null;
                  const clean = jsonStr.replace(/^\n/, "");
                  const epilogue = JSON.parse(clean);
                  epilogueSnapshot = epilogue;
+                 planAwaitingApproval = Boolean(epilogue?.awaitingApproval);
+                 planTaskFolder = epilogue?.taskFolder;
                  if (epilogue.hypothesisEvents?.length) {
                    for (const evt of epilogue.hypothesisEvents) {
                      scientificState.appendEvent("HYPOTHESIS_CREATED", epilogue.agentId, evt.payload);
@@ -852,23 +880,13 @@ let activityId: string | null = null;
                    scientificState.detectAndAppendOpportunities();
                  }
                  if (epilogue.implementationPlanContent) {
-                   useAppStore.getState().setFileContent("Implementation Plan", epilogue.implementationPlanContent);
+                   useAppStore.getState().setFileContent(TEMP_PLAN_ID, epilogue.implementationPlanContent);
                  }
                  if (epilogue.thought) {
                    thought = epilogue.thought;
                  }
                  if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
-                   const state = useAppStore.getState();
-                   const currentFiles = state.projectFiles;
-                   const newFiles = epilogue.projectFilesUpdates.filter((f: { id: string, content?: string }) => !currentFiles.some(existing => existing.id === f.id));
-                   if (newFiles.length > 0) {
-                      state.setProjectFiles([...currentFiles, ...newFiles]);
-                      newFiles.forEach((f: { id: string, content?: string }) => {
-                        if (f.content) {
-                          state.setFileContent(f.id, f.content);
-                        }
-                      });
-                   }
+                   applyWorkspaceFileUpdates(epilogue.projectFilesUpdates);
                  }
                  if (activityId) agentStore.completeActivity(activityId);
                } catch { /* malformed epilogue — ignore */ }
@@ -902,14 +920,16 @@ let activityId: string | null = null;
 
       // Finalize message
       const thinkingDuration = thinkingDurationRecorded ?? Math.round((Date.now() - (actualThinkingStart || Date.now())) / 1000);
+      const awaitingApproval = planAwaitingApproval;
+
       updateMessageInConversation(convId, agentMsgId, {
         text: accumulatedText,
         preamble,
         isStreaming: false,
         thinkingDuration,
         thought: thought || undefined,
-        awaitingApproval: (epilogueSnapshot as any)?.awaitingApproval ?? false,
-        taskFolder: (epilogueSnapshot as any)?.taskFolder
+        awaitingApproval,
+        taskFolder: planTaskFolder
       });
 
       if (shouldTitle) {
@@ -942,9 +962,9 @@ let activityId: string | null = null;
       agentStore.setStreaming(false);
     }
   }, [
-    inputVal, isGenerating, activeConversation.id, activeConversation.messages.length, 
+    inputVal, isGenerating, activeConversation.id, activeConversation.messages, 
     addMessageToConversation, updateMessageInConversation, setConversationState, agentStore, scientificState, projectFiles, 
-    fileContents, currentProject, selectedMode, updateConversationTopic, assignAiTopic
+    fileContents, currentProject, workspaceRoot, workspaceIndex, selectedMode, updateConversationTopic, assignAiTopic
   ]);
 
   useEffect(() => {
@@ -997,6 +1017,13 @@ const handleApproveDiurnal = async (sessionId: string) => {
       let accumulated = "";
       let preamble: StreamPreamble | null = null;
       let rawBuf = new Uint8Array(0);
+
+      const findByte = (buf: Uint8Array, value: number, start = 0) => {
+        for (let i = start; i < buf.length; i++) {
+          if (buf[i] === value) return i;
+        }
+        return -1;
+      };
       
       while (true) {
         const { done, value } = await reader.read();
@@ -1005,61 +1032,43 @@ const handleApproveDiurnal = async (sessionId: string) => {
         merged.set(rawBuf);
         merged.set(value, rawBuf.length);
         rawBuf = merged;
-        
-        // Extract preamble and epilogue
+
         let pos = 0;
         while (pos < rawBuf.length) {
-          if (rawBuf[pos] === 0x00) {
-            // Preamble start - find the newline
-            let end = pos + 1;
-            while (end < rawBuf.length && rawBuf[end] !== 0x0a) end++;
-            if (end < rawBuf.length) {
-              const jsonStr = dec.decode(new Uint8Array(rawBuf.slice(pos + 1, end)));
-              try {
-                preamble = JSON.parse(jsonStr) as StreamPreamble;
-              } catch {}
-              pos = end + 1;
-            } else break;
-          } else if (rawBuf[pos] === 0x02) {
-            // Epilogue start - find the newline
-            let end = pos + 1;
-            while (end < rawBuf.length && rawBuf[end] !== 0x0a) end++;
-            if (end < rawBuf.length) {
-              const jsonStr = dec.decode(new Uint8Array(rawBuf.slice(pos + 1, end)));
-              try {
-                const epilogue = JSON.parse(jsonStr.replace(/^\n/, ""));
-                if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
-                   const state = useAppStore.getState();
-                   const currentFiles = state.projectFiles;
-                   const newFiles = epilogue.projectFilesUpdates.filter((f: any) => !currentFiles.some(existing => existing.id === f.id));
-                   if (newFiles.length > 0) {
-                      state.setProjectFiles([...currentFiles, ...newFiles]);
-                   }
-                }
-              } catch (e) {}
+          const byte = rawBuf[pos];
+          if (byte === 0x00 || byte === 0x02) {
+            const end = findByte(rawBuf, 0x0a, pos + 1);
+            if (end < 0) break;
+            const jsonStr = dec.decode(rawBuf.slice(pos + 1, end));
+            try {
+              const parsed = JSON.parse(jsonStr.replace(/^\n/, ""));
+              if (byte === 0x00) preamble = parsed as StreamPreamble;
+              if (parsed.projectFilesUpdates && Array.isArray(parsed.projectFilesUpdates)) {
+                applyWorkspaceFileUpdates(parsed.projectFilesUpdates);
+              }
+            } catch {
+              /* ignore malformed control frames */
             }
             pos = end + 1;
           } else {
-            pos++;
+            let next = pos + 1;
+            while (next < rawBuf.length && rawBuf[next] !== 0x00 && rawBuf[next] !== 0x02) next++;
+            if (next === rawBuf.length && !done) {
+              accumulated += dec.decode(rawBuf.slice(pos, next), { stream: true });
+              pos = next;
+              break;
+            }
+            accumulated += dec.decode(rawBuf.slice(pos, next), { stream: true });
+            pos = next;
           }
         }
-        
-        // Extract text content
-        let textStart = 0;
-        let textEnd = rawBuf.length;
-        if (rawBuf[0] === 0x00) textStart = 1;
-        for (let k = textStart; k < rawBuf.length; k++) {
-          if (rawBuf[k] === 0x02) { textEnd = k; break; }
-        }
-        
-        if (textEnd > textStart) {
-          const slice = rawBuf.slice(textStart, textEnd);
-          const decoded = dec.decode(slice, { stream: true });
-          accumulated += decoded;
-          updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: true });
-        }
+        rawBuf = rawBuf.slice(pos);
+        updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: true });
       }
 
+      if (rawBuf.length) {
+        accumulated += dec.decode(rawBuf);
+      }
       updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: false });
 
     } catch (err) {
@@ -1301,7 +1310,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
                    {!msg.isStreaming && msg.awaitingApproval && (
                      <div 
                        onClick={() => {
-                         openWorkbenchTab("file:Implementation Plan", "file", "Implementation Plan");
+                         openWorkbenchTab(`file:${TEMP_PLAN_ID}`, "file", TEMP_PLAN_ID);
                        }}
                        className="mt-4 bg-[#1e1e1e] border border-[#2b2b2b] rounded-lg p-3 w-full max-w-sm flex flex-col gap-2 shadow-sm cursor-pointer hover:border-[#3c3c3c] transition-colors"
                      >
@@ -1310,7 +1319,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
                          <span className="font-semibold text-white text-[13px]">Implementation Plan</span>
                        </div>
                        <p className="text-[12px] text-[#cccccc] mb-2 leading-relaxed">
-                         Implementation plan for correcting diurnal variations.
+                         Read the plan. Request changes in chat until it matches. Proceed only when you agree.
                        </p>
                        <div className="flex gap-2">
                          <button

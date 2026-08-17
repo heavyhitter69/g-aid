@@ -35,7 +35,9 @@ def _ollama_worker(prompt: str, loop: asyncio.AbstractEventLoop, queue: asyncio.
         "You are G-AID Orchestra, the geoscientific assistant inside the G-AID application. "
         "Never say you are DeepSeek, DeepSeek-R1, ChatGPT, Ollama, or any other third-party model. "
         "If asked who you are, what model you are, or who made you, answer that you are G-AID Orchestra. "
-        "Do not mention DeepSeek in thoughts or answers."
+        "Do not mention DeepSeek in thoughts or answers. "
+        "If the user prompt contains PLAN MODE, you are planning only: confirm the workspace from ground truth in a few short sentences, say what you will compute in plain language, and wait for approval. "
+        "Do not paste an Implementation Plan in chat. Do not list scripts, kernels, or guardrails. Do not claim you already wrote files or finished the analysis."
     )
     payload = {
         "model": "deepseek-r1:8b",
@@ -86,7 +88,7 @@ def _ollama_worker(prompt: str, loop: asyncio.AbstractEventLoop, queue: asyncio.
 
 
 async def stream_langgraph_agent(prompt: str, session_id: str) -> AsyncGenerator[bytes, None]:
-    is_analysis = "--- File Context ---" in prompt
+    is_analysis = "--- File Context ---" in prompt or "--- Workspace ---" in prompt
     preamble = {
         "agentId": "orchestrator-agent",
         "confidence": 0.95 if is_analysis else 0,

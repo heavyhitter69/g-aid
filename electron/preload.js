@@ -43,6 +43,14 @@ contextBridge.exposeInMainWorld("gaidDesktop", {
   getAuthBaseUrl: () => ipcRenderer.invoke("get-auth-base-url"),
   getPendingAuthUrl: () => ipcRenderer.invoke("get-pending-auth"),
   openAuxWindow: (pathname) => ipcRenderer.invoke("open-aux-window", pathname),
+  pickFolder: () => ipcRenderer.invoke("pick-folder"),
+  indexWorkspace: (root) => ipcRenderer.invoke("index-workspace", root),
+  readWorkspaceFile: (root, relativePath) =>
+    ipcRenderer.invoke("read-workspace-file", root, relativePath),
+  createWorkspaceFile: (root, relativePath, content) =>
+    ipcRenderer.invoke("create-workspace-file", root, relativePath, content ?? ""),
+  createWorkspaceFolder: (root, relativePath) =>
+    ipcRenderer.invoke("create-workspace-folder", root, relativePath),
   dismissBootCover: () => dismissBootCover(),
   onAuthCallback: (callback) => {
     const listener = (_event, url) => callback(url);

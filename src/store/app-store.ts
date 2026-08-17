@@ -8,6 +8,7 @@ import type {
   WorkspaceView,
 } from "@/types";
 import type { ProjectFile } from "@/types/project";
+import type { WorkspaceIndex } from "@/lib/workspace-index";
 
 export interface ConversationMessage {
   id?: string;
@@ -63,6 +64,8 @@ interface AppState {
   assignedAgent: AgentProfile | null;
   workspaceView: WorkspaceView;
   currentProject: string | null;
+  workspaceRoot: string | null;
+  workspaceIndex: WorkspaceIndex | null;
   recentProjects: RecentProject[];
   processingStatus: "idle" | "running" | "complete" | "error";
   theme: "light" | "dark";
@@ -124,6 +127,7 @@ interface AppState {
   setProjectFiles: (files: ProjectFile[]) => void;
   addProjectFile: (file: ProjectFile) => void;
   setCurrentProject: (projectName: string | null, path?: string, fileCount?: number) => void;
+  setWorkspaceRoot: (root: string | null, index?: WorkspaceIndex | null) => void;
   setOpenFileDialogOpen: (value: boolean) => void;
   setOpenFolderDialogOpen: (value: boolean) => void;
   setSaveAsDialogOpen: (value: boolean) => void;
@@ -169,6 +173,8 @@ const initialState = {
   assignedAgent: null,
   workspaceView: "dashboard" as WorkspaceView,
   currentProject: null as string | null,
+  workspaceRoot: null as string | null,
+  workspaceIndex: null as WorkspaceIndex | null,
   recentProjects: [] as RecentProject[],
   processingStatus: "idle" as const,
   theme: "dark" as const,
@@ -361,11 +367,15 @@ export const useAppStore = create<AppState>()(
           openedAt: new Date().toISOString(),
           fileCount: fileCount ?? 0,
         };
-        const filtered = s.recentProjects.filter((p) => p.name !== projectName);
+        const filtered = s.recentProjects.filter((p) => p.name !== projectName && p.path !== entry.path);
         return {
           currentProject: projectName,
           recentProjects: [entry, ...filtered].slice(0, 10),
         };
+      }),
+      setWorkspaceRoot: (root, index) => set({
+        workspaceRoot: root,
+        workspaceIndex: index ?? null,
       }),
       setOpenFileDialogOpen: (value) => set({ isOpenFileDialogOpen: value }),
       setOpenFolderDialogOpen: (value) => set({ isOpenFolderDialogOpen: value }),
@@ -489,6 +499,7 @@ export const useAppStore = create<AppState>()(
         selectedDiscipline: state.selectedDiscipline,
         assignedAgent: state.assignedAgent,
         currentProject: state.currentProject,
+        workspaceRoot: state.workspaceRoot,
         recentProjects: state.recentProjects,
         autoSave: state.autoSave,
         theme: state.theme,

@@ -1,11 +1,7 @@
-import { PipelineEvent, PipelineNodeExecution, ScientificArtifact } from './interfaces';
+import { PipelineEvent, ScientificArtifact } from './interfaces';
+import { executePythonNode, type NodeResult } from '@/lib/python-runtime';
 
-export interface NodeResult {
-  artifacts: ScientificArtifact[];
-  events: PipelineEvent[];
-  success: boolean;
-  error?: string;
-}
+export type { NodeResult };
 
 export abstract class PipelineNode {
   id: string;
@@ -61,8 +57,6 @@ export async function streamAgentOrchestration(prompt: string, sessionId: string
   }
 }
 
-import { spawn } from 'child_process';
-
 export class ChildProcessRuntime {
   static async execute(
     nodeId: string,
@@ -70,81 +64,26 @@ export class ChildProcessRuntime {
     inputArtifacts: ScientificArtifact[],
     parameters: Record<string, unknown>
   ): Promise<NodeResult> {
-    return new Promise((resolve) => {
-      const payload = {
-        node_id: nodeId,
-        input_artifacts: inputArtifacts,
-        parameters: parameters
-      };
-
-      const pythonProcess = spawn('python', [scriptPath]);
-      const events: PipelineEvent[] = [];
-      const artifacts: ScientificArtifact[] = [];
-      let errorMessage = "";
-
+    const started: PipelineEvent = {
+      type: "NODE_STARTED",
+      nodeId,
+      message: `Started node ${nodeId} via ChildProcessRuntime`,
+      timestamp: new Date().toISOString(),
+    };
+    const result = await executePythonNode(nodeId, scriptPath, inputArtifacts, parameters);
+    const events = [started, ...(result.events || [])];
+    if (result.success) {
       events.push({
-        type: "NODE_STARTED",
+        type: "NODE_COMPLETED",
         nodeId,
-        message: `Started node ${nodeId} via ChildProcessRuntime`,
-        timestamp: new Date().toISOString()
+        message: `Completed node ${nodeId}`,
+        timestamp: new Date().toISOString(),
       });
-
-      // Pass payload to python via stdin
-      pythonProcess.stdin.write(JSON.stringify(payload) + "\n");
-      pythonProcess.stdin.end();
-
-      let stdoutData = "";
-      pythonProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        errorMessage += data.toString();
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          resolve({
-            artifacts: [],
-            events: events,
-            success: false,
-            error: `Python process exited with code ${code}. Stderr: ${errorMessage}`
-          });
-          return;
-        }
-
-        try {
-          const lines = stdoutData.trim().split('\n');
-          let parsedResult = null;
-          for (let i = lines.length - 1; i >= 0; i--) {
-            try {
-              parsedResult = JSON.parse(lines[i]);
-              break;
-            } catch (e) {}
-          }
-
-          if (parsedResult) {
-            if (parsedResult.artifacts) artifacts.push(...parsedResult.artifacts);
-            if (parsedResult.events) events.push(...parsedResult.events);
-          } else {
-             errorMessage = "No valid JSON returned from python node. stdout: " + stdoutData;
-             resolve({ artifacts: [], events, success: false, error: errorMessage });
-             return;
-          }
-
-          events.push({
-            type: "NODE_COMPLETED",
-            nodeId,
-            message: `Completed node ${nodeId}`,
-            timestamp: new Date().toISOString()
-          });
-
-          resolve({ artifacts, events, success: true });
-        } catch (e: any) {
-          resolve({ artifacts: [], events, success: false, error: `Failed to parse python output: ${e.message}` });
-        }
-      });
-    });
+    }
+    return {
+      ...result,
+      events,
+    };
   }
 }
 

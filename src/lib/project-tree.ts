@@ -15,15 +15,16 @@ export function buildFileTree(files: ProjectFile[]): FileTreeNode[] {
   const sorted = [...files].sort((a, b) => a.id.localeCompare(b.id));
 
   for (const file of sorted) {
-    if (file.type !== "file") continue;
     const parts = file.id.split("/").filter(Boolean);
     if (!parts.length) continue;
+    const fileIsFolder = file.type === "folder";
 
     let level = root;
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      const isFile = i === parts.length - 1;
+      const isLeaf = i === parts.length - 1;
+      const isFile = isLeaf && !fileIsFolder;
       const nodeId = parts.slice(0, i + 1).join("/");
 
       let node = level.find((n) => n.id === nodeId);

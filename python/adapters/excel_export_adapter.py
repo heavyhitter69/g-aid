@@ -4,6 +4,8 @@ import hashlib
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,40 +46,61 @@ def export_excel(payload: dict) -> dict:
         "message": "Generated spatial magnetic field plot (mag_map.png)."
     })
     
-    # 2. Generate Excel workbook
-    # To embed image in excel we use openpyxl via pandas
-    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
-        # Write downsampled data for excel so it doesn't crash (10Hz can be huge)
-        df_downsampled = df.iloc[::10, :] # 1Hz
-        df_downsampled.to_excel(writer, sheet_name='Corrected Data', index=False)
-        
-        # Add a sheet with the image
-        workbook = writer.book
-        worksheet = workbook.create_sheet('Plots')
-        from openpyxl.drawing.image import Image
-        img = Image(plot_path)
-        worksheet.add_image(img, 'A1')
-        
-    events.append({
-        "type": "NODE_PROGRESS",
-        "message": "Generated Excel workbook with downsampled data and embedded spatial plot."
-    })
-        
-    timestamp = datetime.utcnow().isoformat() + "Z"
-    
-    excel_artifact = {
-        "id": "artifact-excel-workbook-1",
+    artifacts = [{
+        "id": "artifact-mag-map-1",
         "type": "plot",
-        "format": "xlsx",
+        "format": "png",
         "lineage": ["artifact-airborne-corrected-1"],
         "generated_by_node": node_id,
-        "checksum": hashlib.sha256(open(excel_path, 'rb').read()).hexdigest(),
-        "created_at": timestamp,
-        "path": excel_path
-    }
+        "checksum": hashlib.sha256(open(plot_path, 'rb').read()).hexdigest(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "path": plot_path
+    }]
+
+    try:
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            df_downsampled = df.iloc[::10, :]
+            df_downsampled.to_excel(writer, sheet_name='Corrected Data', index=False)
+            workbook = writer.book
+            worksheet = workbook.create_sheet('Plots')
+            from openpyxl.drawing.image import Image
+            img = Image(plot_path)
+            worksheet.add_image(img, 'A1')
+        events.append({
+            "type": "NODE_PROGRESS",
+            "message": "Generated Excel workbook with downsampled data and embedded spatial plot."
+        })
+        artifacts.append({
+            "id": "artifact-excel-workbook-1",
+            "type": "plot",
+            "format": "xlsx",
+            "lineage": ["artifact-airborne-corrected-1"],
+            "generated_by_node": node_id,
+            "checksum": hashlib.sha256(open(excel_path, 'rb').read()).hexdigest(),
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "path": excel_path
+        })
+    except Exception as exc:
+        fallback_csv = os.path.join(out_dir, task_folder, "diurnal_analysis_downsampled.csv")
+        df.iloc[::10, :].to_csv(fallback_csv, index=False)
+        events.append({
+            "type": "QC_WARNING",
+            "severity": "warning",
+            "message": f"Excel export unavailable ({exc}). Wrote {os.path.basename(fallback_csv)} instead."
+        })
+        artifacts.append({
+            "id": "artifact-excel-fallback-1",
+            "type": "processed_dataset",
+            "format": "csv",
+            "lineage": ["artifact-airborne-corrected-1"],
+            "generated_by_node": node_id,
+            "checksum": hashlib.sha256(open(fallback_csv, 'rb').read()).hexdigest(),
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "path": fallback_csv
+        })
 
     return {
-        "artifacts": [excel_artifact],
+        "artifacts": artifacts,
         "events": events
     }
 

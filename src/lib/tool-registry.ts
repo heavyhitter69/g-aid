@@ -1,278 +1,217 @@
 /**
- * tool-registry.ts
- * ScientificTool registry with execution contracts, reproducibility hashes, and simulation.
- * In Phase 1: all tools are simulated. In Phase 2+: tools dispatch to Python backend.
+ * ScientificTool registry. Every tool dispatches to a Python kernel.
+ * There is no simulation path. Missing kernels fail.
  */
 
+import crypto from "crypto";
 import type { ScientificTool, ToolExecutionRecord, AgentId } from "@/types/scientific";
 
-// ─── Utility: simple checksum (Phase 1 substitute for SHA-256) ────────────────
-
-function simpleChecksum(input: string): string {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(8, "0");
-}
-
-function computeInputChecksum(inputs: Record<string, unknown>): string {
-  return simpleChecksum(JSON.stringify(inputs, Object.keys(inputs).sort()));
+function sha256Json(inputs: Record<string, unknown>): string {
+  return crypto.createHash("sha256").update(JSON.stringify(inputs, Object.keys(inputs).sort())).digest("hex");
 }
 
 function computeExecutionHash(toolId: string, version: string, inputChecksum: string): string {
-  return simpleChecksum(`${toolId}@${version}:${inputChecksum}`);
+  return crypto.createHash("sha256").update(`${toolId}@${version}:${inputChecksum}`).digest("hex");
 }
 
-// ─── Tool Registry ────────────────────────────────────────────────────────────
+const pythonNode: Record<string, string> = {
+  rtp_filter: "rtp_filter",
+  analytic_signal: "fft_derivatives",
+  lineament_extractor: "lineament_extractor",
+  pseudosection_gen: "ert_pseudosection",
+  inversion_ert_2d: "ert_invert",
+  bouguer_correction: "gravity_reduce",
+  regional_residual_separation: "regional_residual",
+  spectral_analysis: "seismic_process",
+  horizon_picker: "seismic_process",
+  crs_harmonizer: "crs_reproject",
+};
 
 export const TOOL_REGISTRY: ScientificTool[] = [
-  // ── Magnetic ──────────────────────────────────────────────────────────────
   {
     id: "rtp_filter",
     name: "Reduction to Pole (RTP)",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "magnetic",
-    description: "Removes inclination effects from magnetic data, transforming anomalies to appear as if acquired at the magnetic pole. Unstable at low latitudes.",
+    description: "Blakely 1995 FFT RTP. Unstable at |I|<10°; writes RTE instead unless forceRtp is set.",
     inputs: {
-      grid: { type: "object", required: true, description: "Input magnetic grid", units: "nT" },
-      inclination: { type: "number", required: true, description: "Magnetic inclination (degrees)", units: "degrees" },
-      declination: { type: "number", required: true, description: "Magnetic declination (degrees)", units: "degrees" },
+      inclination: { type: "number", required: false, description: "Magnetic inclination (degrees). Default: IGRF at survey.", units: "degrees" },
+      declination: { type: "number", required: false, description: "Magnetic declination (degrees).", units: "degrees" },
+      outDir: { type: "string", required: true, description: "G-AID Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder containing tmi_grid.npz" },
     },
-    outputs: {
-      rtp_grid: { type: "grid", description: "RTP-transformed magnetic grid", units: "nT" },
-    },
+    outputs: { rtp_grid: { type: "grid", description: "RTP GeoTIFF/ASCII", units: "nT" } },
     deterministic: true,
     uncertaintyModel: "parametric",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
   {
     id: "analytic_signal",
     name: "Analytic Signal (Total Gradient)",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "magnetic",
-    description: "Computes the total horizontal gradient amplitude — inclination-independent. Preferred for low-latitude or remanence-affected surveys.",
+    description: "Roest et al. 1992 total gradient via FFT derivatives.",
     inputs: {
-      grid: { type: "object", required: true, description: "Input magnetic grid", units: "nT" },
+      outDir: { type: "string", required: true, description: "G-AID Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
     },
-    outputs: {
-      as_grid: { type: "grid", description: "Analytic signal amplitude grid", units: "nT/m" },
-    },
+    outputs: { as_grid: { type: "grid", description: "Analytic signal GeoTIFF", units: "nT/m" } },
     deterministic: true,
     uncertaintyModel: "none",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
   {
     id: "lineament_extractor",
     name: "Structural Lineament Extraction",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "magnetic",
-    description: "Automatically extracts linear structural features (faults, dykes, contacts) from derivative grids using gradient analysis.",
+    description: "THD non-maximum suppression and 8-connected linking.",
     inputs: {
-      grid: { type: "object", required: true, description: "Derivative grid (THD or VD)", units: "nT/m" },
-      threshold: { type: "number", required: false, description: "Gradient threshold for lineament detection", defaultValue: 0.3 },
+      outDir: { type: "string", required: true, description: "G-AID Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
     },
-    outputs: {
-      lineaments: { type: "array", description: "Array of detected lineament polylines with azimuth statistics" },
-      rose_diagram: { type: "object", description: "Azimuth frequency rose diagram data" },
-    },
-    deterministic: false,
+    outputs: { lineaments: { type: "array", description: "GeoJSON polylines with azimuths" } },
+    deterministic: true,
     uncertaintyModel: "parametric",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
-  // ── Resistivity ───────────────────────────────────────────────────────────
   {
     id: "pseudosection_gen",
     name: "Apparent Resistivity Pseudosection",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "resistivity",
-    description: "Generates 2D apparent resistivity pseudosection from ERT data for qualitative interpretation before inversion.",
+    description: "ρa = K ΔV/I with published geometric factors (Telford et al. 1990).",
     inputs: {
-      data: { type: "object", required: true, description: "Raw ERT measurement data" },
-      array_type: { type: "string", required: true, description: "Electrode array geometry", defaultValue: "dipole-dipole" },
+      inputPath: { type: "string", required: true, description: "Res2DInv .dat path" },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
     },
-    outputs: {
-      pseudosection: { type: "section", description: "2D apparent resistivity pseudosection", units: "Ohm.m" },
-    },
+    outputs: { pseudosection: { type: "section", description: "Apparent resistivity points", units: "Ohm.m" } },
     deterministic: true,
     uncertaintyModel: "none",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
   {
     id: "inversion_ert_2d",
     name: "ERT 2D Smooth-Model Inversion",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "resistivity",
-    description: "Least-squares smooth-model inversion of ERT data. Iterative convergence to minimum RMSE model.",
+    description: "Loke & Barker 1996 smoothness-constrained least squares. Reports misfit; does not invent a section.",
     inputs: {
-      data: { type: "object", required: true, description: "Raw ERT measurement data" },
-      initial_model: { type: "object", required: false, description: "Starting resistivity model" },
-      damping_factor: { type: "number", required: false, description: "Regularisation damping factor", defaultValue: 0.1 },
-      max_iterations: { type: "number", required: false, description: "Maximum inversion iterations", defaultValue: 10 },
+      inputPath: { type: "string", required: true, description: "Res2DInv .dat path" },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
+      damping_factor: { type: "number", required: false, description: "Roughness weight λ", defaultValue: 0.2 },
+      max_iterations: { type: "number", required: false, description: "Gauss-Newton iterations", defaultValue: 8 },
     },
     outputs: {
-      inverted_section: { type: "section", description: "Inverted resistivity model", units: "Ohm.m" },
-      rmse: { type: "number", description: "Root mean square error at convergence", units: "%" },
-      doi_index: { type: "section", description: "Depth of investigation index (0–1)" },
-    },
-    deterministic: false,
-    uncertaintyModel: "monte-carlo",
-    simulatable: true,
-    phaseAvailable: 2,
-  },
-  // ── Gravity ───────────────────────────────────────────────────────────────
-  {
-    id: "bouguer_correction",
-    name: "Complete Bouguer Anomaly",
-    version: "1.0.0",
-    domain: "gravity",
-    description: "Applies free-air, Bouguer slab, and terrain corrections to raw gravity observations.",
-    inputs: {
-      raw_gravity: { type: "object", required: true, description: "Raw gravity observations", units: "mGal" },
-      dem: { type: "object", required: true, description: "Digital elevation model", units: "m" },
-      density: { type: "number", required: false, description: "Bouguer slab density", units: "g/cm3", defaultValue: 2.67 },
-    },
-    outputs: {
-      bouguer_anomaly: { type: "grid", description: "Complete Bouguer anomaly grid", units: "mGal" },
+      inverted_section: { type: "section", description: "Resistivity model", units: "Ohm.m" },
+      rmse: { type: "number", description: "Misfit percent" },
     },
     deterministic: true,
     uncertaintyModel: "parametric",
-    simulatable: true,
-    phaseAvailable: 2,
+    simulatable: false,
+    phaseAvailable: 1,
+  },
+  {
+    id: "bouguer_correction",
+    name: "Complete Bouguer Anomaly",
+    version: "2.0.0",
+    domain: "gravity",
+    description: "Somigliana normal gravity, free-air 0.3086 h, 2πGρh slab, Bullard B (LaFehr 1991).",
+    inputs: {
+      inputPath: { type: "string", required: true, description: "CSV with value, y=lat, z=height" },
+      density: { type: "number", required: false, description: "Bouguer density", units: "g/cm3", defaultValue: 2.67 },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
+    },
+    outputs: { bouguer_anomaly: { type: "grid", description: "Bouguer values / grids", units: "mGal" } },
+    deterministic: true,
+    uncertaintyModel: "parametric",
+    simulatable: false,
+    phaseAvailable: 1,
   },
   {
     id: "regional_residual_separation",
     name: "Regional-Residual Gravity Separation",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "gravity",
-    description: "Separates long-wavelength regional gravity field from short-wavelength residual anomalies using polynomial or upward continuation.",
+    description: "Polynomial or upward-continuation residual (Blakely 1995).",
     inputs: {
-      bouguer_grid: { type: "object", required: true, description: "Complete Bouguer anomaly grid", units: "mGal" },
-      method: { type: "string", required: false, description: "Separation method: polynomial | upward_continuation", defaultValue: "upward_continuation" },
-      continuation_height: { type: "number", required: false, description: "Upward continuation height (m)", defaultValue: 5000 },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
+      method: { type: "string", required: false, description: "polynomial | upward_continuation", defaultValue: "upward_continuation" },
     },
     outputs: {
-      regional: { type: "grid", description: "Regional gravity field", units: "mGal" },
-      residual: { type: "grid", description: "Residual gravity anomaly", units: "mGal" },
+      regional: { type: "grid", description: "Regional field", units: "mGal" },
+      residual: { type: "grid", description: "Residual anomaly", units: "mGal" },
     },
     deterministic: true,
     uncertaintyModel: "parametric",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
-  // ── Seismic ───────────────────────────────────────────────────────────────
   {
     id: "spectral_analysis",
     name: "Power Spectral Density Analysis",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "seismic",
-    description: "Computes power spectral density of seismic traces for frequency analysis and bandwidth assessment.",
+    description: "Welch 1967 PSD of SEG-Y traces after real I/O.",
     inputs: {
-      traces: { type: "array", required: true, description: "Seismic trace array" },
-      window_length: { type: "number", required: false, description: "FFT window length (samples)", defaultValue: 256 },
+      inputPath: { type: "string", required: true, description: "SEG-Y path" },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
     },
     outputs: {
-      psd: { type: "array", description: "Power spectral density curve" },
+      psd: { type: "array", description: "Power spectral density" },
       dominant_frequency: { type: "number", description: "Dominant frequency", units: "Hz" },
-      bandwidth: { type: "array", description: "Usable frequency bandwidth [min, max]", units: "Hz" },
     },
     deterministic: true,
     uncertaintyModel: "none",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
   {
     id: "horizon_picker",
     name: "Automatic Horizon Picking",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "seismic",
-    description: "Semi-automatic horizon picking using amplitude tracking and phase correlation.",
+    description: "Local amplitude tracking from a seed (Sheriff & Geldart). Requires processed traces.",
     inputs: {
-      section: { type: "object", required: true, description: "Seismic section data" },
-      seed_points: { type: "array", required: true, description: "User-defined seed picks to propagate" },
-      tracking_method: { type: "string", required: false, description: "zero-crossing | peak | trough", defaultValue: "peak" },
+      inputPath: { type: "string", required: true, description: "SEG-Y path" },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
     },
-    outputs: {
-      horizon_picks: { type: "array", description: "Picked horizon in TWT (ms)" },
-      confidence_map: { type: "section", description: "Pick confidence 0–1 per trace" },
-    },
-    deterministic: false,
+    outputs: { horizon_picks: { type: "array", description: "Sample picks per trace" } },
+    deterministic: true,
     uncertaintyModel: "parametric",
-    simulatable: true,
-    phaseAvailable: 2,
+    simulatable: false,
+    phaseAvailable: 1,
   },
-  // ── Spatial ───────────────────────────────────────────────────────────────
   {
     id: "crs_harmonizer",
     name: "CRS Harmonisation",
-    version: "1.0.0",
+    version: "2.0.0",
     domain: "spatial",
-    description: "Reprojects all datasets to a common coordinate reference system with distortion assessment.",
+    description: "WGS-84 ↔ UTM Transverse Mercator (USGS PP 1395).",
     inputs: {
-      datasets: { type: "array", required: true, description: "Array of GeoDataset objects" },
-      target_crs: { type: "string", required: true, description: "Target EPSG code", defaultValue: "EPSG:4326" },
+      outDir: { type: "string", required: true, description: "Output directory" },
+      taskFolder: { type: "string", required: true, description: "Task folder" },
+      target_crs: { type: "string", required: false, description: "Target EPSG integer", defaultValue: "auto UTM" },
     },
-    outputs: {
-      reprojected_datasets: { type: "array", description: "Datasets in target CRS" },
-      distortion_report: { type: "object", description: "CRS compatibility and distortion report" },
-    },
+    outputs: { reprojected_datasets: { type: "array", description: "CSV with x_proj, y_proj, crs_epsg" } },
     deterministic: true,
     uncertaintyModel: "none",
-    simulatable: true,
+    simulatable: false,
     phaseAvailable: 1,
   },
 ];
 
-// ─── Execution cache ──────────────────────────────────────────────────────────
-
 const executionCache = new Map<string, ToolExecutionRecord>();
-
-// ─── Simulated tool outputs ───────────────────────────────────────────────────
-
-function simulateToolOutput(toolId: string, inputs: Record<string, unknown>): Record<string, unknown> {
-  switch (toolId) {
-    case "rtp_filter":
-      return { rtp_grid: { type: "simulated_grid", rows: 100, cols: 100, unit: "nT", note: "RTP simulation — Phase 2 runs real FFT filter" } };
-    case "analytic_signal":
-      return { as_grid: { type: "simulated_grid", rows: 100, cols: 100, unit: "nT/m", note: "Analytic signal simulation" } };
-    case "lineament_extractor":
-      return {
-        lineaments: [
-          { id: "L1", azimuth: 47, length_km: 12.3, confidence: 0.78 },
-          { id: "L2", azimuth: 315, length_km: 8.7, confidence: 0.65 },
-          { id: "L3", azimuth: 51, length_km: 6.1, confidence: 0.71 },
-        ],
-        rose_diagram: { dominant_azimuth: 47, spread_degrees: 15 },
-      };
-    case "pseudosection_gen":
-      return { pseudosection: { type: "simulated_section", stations: 24, max_depth_m: 80, unit: "Ohm.m", note: "Pseudosection simulation" } };
-    case "inversion_ert_2d":
-      return { inverted_section: { type: "simulated_section", rmse_percent: 2.1, iterations: 4 }, rmse: 2.1, doi_index: { min: 0.0, max: 0.85 } };
-    case "bouguer_correction":
-      return { bouguer_anomaly: { type: "simulated_grid", unit: "mGal", density_used: inputs.density ?? 2.67 } };
-    case "regional_residual_separation":
-      return {
-        regional: { type: "simulated_grid", unit: "mGal", method: inputs.method ?? "upward_continuation" },
-        residual: { type: "simulated_grid", unit: "mGal", note: "Residual after regional removal" },
-      };
-    case "spectral_analysis":
-      return { psd: [0, 0.2, 0.8, 1.0, 0.9, 0.5, 0.1], dominant_frequency: 45, bandwidth: [10, 90] };
-    case "horizon_picker":
-      return { horizon_picks: Array.from({ length: 24 }, (_, i) => ({ trace: i + 1, twt_ms: 850 + Math.sin(i * 0.4) * 20 })), confidence_map: {} };
-    case "crs_harmonizer":
-      return { reprojected_datasets: [], distortion_report: { compatible: true, warnings: [] } };
-    default:
-      return { status: "simulated", toolId };
-  }
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 export function getTool(id: string): ScientificTool | undefined {
   return TOOL_REGISTRY.find((t) => t.id === id);
@@ -286,15 +225,19 @@ export async function executeTool(
   toolId: string,
   inputs: Record<string, unknown>,
   agentId: AgentId,
-  simulationMode = true
+  simulationMode = false
 ): Promise<ToolExecutionRecord> {
   const tool = getTool(toolId);
   if (!tool) throw new Error(`Tool not found: ${toolId}`);
+  if (simulationMode) {
+    throw new Error(`Refusing to simulate ${toolId}. All tools execute Python kernels.`);
+  }
 
-  const inputChecksum = computeInputChecksum(inputs);
+  const nodeId = pythonNode[toolId];
+  if (!nodeId) throw new Error(`No Python kernel mapped for ${toolId}`);
+
+  const inputChecksum = sha256Json(inputs);
   const executionHash = computeExecutionHash(tool.id, tool.version, inputChecksum);
-
-  // Cache hit for deterministic tools
   if (tool.deterministic && executionCache.has(executionHash)) {
     return executionCache.get(executionHash)!;
   }
@@ -306,29 +249,55 @@ export async function executeTool(
     inputs,
     inputChecksum,
     executionHash,
-    reproducibilitySignature: tool.deterministic ? executionHash : `non-deterministic_${Date.now()}`,
+    reproducibilitySignature: executionHash,
     outputs: null,
     status: "running",
     startedAt: new Date().toISOString(),
     completedAt: null,
     agentId,
-    simulationMode,
+    simulationMode: false,
     errorMessage: null,
   };
 
-  // Simulate execution delay
-  await new Promise((r) => setTimeout(r, simulationMode ? 300 : 0));
-
-  const outputs = simulationMode ? simulateToolOutput(toolId, inputs) : {};
-  const completed: ToolExecutionRecord = {
-    ...record,
-    outputs,
-    status: "complete",
-    completedAt: new Date().toISOString(),
-  };
-
-  if (tool.deterministic) executionCache.set(executionHash, completed);
-  return completed;
+  try {
+    const response = await fetch("http://127.0.0.1:8000/api/v1/run-node", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ node_id: nodeId, parameters: inputs, input_artifacts: [] }),
+    });
+    const parsed = (await response.json()) as {
+      success?: boolean;
+      error?: string;
+      artifacts?: unknown[];
+      events?: unknown[];
+      detail?: string;
+    };
+    if (!response.ok || parsed.success === false) {
+      const message = parsed.error || parsed.detail || `run-node ${response.status}`;
+      const failed: ToolExecutionRecord = {
+        ...record,
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        errorMessage: message,
+      };
+      return failed;
+    }
+    const completed: ToolExecutionRecord = {
+      ...record,
+      outputs: { artifacts: parsed.artifacts ?? [], events: parsed.events ?? [] },
+      status: "complete",
+      completedAt: new Date().toISOString(),
+    };
+    if (tool.deterministic) executionCache.set(executionHash, completed);
+    return completed;
+  } catch (err) {
+    return {
+      ...record,
+      status: "failed",
+      completedAt: new Date().toISOString(),
+      errorMessage: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 export function getExecutionFromHash(executionHash: string): ToolExecutionRecord | undefined {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
 import {
   ChevronDown,
   ChevronRight,
@@ -19,6 +20,7 @@ interface ExplorerTreeProps {
   files: ProjectFile[];
   onOpenFile: (file: ProjectFile) => void;
   onContextMenu: (e: React.MouseEvent, fileId: string) => void;
+  collapseSignal?: number;
 }
 
 function fileIcon(name: string) {
@@ -102,11 +104,22 @@ function TreeNode({
   );
 }
 
-export function ExplorerTree({ files, onOpenFile, onContextMenu }: ExplorerTreeProps) {
-  const tree = useMemo(() => buildFileTree(files), [files]);
-  const fileById = useMemo(() => new Map(files.map((f) => [f.id, f])), [files]);
+export function ExplorerTree({ files, onOpenFile, onContextMenu, collapseSignal }: ExplorerTreeProps) {
+  const visible = useMemo(
+    () =>
+      files.filter(
+        (file) => !isTemporaryWorkspaceFile(file.id) && !isTemporaryWorkspaceFile(file.name)
+      ),
+    [files]
+  );
+  const tree = useMemo(() => buildFileTree(visible), [visible]);
+  const fileById = useMemo(() => new Map(visible.map((f) => [f.id, f])), [visible]);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setExpanded(new Set());
+  }, [collapseSignal]);
 
   const onToggle = (id: string) => {
     setExpanded((prev) => {

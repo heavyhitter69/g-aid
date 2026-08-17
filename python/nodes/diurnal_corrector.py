@@ -22,16 +22,20 @@ def compute_correction(payload: dict) -> dict:
     
     events = []
     
-    # Calculate diurnal correction
-    # CorrectedMag = AirborneMag - BaseInterpolated + BaseReferenceValue
-    # For Phase 1, we use mean_base
-    base_reference_value = df['base_magnetic_field'].mean()
+    base_reference_method = payload.get("parameters", {}).get("baseReference", "mean_base")
+    if base_reference_method == "median_base":
+        base_reference_value = df['base_magnetic_field'].median()
+    elif base_reference_method == "first_sample":
+        base_reference_value = df['base_magnetic_field'].iloc[0]
+    else:
+        base_reference_value = df['base_magnetic_field'].mean()
+        base_reference_method = "mean_base"
     
     df['corrected_magnetic_field'] = df['magnetic_field'] - df['base_magnetic_field'] + base_reference_value
     
     events.append({
         "type": "NODE_PROGRESS",
-        "message": f"Applied diurnal correction using DiurnalReference method: mean_base ({base_reference_value:.2f} nT)."
+        "message": f"Applied diurnal correction using DiurnalReference method: {base_reference_method} ({base_reference_value:.2f} nT)."
     })
     
     out_path = os.path.abspath(os.path.join(out_dir, task_folder, "airborne_corrected.csv"))
