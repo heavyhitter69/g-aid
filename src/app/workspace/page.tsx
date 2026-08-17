@@ -60,6 +60,7 @@ export default function WorkspacePage() {
     saveFile,
     setFileContent,
     addConversation,
+    setActiveConversationId,
     setChatPanelOpen,
     toggleChatPanel,
     setActiveLeftSidebarTab,
@@ -80,6 +81,7 @@ export default function WorkspacePage() {
 
   // Guest Workspace Guard: prevents authenticated data from bleeding into guest mode
   useEffect(() => {
+    if (!useAppStore.persist.hasHydrated()) return;
     if (!isAuthenticated) {
       if (recentProjects && recentProjects.length > 0) {
         useAppStore.setState({ recentProjects: [] });
@@ -155,6 +157,26 @@ export default function WorkspacePage() {
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const conversationId = new URLSearchParams(window.location.search).get("conversation");
+    if (!conversationId) return;
+
+    const openConversation = () => {
+      setActiveConversationId(conversationId);
+      setChatPanelOpen(true);
+    };
+
+    if (useAppStore.persist.hasHydrated()) {
+      openConversation();
+      return;
+    }
+
+    return useAppStore.persist.onFinishHydration(() => {
+      openConversation();
+    });
+  }, [setActiveConversationId, setChatPanelOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

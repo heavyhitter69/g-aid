@@ -9,25 +9,33 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "icons": "node scripts/generate-icons.mjs",
+    "dist": "npm run icons && npm run build && electron-builder",
+    "dist:inno": "node scripts/compile-inno.mjs",
+    "dist:win": "npm run icons && npm run build && electron-builder --win dir && npm run dist:inno",
+    "dist:mac": "npm run icons && npm run build && electron-builder --mac",
+    "dist:linux": "npm run icons && npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
+    "@tailwindcss/typography": "^0.5.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
+    "katex": "^0.18.4",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",
     "next": "16.2.6",
     "plotly.js": "^3.5.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
     "react-plotly.js": "^2.6.0",
     "reactflow": "^11.11.4",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "tailwind-merge": "^3.6.0",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.13"
@@ -43,37 +51,56 @@
     "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "png-to-ico": "^3.0.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
   "build": {
     "appId": "com.geophysics.gaid",
     "productName": "G-AID",
+    "executableName": "G-AID",
+    "compression": "store",
+    "icon": "build/icon.ico",
     "directories": {
-      "output": "dist_desktop"
+      "output": "dist_desktop",
+      "buildResources": "build"
     },
     "files": [
       "**/*",
+      ".env",
+      ".env.local",
       "!src/**/*.ts",
       "!src/**/*.tsx",
       "!.next/cache/**/*",
-      "!dist_desktop/**/*"
+      "!.next/dev/**/*",
+      "!dist_desktop/**/*",
+      "!resources/**/*",
+      "!python/**/*"
     ],
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "include": "build/installer.nsh",
-      "license": "build/license.txt",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "createDesktopShortcut": false,
-      "createStartMenuShortcut": true,
-      "runAfterFinish": true
+    "extraMetadata": {
+      "main": "electron/main.js"
     },
+    "asar": false,
+    "protocols": [
+      {
+        "name": "G-AID",
+        "schemes": [
+          "gaid"
+        ]
+      }
+    ],
     "win": {
-      "target": "nsis",
-      "icon": "build/icon.ico"
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "G-AID",
+      "signAndEditExecutable": true
     },
     "mac": {
       "target": [
@@ -91,6 +118,22 @@
       "provider": "github",
       "owner": "heavyhitter69",
       "repo": "g-aid"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "python/dist/g-aid-engine",
+        "to": "g-aid-engine",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/ai",
+        "to": "ai",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   }
 }

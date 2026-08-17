@@ -179,8 +179,7 @@ export default function DownloadPage() {
           transition={{ duration: 0.4, delay: 0.05 }}
           className="flex flex-wrap gap-6 mb-8"
         >
-          {[
-          ].map((feature) => (
+          {([] as { text: string; icon: React.ReactNode }[]).map((feature) => (
             <div
               key={feature.text}
               className="flex items-center gap-2 text-zinc-500 text-xs"

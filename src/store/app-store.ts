@@ -20,6 +20,7 @@ export interface ConversationMessage {
   awaitingApproval?: boolean;
   taskFolder?: string;
   timestamp?: string;
+  isStreaming?: boolean;
 }
 
 export interface Conversation {
@@ -27,6 +28,8 @@ export interface Conversation {
   topic: string;
   messages: ConversationMessage[];
   hidden?: boolean;
+  inputVal?: string;
+  isGenerating?: boolean;
 }
 
 export interface WorkbenchTab {
@@ -61,7 +64,7 @@ interface AppState {
   workspaceView: WorkspaceView;
   currentProject: string | null;
   recentProjects: RecentProject[];
-  processingStatus: "idle" | "running" | "complete";
+  processingStatus: "idle" | "running" | "complete" | "error";
   theme: "light" | "dark";
   isAgentSidebarOpen: boolean;
   isTerminalOpen: boolean;
@@ -95,7 +98,7 @@ interface AppState {
   setAgent: (agent: AgentProfile | null) => void;
   completeOnboarding: () => void;
   setWorkspaceView: (view: WorkspaceView) => void;
-  setProcessingStatus: (status: "idle" | "running" | "complete") => void;
+  setProcessingStatus: (status: "idle" | "running" | "complete" | "error") => void;
   setTheme: (theme: "light" | "dark") => void;
   toggleAgentSidebar: () => void;
   toggleTerminal: () => void;
@@ -130,6 +133,8 @@ interface AppState {
   removeConversation: (id: string) => void;
   updateConversationTopic: (id: string, topic: string) => void;
   addMessageToConversation: (id: string, msg: ConversationMessage) => void;
+  updateMessageInConversation: (conversationId: string, messageId: string, updates: Partial<ConversationMessage>) => void;
+  setConversationState: (id: string, state: Partial<Conversation>) => void;
   reset: () => void;
   isHistoryModalOpen: boolean;
   setHistoryModalOpen: (value: boolean) => void;
@@ -139,6 +144,20 @@ interface AppState {
   setPendingFileUpdates: (updates: { id: string, content?: string }[]) => void;
   clearPendingFileUpdates: () => void;
   applyPendingFileUpdates: () => void;
+}
+
+function persistableConversations(conversations: Conversation[]): Conversation[] {
+  return conversations.map((conversation) => ({
+    id: conversation.id,
+    topic: conversation.topic,
+    hidden: conversation.hidden,
+    inputVal: conversation.inputVal,
+    isGenerating: false,
+    messages: conversation.messages.map((message) => ({
+      ...message,
+      isStreaming: false,
+    })),
+  }));
 }
 
 const initialState = {
@@ -358,7 +377,8 @@ export const useAppStore = create<AppState>()(
         const limit = s.agentSettings?.maxTabCount?.value;
         if (limit !== "Unlimited" && limit !== undefined) {
           const limitNum = Number(limit);
-          if (!isNaN(limitNum) && s.conversations.length >= limitNum) {
+          const visibleCount = s.conversations.filter(c => !c.hidden).length;
+          if (!isNaN(limitNum) && visibleCount >= limitNum) {
             return {}; // Max tabs reached
           }
         }
@@ -387,14 +407,14 @@ export const useAppStore = create<AppState>()(
           return {
             conversations: [...updated, { id: newId, topic: "New Agent", messages: [], hidden: false }],
             activeConversationId: newId,
-            isChatPanelOpen: true
+            isChatPanelOpen: false
           };
         }
 
         return {
           conversations: updated,
           activeConversationId: nextActiveId,
-          isChatPanelOpen: true
+          isChatPanelOpen: s.isChatPanelOpen
         };
       }),
       removeConversation: (id) => set((s) => {
@@ -419,6 +439,16 @@ export const useAppStore = create<AppState>()(
       addMessageToConversation: (id, msg) => set((s) => ({
         conversations: s.conversations.map(c => c.id === id ? { ...c, messages: [...c.messages, msg] } : c)
       })),
+      updateMessageInConversation: (conversationId, messageId, updates) => set((s) => ({
+        conversations: s.conversations.map(c => 
+          c.id === conversationId 
+            ? { ...c, messages: c.messages.map(m => m.id === messageId ? { ...m, ...updates } : m) } 
+            : c
+        )
+      })),
+      setConversationState: (id, state) => set((s) => ({
+        conversations: s.conversations.map(c => c.id === id ? { ...c, ...state } : c)
+      })),
       reset: () => set(initialState),
       setHistoryModalOpen: (value) => set({ isHistoryModalOpen: value }),
       setPendingPrompt: (prompt) => set({ pendingPrompt: prompt }),
@@ -433,7 +463,7 @@ export const useAppStore = create<AppState>()(
           name: f.id.split('/').pop() || f.id,
           size: 0,
           modified: new Date().toISOString()
-        }))];
+        } as any))];
 
         const newFileContents = { ...state.fileContents };
         state.pendingFileUpdates.forEach(f => {
@@ -465,6 +495,7 @@ export const useAppStore = create<AppState>()(
         layoutMode: state.layoutMode,
         privacyMode: state.privacyMode,
         agentSettings: state.agentSettings,
+        conversations: persistableConversations(state.conversations),
       }),
       version: 1,
       migrate: (persistedState: any, version: number) => {

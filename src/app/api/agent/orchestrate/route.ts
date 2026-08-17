@@ -1,661 +1,87 @@
 /**
  * route.ts — /api/agent/orchestrate
- * Coordination layer. Resolves capabilities, selects kernel, runs reasoning + synthesis.
- * All inline — no sub-fetch to agent routes. Clean 3-phase stream protocol:
- *   \x00{json}\n  — preamble
- *   text tokens    — streamed content (NO \x01 prefix per token, text mode entered once)
- *   \n\x02{json}\n — epilogue
- *
- * The client receives exactly one clean stream.
+ * Coordination layer. Proxies the request to the local FastAPI Python backend.
  */
 
 import type { NextRequest } from "next/server";
-import { resolveFromIntent, selectMinimalAgents, resolveFromState } from "@/lib/capability-graph";
-import { buildAgentContext, formatContextForPrompt } from "@/lib/context-engine";
-import { compileDAG } from "@/lib/workflow-planner";
-import { generateImplementationPlan, generateTasksMarkdown, updateTaskProgress, PENDING_APPROVAL } from "./implementation-plan";
-import fs from "fs";
-import path from "path";
-import { synthesizeResponse, buildOllamaPrompt } from "@/lib/agent-prompts";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { magneticKernel } from "@/lib/kernels/magnetic-kernel";
-import { resistivityKernel } from "@/lib/kernels/resistivity-kernel";
-import { gravityKernel } from "@/lib/kernels/gravity-kernel";
-import { seismicKernel } from "@/lib/kernels/seismic-kernel";
-import { geologicalKernel } from "@/lib/kernels/geological-kernel";
-import type { ReasoningKernel } from "@/lib/kernels/kernel-base";
-import type {
-  ScientificProjectSnapshot,
-  AgentId,
-  StreamPreamble,
-  ConfidenceProvenance,
-} from "@/types/scientific";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// ─── Kernel registry ──────────────────────────────────────────────────────────
+const ORCHESTRA_IDENTITY = `You are G-AID Orchestra. Never say you are DeepSeek or any other model. If asked who you are, say you are G-AID Orchestra.
 
-const KERNEL_MAP: Record<string, ReasoningKernel> = {
-  "magnetic-agent":    magneticKernel,
-  "resistivity-agent": resistivityKernel,
-  "gravity-agent":     gravityKernel,
-  "seismic-agent":     seismicKernel,
-  "geological-agent":  geologicalKernel,
-};
+`;
 
-// ─── Request shape ────────────────────────────────────────────────────────────
-
-interface OrchestrateRequest {
-  message: string;
-  sessionId: string;
-  mode?: "interpret" | "plan" | "status";
-  snapshotData?: ScientificProjectSnapshot;
-  projectName?: string;
-  guestId?: string;
+function withOrchestraIdentity(message: string): string {
+  if (message.startsWith("You are G-AID Orchestra")) return message;
+  return `${ORCHESTRA_IDENTITY}${message}`;
 }
 
-// ─── Stream helpers ───────────────────────────────────────────────────────────
-
-const encoder = new TextEncoder();
-const enc = (s: string) => encoder.encode(s);
-const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-// ─── Route handler ────────────────────────────────────────────────────────────
-
 export async function POST(request: NextRequest): Promise<Response> {
-  let body: OrchestrateRequest;
+  let body;
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { message, sessionId, mode = "interpret", snapshotData } = body;
+  const { message, sessionId } = body;
   if (!message || !sessionId) {
     return Response.json({ error: "message and sessionId are required" }, { status: 400 });
   }
 
-  const snapshot: ScientificProjectSnapshot = snapshotData ?? makeEmptySnapshot(sessionId);
-
-  // ── Conversational routing check ──────────────────────────────────────────
-  const lowerMsg = message.toLowerCase().trim();
-  const isGreeting = /^(hi|hello|hey|howdy|greetings|good\s(morning|afternoon|evening)|what's up|sup|yo)\b/.test(lowerMsg);
-  const isConversational = isGreeting || lowerMsg === "help" || lowerMsg === "who are you";
-
-  // ── Capability + agent resolution ─────────────────────────────────────────
-  let capabilities: ReturnType<typeof resolveFromIntent> = [];
-  let agentIds: AgentId[] = [];
-
-  if (isConversational) {
-    agentIds = ["orchestrator-agent"];
-  } else {
-    capabilities = resolveFromIntent(message, snapshot);
-    agentIds     = selectMinimalAgents(capabilities, snapshot);
-  }
-
-  const proactiveOpps = resolveFromState(snapshot);
-
-  // Primary agent: prefer specialist over geological (geological synthesises last)
-  const primaryAgentId: AgentId =
-    agentIds.find((a) => a !== "geological-agent") ??
-    agentIds[0] ??
-    "orchestrator-agent";
-
-  const kernel = KERNEL_MAP[primaryAgentId] ?? null;
-
-  // ── Context ───────────────────────────────────────────────────────────────
-  const agentContext = buildAgentContext(snapshot, message, primaryAgentId);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  const stream = new ReadableStream({
-    async start(controller) {
-      const enqueue = (s: string) => controller.enqueue(enc(s));
-
+  try {
+    let pythonResponse: Response | null = null;
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 8; attempt++) {
       try {
-        // ── Plan mode ──────────────────────────────────────────────────────
-        if (mode === "plan" && capabilities.length > 0) {
-          const { dag, markdown } = compileDAG(capabilities, snapshot.datasets, snapshot);
-
-          const planPreamble: StreamPreamble = buildPreamble(
-            primaryAgentId, 0.65, capabilities, [], []
-          );
-          enqueue(`\x00${JSON.stringify(planPreamble)}\n`);
-          await delay(80);
-
-          // Stream plan markdown token by token
-          const tokens = markdown.split(" ");
-          for (const token of tokens) {
-            enqueue(token + " ");
-            await delay(14);
-          }
-
-          enqueue(`\n\n---\n\n*Workflow compiled from ${capabilities.length} capability(ies).*\n`);
-          enqueue(`\n\x02${JSON.stringify({
-            type: "plan_complete",
-            dag,
-            opportunitiesDetected: proactiveOpps.length,
-          })}\n`);
-
-          controller.close();
-          return;
-        }
-
-        // ── Direct NLP Pipeline Trigger (Diurnal Analysis) ─────────────────
-        if (lowerMsg.includes("diurnal analysis") || lowerMsg.includes("diurnal correction")) {
-          const planPreamble: StreamPreamble = buildPreamble(
-            "magnetic-agent", 0.95, capabilities, [], []
-          );
-          
-          let targetFolder = "DAY 1";
-          const dayMatch = lowerMsg.match(/day\s*\d+/i);
-          const customMatch = lowerMsg.match(/(?:for|on)\s+([a-z0-9\s\_-]+?)(?:\s|$)/i);
-          
-          if (dayMatch) {
-             targetFolder = dayMatch[0].toUpperCase(); // E.g., "DAY 23"
-          } else if (customMatch) {
-             targetFolder = customMatch[1].trim(); // E.g., "block a" -> "block a"
-          }
-          
-          let projectName = body.projectName || "";
-          let baseDir = path.join(process.cwd(), "public", projectName);
-          
-          // Attempt Supabase Cloud Ingestion
-          const supabase = await createServerSupabaseClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          let usingSupabase = false;
-          let targetProjectId = "";
-          
-          let isGuest = !user;
-          let activeUserId = user?.id || body.guestId;
-          
-          if (activeUserId && projectName) {
-            // ALWAYS bypass Supabase and read from local_uploads since buckets are missing
-            if (true) {
-               // Read from local_uploads
-               const localUploadsDir = path.join(process.cwd(), ".tmp", "local_uploads", projectName);
-               if (fs.existsSync(localUploadsDir)) {
-                 const getAllFiles = (dir: string): string[] => {
-                     let results: string[] = [];
-                     const list = fs.readdirSync(dir);
-                     list.forEach((file) => {
-                         const fullPath = path.join(dir, file);
-                         if (fs.statSync(fullPath).isDirectory()) { 
-                             results = results.concat(getAllFiles(fullPath));
-                         } else { 
-                             results.push(fullPath);
-                         }
-                     });
-                     return results;
-                 };
-                 const allFiles = getAllFiles(localUploadsDir);
-                 const matchedFiles = targetFolder ? allFiles.filter(f => f.toLowerCase().includes(targetFolder.toLowerCase())) : allFiles;
-                 
-                 if (matchedFiles.length > 0) {
-                   usingSupabase = true;
-                   baseDir = path.join(process.cwd(), ".tmp", "executions", body.sessionId || Date.now().toString(), projectName);
-                   for (const f of matchedFiles) {
-                     const relativePath = path.relative(localUploadsDir, f).replace(/\\/g, '/');
-                     const destPath = path.join(baseDir, relativePath);
-                     fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                     fs.copyFileSync(f, destPath);
-                   }
-                 }
-               }
-            } else {
-               const activeBucket = "gaid_workspace";
-               const activeTable = "project_files";
-               
-               const { data: project } = await supabase
-                 .from("projects")
-                 .select("id")
-                 .eq("user_id", user!.id)
-                 .eq("name", projectName)
-                 .maybeSingle();
-                 
-               if (project) {
-                 targetProjectId = project.id;
-                 let query = supabase.from(activeTable).select("storage_path, name").eq("project_id", project.id);
-                 if (targetFolder) {
-                   query = query.like("storage_path", `%${targetFolder}%`);
-                 }
-                 const { data: files } = await query;
-                   
-                 if (files && files.length > 0) {
-                   usingSupabase = true;
-                   baseDir = path.join(process.cwd(), ".tmp", "executions", body.sessionId || Date.now().toString(), projectName);
-                   
-                   for (const file of files) {
-                      const { data: blob } = await supabase.storage.from(activeBucket).download(file.storage_path);
-                      if (blob) {
-                         const buffer = Buffer.from(await blob.arrayBuffer());
-                         const pathParts = file.storage_path.split("/");
-                         const relativePath = pathParts.slice(2).join("/");
-                         const destPath = path.join(baseDir, relativePath);
-                         
-                         fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                         fs.writeFileSync(destPath, buffer);
-                      }
-                   }
-                 }
-               }
-            }
-          }
-          
-          // Fallback: Auto-discover the project name in public/ (helpful for guest testing!)
-          if (!usingSupabase) {
-            const checkHasFiles = (dir: string): boolean => {
-              if (!fs.existsSync(dir)) return false;
-              const items = fs.readdirSync(dir, { withFileTypes: true });
-              for (const item of items) {
-                if (item.isFile()) return true;
-                if (item.isDirectory() && checkHasFiles(path.join(dir, item.name))) return true;
-              }
-              return false;
-            };
-
-            if (!checkHasFiles(path.join(baseDir, targetFolder))) {
-               const publicDirs = fs.readdirSync(path.join(process.cwd(), "public"), { withFileTypes: true })
-                  .filter(d => d.isDirectory() && d.name !== "g-aid output")
-                  .map(d => d.name);
-               
-               for (const pd of publicDirs) {
-                  if (checkHasFiles(path.join(process.cwd(), "public", pd, targetFolder))) {
-                     projectName = pd;
-                     baseDir = path.join(process.cwd(), "public", projectName);
-                     usingSupabase = true; // Pretend we found it
-                     break;
-                  }
-               }
-            } else {
-               usingSupabase = true;
-            }
-          }
-
-          enqueue(`\x00${JSON.stringify(planPreamble)}\n`);
-          await delay(80);
-
-          if (!usingSupabase) {
-            enqueue("I couldn't find any files for this project. Please upload your survey data files first before running diurnal analysis.\n\n");
-            
-            enqueue(`\x02${JSON.stringify({
-              type: "agent_complete",
-              agentId: "magnetic-agent",
-              thought: "Checked Supabase and local directories for files but none were found for the current project.",
-              hypothesisEvents: [],
-              opportunitiesDetected: 0,
-              agentsDispatched: ["magnetic-agent"],
-              capabilitiesResolved: ["diurnal-correction"],
-              contextTokens: 0,
-              sessionId: body.sessionId || "default"
-            })}\n`);
-            
-            controller.close();
-            return;
-          }
-          
-          // Compute dynamic task folder
-          const outputDir = path.join(baseDir, "g-aid output");
-          let nextTaskNum = 1;
-          if (fs.existsSync(outputDir)) {
-             const dirs = fs.readdirSync(outputDir, { withFileTypes: true })
-               .filter(dirent => dirent.isDirectory() && dirent.name.toLowerCase().startsWith("task "))
-               .map(dirent => parseInt(dirent.name.toLowerCase().replace("task ", ""), 10))
-               .filter(n => !isNaN(n));
-             if (dirs.length > 0) {
-               nextTaskNum = Math.max(...dirs) + 1;
-             }
-          }
-          const taskFolder = `task ${nextTaskNum}`;
-
-          
-          const planMarkdown = generateImplementationPlan(projectName, targetFolder, taskFolder);
-          
-          // Stream plan markdown token by token
-          const tokens = planMarkdown.split(" ");
-          for (const token of tokens) {
-            enqueue(token + " ");
-            await delay(14); // Simulate typing speed
-          }
-          
-          // Save the task checklist to disk
-          const outTaskDir = path.join(outputDir, taskFolder);
-          fs.mkdirSync(outTaskDir, { recursive: true });
-          const tasksPath = path.join(outTaskDir, "tasks.md");
-          fs.writeFileSync(tasksPath, generateTasksMarkdown(projectName, taskFolder));
-
-          // Register in memory for the approve route to pick up
-          PENDING_APPROVAL[body.sessionId || "default"] = {
-            plan: planMarkdown,
-            taskFolder,
-            outputDir
-          };
-          
-          // Send epilogue with awaitingApproval = true
-          enqueue(`\n\x02${JSON.stringify({
-            type: "agent_complete",
-            agentId: "magnetic-agent",
-            thought: "",
-            hypothesisEvents: [],
-            opportunitiesDetected: 0,
-            agentsDispatched: ["magnetic-agent"],
-            capabilitiesResolved: ["diurnal-correction"],
-            contextTokens: 0,
-            sessionId: body.sessionId || "default",
-            awaitingApproval: true,
-            taskFolder: taskFolder,
-            implementationPlanContent: planMarkdown
-          })}\n`);
-          controller.close();
-          return;
-        }
-
-        // ── Interpret mode: run kernel if available ────────────────────────
-        let ruleMatchIds: string[] = [];
-        let hypothesisEvents: object[] = [];
-        let derivedConfidence = 0.55;
-        let kernelProvenance: ConfidenceProvenance | null = null;
-
-        if (kernel) {
-          try {
-            const result = await kernel.reason(message, snapshot.datasets, snapshot);
-            ruleMatchIds       = result.ruleMatchIds;
-            derivedConfidence  = result.baseProvenance.derivedConfidence;
-            kernelProvenance   = result.baseProvenance;
-            hypothesisEvents   = result.hypotheses.map((h) => ({
-              type: "HYPOTHESIS_CREATED",
-              payload: { hypothesis: h },
-            }));
-          } catch {
-            // Kernel error — fall through to base provenance
-          }
-        }
-
-        // ── Phase 1: Preamble ──────────────────────────────────────────────
-        const provenance: ConfidenceProvenance = kernelProvenance ?? {
-          dataQualityScore:       snapshot.datasets.length > 0 ? 0.6 : null,
-          crossMethodAgreement:   agentIds.length > 1 ? 0.65 : null,
-          modelConvergence:       null,
-          geologicalConsistency:  null,
-          spatialCoverage:        snapshot.datasets.length > 0 ? 0.55 : null,
-          spatialCompatibility:   null,
-          linespacing:            null,
-          derivedConfidence,
-          computedAt:             new Date().toISOString(),
-          computedByKernel:       kernel?.agentId ?? "orchestrator",
-        };
-
-        const preamble: StreamPreamble = buildPreamble(
-          primaryAgentId,
-          provenance.derivedConfidence,
-          capabilities,
-          ruleMatchIds,
-          [],
-        );
-        preamble.confidenceProvenance = provenance;
-        enqueue(`\x00${JSON.stringify(preamble)}\n`);
-
-        await delay(60);
-
-        // ── Phase 2: Response text (no \x01 per token — enter text mode once) ─
-        const ollamaUrl = process.env.NEXT_PUBLIC_OLLAMA_URL || "http://127.0.0.1:11434";
-        const ollamaModel = process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1:8b";
-        let usedOllama = false;
-        let generatedThought = "";
-
-        try {
-          const prompt = buildOllamaPrompt({
-            agentId:      primaryAgentId,
-            query:        message,
-            hypotheses:   snapshot.hypothesisGraph.filter((h) => h.status === "active"),
-            datasets:     snapshot.datasets,
-            provenance,
-            ruleMatchIds,
-          });
-
-          const ollamaRes = await fetch(`${ollamaUrl}/api/generate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: ollamaModel,
-              prompt: prompt,
-              stream: true,
-            })
-          });
-
-          if (!ollamaRes.ok) {
-            throw new Error(`Ollama responded with status: ${ollamaRes.status}`);
-          }
-
-          const reader = ollamaRes.body?.getReader();
-          if (reader) {
-            usedOllama = true;
-            const decoder = new TextDecoder();
-            let hasStartedThinking = false;
-            let hasFinishedThinking = false;
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split("\n");
-
-              for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                  const json = JSON.parse(line);
-                  
-                  if (json.thinking) {
-                    if (!hasStartedThinking) {
-                      enqueue("<think>\n");
-                      hasStartedThinking = true;
-                    }
-                    enqueue(json.thinking);
-                  } else if (hasStartedThinking && !hasFinishedThinking && json.response) {
-                    enqueue("\n</think>\n\n");
-                    hasFinishedThinking = true;
-                  }
-
-                  if (json.response) {
-                    enqueue(json.response);
-                  }
-                } catch (e) {
-                  // ignore parse errors for partial lines
-                }
-              }
-            }
-          }
-        } catch (err) {
-          // Fallback to local hardcoded synthesis
-          console.warn("Ollama unavailable, falling back to mock synthesis", err);
-          const responseText = synthesizeResponse({
-            agentId:      primaryAgentId,
-            query:        message,
-            hypotheses:   snapshot.hypothesisGraph.filter((h) => h.status === "active"),
-            datasets:     snapshot.datasets,
-            provenance,
-            ruleMatchIds,
-          });
-
-          // Stream tokens with human-readable cadence
-          const tokens = responseText.split(/(?<= )/);
-          for (const token of tokens) {
-            enqueue(token);
-            const hasNewline = token.includes("\n");
-            await delay(hasNewline ? 25 : 10);
-          }
-        }
-
-        // Append proactive opportunity note if any were found
-        if (proactiveOpps.length > 0) {
-          enqueue(`\n\n---\n\n**💡 ${proactiveOpps.length} proactive opportunit${proactiveOpps.length === 1 ? "y" : "ies"} detected.** Use the chips in the panel to activate them.`);
-        }
-
-        // ── Phase 3: Epilogue ──────────────────────────────────────────────
-        // We always generate a fallback thought. If the LLM produces its own <think> tags, 
-        // the frontend UI will extract them and overwrite this fallback thought!
-        const thought = generateThought(message, primaryAgentId, capabilities, ruleMatchIds, snapshot.datasets.length);
-        
-        enqueue(`\n\x02${JSON.stringify({
-          type:                   "agent_complete",
-          agentId:                primaryAgentId,
-          thought,
-          hypothesisEvents,
-          opportunitiesDetected:  proactiveOpps.length,
-          agentsDispatched:       agentIds,
-          capabilitiesResolved:   capabilities.map((c) => c.id),
-          contextTokens:          agentContext.tokenEstimate,
-          sessionId,
-        })}\n`);
-
-        controller.close();
+        pythonResponse = await fetch("http://127.0.0.1:8000/api/v1/orchestrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: withOrchestraIdentity(message), session_id: sessionId }),
+        });
+        break;
       } catch (err) {
-        enqueue(`\n*Internal error: ${err instanceof Error ? err.message : "unknown"}*`);
+        lastError = err;
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    }
+    if (!pythonResponse) {
+      throw lastError ?? new Error("Python backend unreachable");
+    }
+
+    if (!pythonResponse.ok) {
+      const errorText = await pythonResponse.text();
+      throw new Error(`Python API responded with ${pythonResponse.status}: ${errorText}`);
+    }
+
+    return new Response(pythonResponse.body, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Transfer-Encoding": "chunked",
+      },
+    });
+
+  } catch (error: any) {
+    console.error("Failed to proxy to Python backend:", error);
+    
+    const stream = new ReadableStream({
+      start(controller) {
+        const enc = new TextEncoder();
+        const preamble = {
+          agentId: "orchestrator-agent",
+          confidence: 0,
+          capabilityTrace: [],
+          rulesMatched: [],
+          epistemicTypesProduced: [],
+        };
+        controller.enqueue(enc.encode(`\x00${JSON.stringify(preamble)}\n`));
+        controller.enqueue(enc.encode(`\n\n> ❌ **Intelligence Engine Offline.** ${error?.message || "The Python server is not running."}`));
+        controller.enqueue(enc.encode(`\n\x02${JSON.stringify({ type: "error" })}\n`));
         controller.close();
       }
-    },
-  });
+    });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Transfer-Encoding": "chunked",
-      "X-Session-Id": sessionId,
-    },
-  });
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function buildPreamble(
-  agentId: AgentId,
-  confidence: number,
-  capabilities: ReturnType<typeof resolveFromIntent>,
-  ruleMatchIds: string[],
-  hypothesesUpdated: string[],
-): StreamPreamble {
-  return {
-    type: "preamble",
-    agentId,
-    confidence,
-    confidenceProvenance: {
-      dataQualityScore: null, crossMethodAgreement: null, modelConvergence: null,
-      geologicalConsistency: null, spatialCoverage: null, spatialCompatibility: null,
-      linespacing: null, derivedConfidence: confidence,
-      computedAt: new Date().toISOString(),
-      computedByKernel: "orchestrator",
-    },
-    toolsInvoked:            capabilities.flatMap((c) => c.requiredTools),
-    capabilityTrace:         capabilities.map((c) => c.id),
-    rulesMatched:            ruleMatchIds,
-    hypothesesUpdated,
-    epistemicTypesProduced:  [],
-  };
-}
-
-// ─── Thought generator ────────────────────────────────────────────────────────
-// Produces a brief internal reasoning trace for the ThoughtDisclosure UI.
-
-function generateThought(
-  query: string,
-  agentId: AgentId,
-  capabilities: ReturnType<typeof resolveFromIntent>,
-  ruleMatchIds: string[],
-  datasetCount: number,
-): string {
-  const lower = query.toLowerCase();
-  const isGreeting = /^(hi|hello|hey|howdy|greetings|what's up|sup|yo)\b/.test(lower);
-  const isHelp     = /\b(help|what can you do|what do you do|capabilities|features|upload|load|import|add|open|switch)\b/.test(lower);
-  const isPlan     = lower.includes("/plan");
-  const isConversational = /^(how\s+are\s+you|how's\s+it\s+going|how\s+is\s+it\s+going|who\s+are\s+you|what\s+are\s+you|who\s+is\s+this|are\s+you\s+(there|alive|real|human|bot|ai)|thanks|thank\s+you|cool|awesome|great|ok|okay|yes|no|test|hello\s+there|what\s+day|holiday)\b/.test(lower);
-
-  if (isGreeting) {
-    return [
-      `[1/2] Semantic Parsing: Greeting intent detected.`,
-      `[2/2] Action: Generating welcoming response.`
-    ].join("\n");
+    return new Response(stream, { headers: { "Content-Type": "application/octet-stream" } });
   }
-  if (isHelp) {
-    return [
-      `[1/3] Parsing query intent: platform support / tutorial request detected.`,
-      `[2/3] Retrieving UI workspace configuration and interactive instruction cards.`,
-      `[3/3] Render output: Synthesizing step-by-step walk-through for data ingestion and project navigation.`
-    ].join("\n");
-  }
-  if (isConversational) {
-    return [
-      `[1/2] Semantic Parsing: Conversational intent detected.`,
-      `[2/2] Action: Generating appropriate conversational response.`
-    ].join("\n");
-  }
-  if (isPlan) {
-    const capList = capabilities.map((c) => c.id).join(", ") || "none matched";
-    return [
-      `[1/3] Pipeline build trigger: compiling executable DAG workflow.`,
-      `[2/3] Resolved intent to active capabilities: [${capList}].`,
-      `[3/3] Render output: Assembling ${capabilities.length} node(s) with ${datasetCount} loaded datasets constraining solver inputs.`
-    ].join("\n");
-  }
-
-  const steps: string[] = [];
-  
-  // Step 1: Parsing
-  steps.push(`[1/4] Semantic Parsing: Analyzing token structure and search vectors. Checked against mineral exploration and geophysics domain ontologies.`);
-  
-  // Step 2: Agent Matching
-  const agentLabel: Record<string, string> = {
-    "orchestrator-agent": "Orchestrator Synthesis Core",
-    "magnetic-agent":     "Magnetic Expert Kernel (coincident anomaly check)",
-    "resistivity-agent":  "Electrical Resistivity / ERT Expert Kernel",
-    "gravity-agent":      "Gravity Anomaly Density Kernel",
-    "seismic-agent":      "Seismic Reflection & Depth Conversion Kernel",
-    "geological-agent":   "Cross-disciplinary Geological Synthesis",
-  };
-  const selectedAgent = agentLabel[agentId] ?? agentId;
-
-  if (capabilities.length > 0) {
-    steps.push(`[2/4] Multi-Agent Routing: intent matched to ${capabilities.length} expert capability(ies): [${capabilities.map((c) => c.id).join(", ")}]. calibrating target solver and routing to: ${selectedAgent}.`);
-  } else {
-    steps.push(`[2/4] Multi-Agent Routing: no specialized geophysical capabilities matched. routing to: ${selectedAgent} for cross-disciplinary correlation.`);
-  }
-
-  // Step 3: Spatial constraints & Datasets
-  if (datasetCount === 0) {
-    steps.push(`[3/4] Spatial Constraint checking: 0 geophysical datasets loaded. epistemic bounds set to low. warning user that confidence will remain minimal without physical constraints.`);
-  } else {
-    steps.push(`[3/4] Spatial Constraint checking: found ${datasetCount} active survey dataset(s). verifying spatial bounds, coordinate reference systems (CRS), and computing signal-to-noise ratio (SNR) consistency.`);
-  }
-
-  // Step 4: Rule matching & Hypotheses
-  if (ruleMatchIds.length > 0) {
-    steps.push(`[4/4] Ontology & Inference Engine: Matched ${ruleMatchIds.length} domain rules: [${ruleMatchIds.slice(0, 3).join(", ")}]. generating hypothesis nodes with epistemic provenance metrics.`);
-  } else {
-    steps.push(`[4/4] Ontology & Inference Engine: no matching hard-coded domain inference rules. executing high-level geological interpretation heuristics.`);
-  }
-
-  return steps.join("\n");
-}
-
-function makeEmptySnapshot(projectId: string): ScientificProjectSnapshot {
-  return {
-    projectId,
-    snapshotSequenceNumber: 0,
-    datasets: [],
-    hypothesisGraph: [],
-    epistemicBranches: [],
-    executionDAG: null,
-    toolExecutions: [],
-    opportunities: [],
-    interpretations: [],
-    spatialIndexSummary: {
-      registeredDatasets: 0,
-      overlapPairs: [],
-      crsSet: [],
-      dominantCRS: null,
-      totalCoverageAreaKm2: 0,
-      compatibilityIssues: [],
-    },
-    lastModified: new Date().toISOString(),
-  };
 }

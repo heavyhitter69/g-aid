@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedBackground } from "@/components/shared/animated-background";
 import { Logo } from "@/components/shared/logo";
@@ -40,7 +40,17 @@ const slideVariants = {
 };
 
 export default function SignUpPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-black" />}>
+      <SignUpBody />
+    </Suspense>
+  );
+}
+
+function SignUpBody() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const desktopHandoff = searchParams.get("desktop") === "1";
   const { setUser, setAuthenticated, setOnboardingStep, setDiscipline, setAgent, patchUser } = useAppStore();
 
   const [phase, setPhase] = useState<1 | 2>(1);
@@ -50,7 +60,7 @@ export default function SignUpPage() {
 
   // Phase 1 fields
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
@@ -177,7 +187,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push("/onboarding");
+      router.push(desktopHandoff ? "/auth/desktop/confirm" : "/onboarding");
     } catch {
       setError("An unexpected error occurred. Please try again.");
       setCreating(false);
@@ -188,9 +198,9 @@ export default function SignUpPage() {
     <main className="relative min-h-screen">
       {/* Back Button */}
       <Link 
-        href="/" 
+        href={desktopHandoff ? "/auth/desktop?mode=login" : "/"} 
         className="absolute top-6 left-6 z-55 flex items-center justify-center w-10 h-10 rounded-full border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200 group backdrop-blur-sm shadow-lg shadow-black/20"
-        title="Back to Home"
+        title={desktopHandoff ? "Back to desktop sign in" : "Back to Home"}
       >
         <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
       </Link>
@@ -245,7 +255,7 @@ export default function SignUpPage() {
         {/* Right panel – form */}
         <section className="flex flex-1 items-center justify-center p-6 lg:p-12">
           <article className="w-full max-w-md glass-panel rounded-2xl border border-white/10 p-8 shadow-2xl overflow-hidden">
-            <Logo className="mb-6" />
+            <Logo className="mb-6" disableLink={desktopHandoff} />
 
             {/* Progress bar */}
             <div className="mb-6 h-0.5 bg-white/5 rounded-full overflow-hidden">
@@ -371,7 +381,7 @@ export default function SignUpPage() {
 
                   <p className="mt-6 text-center text-sm text-zinc-600">
                     Already have an account?{" "}
-                    <Link href="/signin" className="text-white/80 hover:text-white hover:underline">
+                    <Link href={desktopHandoff ? "/auth/desktop?mode=login" : "/signin"} className="text-white/80 hover:text-white hover:underline">
                       Sign in
                     </Link>
                   </p>

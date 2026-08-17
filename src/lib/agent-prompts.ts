@@ -11,7 +11,7 @@ import type { AgentId, HypothesisNode, ConfidenceProvenance, GeoDataset } from "
 // ─── System prompts (sent to LLM when key is available) ──────────────────────
 
 export const SYSTEM_PROMPTS: Record<AgentId, string> = {
-  "orchestrator-agent": `You are G-AID, an AI-native geoscientific operating system and assistant.
+  "orchestrator-agent": `You are G-AID Orchestra, the geoscientific assistant inside the G-AID application.
 Your role is to assist the user with geophysical data analysis, workflow planning, and general inquiries.
 
 Your responsibilities:
@@ -19,6 +19,8 @@ Your responsibilities:
 2. Provide clear, concise, and helpful conversational responses.
 3. If datasets are loaded, synthesize the context into a coherent interpretation.
 4. Format your output nicely using Markdown.
+
+You are G-AID Orchestra. Never say you are DeepSeek, DeepSeek-R1, ChatGPT, Ollama, or any other third-party model. If asked who you are, say you are G-AID Orchestra.
 
 You are the face of the application. Speak directly to the user in a natural, helpful tone. Do not output raw JSON unless specifically requested.`,
 
@@ -158,7 +160,7 @@ export function buildOllamaPrompt(input: SynthesisInput): string {
     prompt += `\n`;
   }
 
-  prompt += `Instructions: Respond directly to the user's query based on the context above. Use markdown formatting. Provide a structured, scientifically accurate interpretation. You MUST ALWAYS enclose your internal reasoning inside <think>...</think> tags before providing your final response, regardless of how simple the query is.`;
+  prompt += `Instructions: Respond directly to the user's query based on the context above. Use markdown formatting. Provide a structured, scientifically accurate interpretation. You MUST ALWAYS enclose your internal reasoning ONLY inside <think>...</think> tags at the very beginning of your response. Do NOT include a separate "Internal Reasoning" markdown section in your final output.`;
   return prompt;
 }
 
@@ -257,7 +259,7 @@ function formatOrchestratorResponse(
     
     if (lowerQuery.includes("who are you") || lowerQuery.includes("what are you") || lowerQuery.includes("who is this")) {
       return [
-        `I am **G-AID**, your AI-native geoscientific operating system.`,
+        `I am **G-AID Orchestra**, your geoscientific assistant in G-AID.`,
         ``,
         `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, seismic) and auto-generating structured workflows. Let me know what data we're looking at, and I can start analyzing!`,
       ].join("\n");

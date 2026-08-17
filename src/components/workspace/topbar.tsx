@@ -1,21 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { Plus, PanelBottom, MessageSquare, Settings, ChevronRight, Check, Zap } from "lucide-react";
+import { Settings, ChevronRight, Check } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import { isDesktop } from "@/lib/desktop";
+
+function CursorChatIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden>
+      <path
+        d="M3.25 2.75h9.5A1.75 1.75 0 0 1 14.5 4.5v5.75a1.75 1.75 0 0 1-1.75 1.75H8.06L5.2 14.4a.4.4 0 0 1-.7-.27v-2.13H3.25A1.75 1.75 0 0 1 1.5 10.25V4.5A1.75 1.75 0 0 1 3.25 2.75Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function Topbar() {
   const { 
     currentProject, 
-    toggleAgentSidebar, 
-    toggleTerminal, 
     toggleChatPanel, 
-    isChatPanelOpen,
-    setChatPanelOpen,
-    setWorkspaceView,
     setActiveLeftSidebarTab,
     setLeftSidebarOpen,
     openWorkbenchTab,
@@ -31,6 +39,11 @@ export function Topbar() {
   } = useAppStore();
   
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [desktop, setDesktop] = useState(false);
+
+  useEffect(() => {
+    setDesktop(isDesktop());
+  }, []);
 
   // Flat interface — all properties optional so any property access is safe
   // after `item.type === "divider"` early-return guard in the render loop
@@ -87,14 +100,20 @@ export function Topbar() {
   ];
 
   return (
-    <header className="h-[35px] bg-[#181818] border-b border-[#2b2b2b] flex items-center justify-between shrink-0 select-none z-50 relative">
-      <div className="flex items-center h-full">
-        <div className="px-3 flex items-center select-none">
-          <Link href="/">
-            <Image src="/g-aid logo.png" alt="G-AID" width={64} height={22} className="object-contain cursor-pointer" priority />
-          </Link>
-        </div>
-        <menu className="flex items-center h-full text-[13px] text-[#cccccc] space-x-1 list-none p-0 m-0">
+    <header className={cn(
+      "h-[36px] bg-[#181818] border-b border-[#2b2b2b] flex items-center justify-between shrink-0 select-none z-50 relative gaid-drag",
+      desktop && "pr-[138px]"
+    )}>
+      <div className="flex items-center h-full gaid-no-drag">
+        <Image
+          src="/app-icon.png"
+          alt="G-AID"
+          width={16}
+          height={16}
+          className="ml-2 mr-1 h-4 w-4 rounded-[3.5px] object-cover pointer-events-none select-none"
+          priority
+        />
+        <menu className="flex items-center h-full text-[13px] text-[#cccccc] space-x-0.5 list-none p-0 m-0">
           
           {/* File Menu Header */}
           <li 
@@ -238,50 +257,34 @@ export function Topbar() {
         <span>{currentProject ? currentProject.toLowerCase().replace(/\s+/g, '-') : "GEOPHYSICS - AGENT ITERATION DOMAIN"}</span>
       </div>
 
-      <div className="flex items-center h-full pr-4 gap-1 text-[#cccccc] z-10">
-        {/* Upgrade to Pro Button */}
-        <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold font-sans transition-all duration-200 border border-[#007acc]/40 bg-gradient-to-r from-[#007acc]/20 to-[#005f9e]/20 text-[#4fc3f7] hover:from-[#007acc]/35 hover:to-[#005f9e]/35 hover:border-[#007acc]/70 hover:text-white hover:shadow-[0_0_12px_rgba(0,122,204,0.3)] shrink-0">
+      <div className="flex items-center h-full gap-0.5 text-[#cccccc] z-10 gaid-no-drag">
+        <button className="flex items-center gap-1.5 mx-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-sans transition-all duration-200 border border-[#007acc]/40 bg-gradient-to-r from-[#007acc]/20 to-[#005f9e]/20 text-[#4fc3f7] hover:from-[#007acc]/35 hover:to-[#005f9e]/35 hover:border-[#007acc]/70 hover:text-white hover:shadow-[0_0_12px_rgba(0,122,204,0.3)] shrink-0">
           Upgrade to Pro
         </button>
 
-        {/* New Agent Button */}
-        {!isChatPanelOpen && (
-          <div className="relative group flex items-center h-full">
-            <button 
-              onClick={() => setChatPanelOpen(true)} 
-              className="h-full px-2 hover:bg-white/10 flex items-center justify-center rounded transition-colors"
-            >
-              <Plus className="h-[18px] w-[18px] stroke-[1.5]" />
-            </button>
-            <div className="absolute top-[105%] left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
-              new agent
-            </div>
-          </div>
-        )}
-
-        {/* Toggle Agents Button */}
         <div className="relative group flex items-center h-full">
           <button 
             onClick={toggleChatPanel} 
-            className="h-full px-2 hover:bg-white/10 flex items-center justify-center rounded transition-colors"
+            className="h-full px-2 hover:bg-white/10 flex items-center justify-center transition-colors"
+            title="Chat"
           >
-            <MessageSquare className="h-[18px] w-[18px] stroke-[1.5]" />
+            <CursorChatIcon className="h-[16px] w-[16px]" />
           </button>
           <div className="absolute top-[105%] left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
-            toggle agents
+            Chat
           </div>
         </div>
 
-        {/* Settings Button */}
         <div className="relative group flex items-center h-full">
           <button 
             onClick={() => openWorkbenchTab("settings", "settings", "Settings")} 
-            className="h-full px-2 hover:bg-white/10 flex items-center justify-center rounded transition-colors"
+            className="h-full px-2 hover:bg-white/10 flex items-center justify-center transition-colors"
+            title="Settings"
           >
-            <Settings className="h-[18px] w-[18px] stroke-[1.5]" />
+            <Settings className="h-[16px] w-[16px] stroke-[1.5]" />
           </button>
           <div className="absolute top-[105%] left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
-            settings
+            Settings
           </div>
         </div>
       </div>

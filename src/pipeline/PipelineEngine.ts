@@ -22,6 +22,45 @@ export abstract class PipelineNode {
   ): Promise<NodeResult>;
 }
 
+export async function streamAgentOrchestration(prompt: string, sessionId: string, onToken: (agent: string, text: string) => void) {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/v1/orchestrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, session_id: sessionId })
+    });
+
+    if (!response.body) throw new Error("No response body received from Python Core Engine");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep partial line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('\x00') && line.endsWith('\x02')) {
+          const cleanLine = line.slice(1, -1); // Strip control bytes
+          const match = cleanLine.match(/^\[(.*?)\] (.*)$/);
+          if (match) {
+            const [_, agentName, content] = match;
+            onToken(agentName, content);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("FastAPI streaming failed:", error);
+    onToken("SYSTEM", `Error communicating with Python backend: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 import { spawn } from 'child_process';
 
 export class ChildProcessRuntime {
@@ -75,24 +114,19 @@ export class ChildProcessRuntime {
         }
 
         try {
-          // Parse the final JSON output from python node
-          // The node might output debugging prints. We look for the last valid JSON block.
           const lines = stdoutData.trim().split('\n');
           let parsedResult = null;
           for (let i = lines.length - 1; i >= 0; i--) {
             try {
               parsedResult = JSON.parse(lines[i]);
               break;
-            } catch (e) {
-              // Ignore lines that aren't JSON
-            }
+            } catch (e) {}
           }
 
           if (parsedResult) {
             if (parsedResult.artifacts) artifacts.push(...parsedResult.artifacts);
             if (parsedResult.events) events.push(...parsedResult.events);
           } else {
-             // Fallback if no valid JSON found
              errorMessage = "No valid JSON returned from python node. stdout: " + stdoutData;
              resolve({ artifacts: [], events, success: false, error: errorMessage });
              return;
@@ -105,18 +139,9 @@ export class ChildProcessRuntime {
             timestamp: new Date().toISOString()
           });
 
-          resolve({
-            artifacts,
-            events,
-            success: true
-          });
+          resolve({ artifacts, events, success: true });
         } catch (e: any) {
-          resolve({
-            artifacts: [],
-            events,
-            success: false,
-            error: `Failed to parse python output: ${e.message}`
-          });
+          resolve({ artifacts: [], events, success: false, error: `Failed to parse python output: ${e.message}` });
         }
       });
     });

@@ -82,7 +82,7 @@ export async function uploadFile(
     });
 
   if (uploadError) {
-    throw new Error(`Storage upload failed: ${uploadError.message}`);
+    throw new Error(`Storage upload failed: ${uploadError?.message}`);
   }
 
   // Insert metadata row

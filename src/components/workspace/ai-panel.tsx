@@ -10,9 +10,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   MessageSquare, X, Plus, Clock, MoreHorizontal, PanelRight,
-  Paperclip, Mic, ChevronDown, ChevronUp, AlertCircle, Zap, GitBranch,
+  Paperclip, Mic, ChevronDown, ChevronRight, ChevronUp, AlertCircle, Zap, GitBranch,
   TrendingUp, AlertTriangle, Info, CheckCircle2, Network,
-  BarChart3, Lightbulb, SendHorizontal, Search, Trash2, FileText
+  BarChart3, Lightbulb, SendHorizontal, Search, Trash2, FileText,
+  Copy, ThumbsUp, ThumbsDown, RotateCcw, Check
 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useScientificState } from "@/store/scientific-state";
@@ -21,6 +22,11 @@ import { cn } from "@/lib/utils";
 import type { StreamPreamble, OpportunityChipViewModel, HypothesisEpistemicType, AgentId } from "@/types/scientific";
 import { AgentActivity } from "@/components/workspace/agent-activity";
 import { summariseFileForAgent } from "@/lib/auto-ingest";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +48,39 @@ const EPISTEMIC_CONFIG: Record<HypothesisEpistemicType, { icon: typeof Info; col
   uncertainty_warning:    { icon: AlertTriangle,color: "#fee440", label: "Uncertainty Warning" },
   recommendation:         { icon: Lightbulb,    color: "#f15bb5", label: "Recommendation" },
 };
+
+// ─── Copy Button ──────────────────────────────────────────────────────────────
+
+function CopyButton({ text, className, iconClassName }: { text: string; className?: string; iconClassName?: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button 
+      className={cn("relative transition-colors", className)} 
+      onClick={handleCopy}
+      title="Copy"
+    >
+      {copied ? (
+        <Check className={cn("h-3.5 w-3.5", iconClassName)} />
+      ) : (
+        <Copy className={cn("h-3.5 w-3.5", iconClassName)} />
+      )}
+      {copied && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-[#252526] text-[#cccccc] text-[11px] font-medium rounded shadow-xl whitespace-nowrap z-50 animate-in fade-in zoom-in-95 duration-100 border border-[#3c3c3c]">
+          Copied
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-[#3c3c3c]">
+             <div className="absolute -top-[5px] -left-[4px] border-4 border-transparent border-t-[#252526]" />
+          </div>
+        </div>
+      )}
+    </button>
+  );
+}
 
 // ─── Confidence chip ──────────────────────────────────────────────────────────
 
@@ -163,127 +202,47 @@ function OpportunityChip({ opp, onDismiss, onActivate }: {
 
 // ─── Streaming markdown renderer ──────────────────────────────────────────────
 
-function StreamingMessage({ content, preamble, isStreaming, isThinking }: {
+function StreamingMessage({ content, preamble, isStreaming, isThinking, showConfidence }: {
   content: string;
   preamble: StreamPreamble | null;
   isStreaming: boolean;
   isThinking?: boolean;
+  showConfidence?: boolean;
 }) {
-  // Simple markdown-to-JSX: bold, headers, bullet points
-  const renderMarkdown = (text: string) => {
-    let formattedText = text.replace(/<think>/g, "\n\n> **Thinking Process:**\n> ");
-    formattedText = formattedText.replace(/<\/think>/g, "\n\n---\n\n");
-    
-    // Also prefix any lines inside the think block with `> ` if they don't have it (optional, but helps if think block spans multiple paragraphs)
-    // Actually, DeepSeek just outputs raw text inside <think>. The user will see it line by line. Let's just handle `> ` lines.
-
-    const lines = formattedText.split("\n");
-    return lines.map((line, i) => {
-      if (line.startsWith("## ")) {
-        return <div key={i} className="font-bold text-[12px] text-[var(--ws-text-bright)] mt-2 mb-1">{line.slice(3)}</div>;
-      }
-      if (line.startsWith("### ")) {
-        return <div key={i} className="font-semibold text-[11px] text-[var(--ws-text-bright)] mt-1.5 mb-0.5">{line.slice(4)}</div>;
-      }
-      if (line.startsWith("**") && line.endsWith("**")) {
-        return <div key={i} className="font-semibold text-[var(--ws-text-bright)] mt-1">{line.slice(2, -2)}</div>;
-      }
-      if (line.startsWith("- ")) {
-        const textStr = line.slice(2).replace(/\*\*(.*?)\*\*/g, "$1");
-        
-        // Handle links in bullet points
-        const linkMatch = textStr.match(/\[(.*?)\]\((.*?)\)/);
-        if (linkMatch) {
-          const preLink = textStr.substring(0, linkMatch.index);
-          const postLink = textStr.substring((linkMatch.index || 0) + linkMatch[0].length);
-          return (
-            <div key={i} className="flex gap-1.5 text-[var(--ws-text)]">
-              <span className="text-[var(--ws-text-muted)] shrink-0">•</span>
-              <span>
-                {preLink}
-                <a href={linkMatch[2]} target="_blank" rel="noreferrer" className="text-[#007acc] hover:underline cursor-pointer">{linkMatch[1]}</a>
-                {postLink}
-              </span>
-            </div>
-          );
-        }
-
-        return <div key={i} className="flex gap-1.5 text-[var(--ws-text)]"><span className="text-[var(--ws-text-muted)] shrink-0">•</span><span>{textStr}</span></div>;
-      }
-      if (line.startsWith("*") && line.endsWith("*") && !line.startsWith("**")) {
-        return <div key={i} className="text-[var(--ws-text-muted)] italic">{line.slice(1, -1)}</div>;
-      }
-      if (line.startsWith("---")) {
-        return <div key={i} className="border-t border-[#2b2b2b] my-2" />;
-      }
-      if (line.startsWith("> ")) {
-        // blockquote rendering
-        const inner = line.slice(2).replace(/\*\*(.*?)\*\*/g, "$1"); // basic bold strip for thought process
-        return <div key={i} className="border-l-2 border-[#444] pl-3 py-0.5 text-[#888888] italic my-1 leading-relaxed text-[11px]">{inner}</div>;
-      }
-      if (line.trim() === "") {
-        return <div key={i} className="h-1" />;
-      }
-      
-      // Handle inline links outside of bullet points
-      const hasLink = line.match(/\[(.*?)\]\((.*?)\)/);
-      if (hasLink) {
-        const parts = line.split(/(\[.*?\]\(.*?\))/g);
-        return (
-          <div key={i} className="text-[var(--ws-text)] leading-relaxed">
-            {parts.map((part, j) => {
-              const m = part.match(/\[(.*?)\]\((.*?)\)/);
-              if (m) {
-                return <a key={j} href={m[2]} target="_blank" rel="noreferrer" className="text-[#007acc] hover:underline cursor-pointer">{m[1]}</a>;
-              }
-              const subParts = part.split(/\*\*(.*?)\*\*/g);
-              return <span key={j}>{subParts.map((sp, k) => k % 2 === 1 ? <strong key={k} className="text-[var(--ws-text-bright)]">{sp}</strong> : sp)}</span>;
-            })}
-          </div>
-        );
-      }
-
-      // Inline bold
-      const parts = line.split(/\*\*(.*?)\*\*/g);
-      return (
-        <div key={i} className="text-[var(--ws-text)] leading-relaxed">
-          {parts.map((part, j) => j % 2 === 1 ? <strong key={j} className="text-[var(--ws-text-bright)]">{part}</strong> : part)}
-        </div>
-      );
-    });
-  };
-
+  let formattedText = content.trim();
+  
+  // Strip outer markdown wrapper if the LLM mistakenly wrapped its entire response in a code block
+  if (formattedText.startsWith("```markdown")) {
+    formattedText = formattedText.substring(11).trimStart();
+    if (formattedText.endsWith("```")) {
+      formattedText = formattedText.substring(0, formattedText.length - 3).trimEnd();
+    }
+  } else if (formattedText.startsWith("```md")) {
+    formattedText = formattedText.substring(5).trimStart();
+    if (formattedText.endsWith("```")) {
+      formattedText = formattedText.substring(0, formattedText.length - 3).trimEnd();
+    }
+  }
   return (
     <div className="space-y-1">
-      {preamble && (
-        <div className="flex items-center gap-2 flex-wrap mb-2">
-          <AgentBadge
-            agentId={preamble.agentId}
-            rulesMatched={preamble.rulesMatched}
-            capabilityTrace={preamble.capabilityTrace}
-          />
+      <div className="space-y-0.5">
+        <div className="text-[13px] leading-relaxed text-[var(--ws-text)] break-words w-full max-w-full overflow-hidden prose prose-invert prose-p:my-1 prose-pre:bg-[#1e1e1e] prose-pre:border prose-pre:border-[#2b2b2b] prose-code:text-[#d4d4d4] prose-code:bg-[#1e1e1e] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-table:border-collapse prose-table:w-full prose-td:border prose-td:border-[#2b2b2b] prose-td:p-2 prose-th:border prose-th:border-[#2b2b2b] prose-th:p-2 prose-th:bg-[#181818] prose-th:text-left">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {formattedText}
+          </ReactMarkdown>
+        </div>
+      </div>
+      {showConfidence && preamble && !isStreaming && formattedText && (
+        <div className="pt-2">
           <ConfidenceChip
             confidence={preamble.confidence}
             provenance={preamble.confidenceProvenance}
           />
-          {preamble.epistemicTypesProduced.map((type) => {
-            const cfg = EPISTEMIC_CONFIG[type];
-            const Icon = cfg.icon;
-            return (
-              <span key={type} className="text-[9px] flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ color: cfg.color, background: `${cfg.color}11` }}>
-                <Icon className="h-2.5 w-2.5" />
-                {cfg.label}
-              </span>
-            );
-          })}
         </div>
       )}
-      <div className="space-y-0.5">
-        {renderMarkdown(content)}
-        {isStreaming && !isThinking && (
-          <span className="inline-block h-3 w-1 bg-[#007acc] animate-pulse ml-0.5" />
-        )}
-      </div>
     </div>
   );
 }
@@ -304,57 +263,20 @@ interface EnhancedMessage {
   taskFolder?: string;
 }
 
-// ─── Thinking indicator ───────────────────────────────────────────────────────
-
-const THINKING_PHASES = ["Thinking"] as const;
-
-function ThinkingIndicator({ startedAt }: { startedAt: number }) {
-  const [phase, setPhase] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+function ThoughtDisclosure({ duration, thought, isThinking }: { duration: number; thought?: string; isThinking?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const thoughtRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const phaseTimer = setInterval(() => setPhase((p) => (p + 1) % THINKING_PHASES.length), 2000);
-    const elapsedTimer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 200);
-    return () => { clearInterval(phaseTimer); clearInterval(elapsedTimer); };
-  }, [startedAt]);
-
-  return (
-    <div className="flex items-center gap-2.5 py-0.5">
-      {/* Phase text */}
-      <span
-        key={phase}
-        className="text-[11px] font-medium text-[#cccccc] animate-in fade-in slide-in-from-bottom-1 duration-300"
-      >
-        {THINKING_PHASES[phase]}
-        <span className="inline-flex gap-[2px] ml-[2px]">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="inline-block h-[3px] w-[3px] rounded-full bg-[#007acc] animate-bounce"
-              style={{ animationDelay: `${i * 0.15}s` }}
-            />
-          ))}
-        </span>
-      </span>
-      {/* Elapsed */}
-      <span className="ml-auto text-[9px] text-[#444] tabular-nums">{elapsed}s</span>
-    </div>
-  );
-}
-
-// ─── Thought disclosure ───────────────────────────────────────────────────────
-
-function ThoughtDisclosure({ duration, thought, isStreaming }: { duration: number; thought?: string; isStreaming?: boolean }) {
-  const [open, setOpen] = useState(isStreaming ?? false);
-
-  useEffect(() => {
-    if (isStreaming) setOpen(true);
-  }, [isStreaming]);
+    if (!open || !thoughtRef.current) return;
+    thoughtRef.current.scrollTop = thoughtRef.current.scrollHeight;
+  }, [thought, open, isThinking]);
 
   const formatTime = (secs: number) => {
-    if (secs < 60) return `${secs}s`;
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
+    const safe = Math.max(1, secs || 0);
+    if (safe < 60) return `${safe}s`;
+    const m = Math.floor(safe / 60);
+    const s = safe % 60;
     if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
     const h = Math.floor(m / 60);
     const remM = m % 60;
@@ -364,20 +286,27 @@ function ThoughtDisclosure({ duration, thought, isStreaming }: { duration: numbe
   return (
     <div className="mb-2">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-[13px] text-[#a0a0a0] hover:text-[#d0d0d0] transition-colors group"
+        className="flex items-center gap-1 text-[13px] text-[#c8c8c8] hover:text-white transition-colors"
       >
-        <span>Thought for {formatTime(duration)}</span>
-        <ChevronDown 
-          className="w-3.5 h-3.5 ml-1 transition-transform duration-200"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        />
+        {isThinking ? (
+          <span className="gaid-thinking-shimmer font-medium select-none">Thinking</span>
+        ) : (
+          <span>Thought for {formatTime(duration)}</span>
+        )}
+        {open ? (
+          <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+        )}
       </button>
-      {open && thought && (
-        <div 
-          className="mt-3 ml-2 text-[13px] text-[#a0a0a0] leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200 border-l-2 border-[#333] pl-3"
+      {open && (isThinking || thought) && (
+        <div
+          ref={thoughtRef}
+          className="mt-3 ml-2 text-[13px] text-[#a0a0a0] leading-relaxed border-l-2 border-[#333] pl-3 max-h-[240px] overflow-y-auto scrollbar-thin"
         >
-          {thought.includes("[1/") ? (
+          {thought && thought.includes("[1/") ? (
             <ul className="list-disc space-y-1 pl-4">
               {thought.split('\n').filter(Boolean).map((line, i) => {
                 const cleanLine = line.replace(/^\[\d+\/\d+\]\s*/, '');
@@ -385,7 +314,10 @@ function ThoughtDisclosure({ duration, thought, isStreaming }: { duration: numbe
               })}
             </ul>
           ) : (
-            <div className="whitespace-pre-wrap font-mono text-[12px] opacity-80">{thought}</div>
+            <div className="whitespace-pre-wrap font-mono text-[12px] opacity-80">
+              {thought || ""}
+              {isThinking && <span className="inline-block w-[6px] h-[12px] ml-0.5 align-[-1px] bg-[#858585] animate-pulse" />}
+            </div>
           )}
         </div>
       )}
@@ -400,6 +332,7 @@ interface InputBoxProps {
   setInputVal: (v: string) => void;
   handleKeyDown: (e: React.KeyboardEvent) => void;
   handleSend: () => void;
+  handleStop: () => void;
   isGenerating: boolean;
   dropdownOpen: boolean;
   setDropdownOpen: (v: boolean) => void;
@@ -415,7 +348,7 @@ interface InputBoxProps {
 }
 
 function InputBox({
-  inputVal, setInputVal, handleKeyDown, handleSend, isGenerating,
+  inputVal, setInputVal, handleKeyDown, handleSend, handleStop, isGenerating,
   dropdownOpen, setDropdownOpen, currentModeObj, modes, selectedMode, setSelectedMode,
   modelDropdownOpen, setModelDropdownOpen, selectedModel, setSelectedModel,
   dropUp = false,
@@ -476,7 +409,7 @@ function InputBox({
             </button>
             {modelDropdownOpen && (
               <div className={`absolute left-0 ${anchor} bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-xl w-[160px] py-1 z-50 flex flex-col text-[10px]`}>
-                {["G-AID Simulation", "DeepSeek-R1", "Llama 3.3", "Qwen 2.5"].map((model) => (
+                {["G-AID Orchestra"].map((model) => (
                   <button
                     key={model}
                     onClick={() => { setSelectedModel(model); setModelDropdownOpen(false); }}
@@ -494,9 +427,36 @@ function InputBox({
             )}
           </div>
         </div>
-        <button className="text-[#858585] hover:text-[#cccccc] p-1.5 rounded-full transition-colors bg-[#333333] border border-[#3c3c3c]">
-          <Mic className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button type="button" className="text-[#858585] hover:text-[#cccccc] p-1.5 rounded-full transition-colors bg-[#333333] border border-[#3c3c3c]" title="Voice">
+            <Mic className="h-3.5 w-3.5" />
+          </button>
+          {isGenerating ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              title="Stop"
+              className="h-7 w-7 rounded-full bg-[#2a2a2a] border border-[#3c3c3c] hover:bg-[#333] transition-colors flex items-center justify-center"
+            >
+              <span className="block h-2.5 w-2.5 rounded-[2px] bg-[#ef4444]" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleSend()}
+              disabled={!canSend}
+              title="Send"
+              className={cn(
+                "p-1.5 rounded-full transition-colors",
+                canSend
+                  ? "bg-[#007acc] text-white hover:bg-[#1b8fe3]"
+                  : "bg-[#2a2a2a] text-[#555555] border border-[#3c3c3c]"
+              )}
+            >
+              <SendHorizontal className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -569,7 +529,9 @@ export function AIPanel() {
     currentProject,
     setActiveFile,
     setWorkspaceView,
-    openWorkbenchTab
+    openWorkbenchTab,
+    setConversationState,
+    updateMessageInConversation
   } = useAppStore();
 
   const scientificState = useScientificState();
@@ -586,55 +548,34 @@ export function AIPanel() {
     id: "default", topic: "New Analysis", messages: []
   };
 
-  const [inputVal, setInputVal] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const inputVal = activeConversation.inputVal || "";
+  const setInputVal = (val: string) => setConversationState(activeConversation.id, { inputVal: val });
+  
+  const isGenerating = activeConversation.isGenerating || false;
+  const setIsGenerating = (val: boolean) => setConversationState(activeConversation.id, { isGenerating: val });
+  
+  const enhancedMessages = activeConversation.messages;
+  const hasSentMessage = enhancedMessages.length > 0;
+
   const [selectedMode, setSelectedMode] = useState("Agent");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("G-AID Simulation");
+  const [selectedModel, setSelectedModel] = useState("G-AID Orchestra");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showLimitWarning, setShowLimitWarning] = useState(false);
-  const [enhancedMessages, setEnhancedMessages] = useState<EnhancedMessage[]>([]);
-  const [currentStreamId, setCurrentStreamId] = useState<string | null>(null);
-  const [hasSentMessage, setHasSentMessage] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const prevConvoIdRef = useRef<string | null>(null);
-  
+  const abortRef = useRef<AbortController | null>(null);
+  const isAutoScrollEnabled = useRef(true);
 
-  // Load conversation messages when switching tabs/conversations or when background messages complete
-  useEffect(() => {
-    if (activeConversation) {
-      const isNewConvo = activeConversation.id !== prevConvoIdRef.current;
-      
-      // Only reload if the store has more messages than our local state, OR if we switched to a different conversation
-      // (This prevents overwriting local streaming state while still picking up finished background tasks)
-      if (isNewConvo || enhancedMessages.length === 0 || activeConversation.messages.length > enhancedMessages.filter(m => !m.isStreaming).length) {
-        const loaded = activeConversation.messages.map((m, idx) => ({
-          id: m.id || `msg_${activeConversation.id}_${idx}`,
-          sender: m.sender,
-          text: m.text,
-          preamble: m.preamble,
-          timestamp: m.timestamp || new Date().toISOString(),
-          thinkingStartedAt: m.thinkingStartedAt,
-          thinkingDuration: m.thinkingDuration,
-          thought: m.thought,
-          awaitingApproval: m.awaitingApproval,
-          taskFolder: m.taskFolder
-        }));
-        setEnhancedMessages(loaded);
-        setHasSentMessage(loaded.length > 0);
-        prevConvoIdRef.current = activeConversation.id;
-      }
-    } else {
-      setEnhancedMessages([]);
-      setHasSentMessage(false);
-      prevConvoIdRef.current = null;
-    }
-  }, [activeConversationId, activeConversation?.messages.length]);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    isAutoScrollEnabled.current = isAtBottom;
+  };
 
   const opportunities = scientificState.getOpportunityChipsViewModel();
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && isAutoScrollEnabled.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [enhancedMessages, agentStore.streamBuffer]);
@@ -642,21 +583,27 @@ export function AIPanel() {
   // Listen for pending prompts from other parts of the app
   const { pendingPrompt, setPendingPrompt, setChatPanelOpen } = useAppStore();
 
-  const generateTopic = (msg: string) => {
-    const lc = msg.toLowerCase();
-    if (lc.includes("exploration") || lc.includes("survey")) return "Exploration Survey";
-    if (lc.includes("ert") || lc.includes("resistivity")) return "ERT Interpretation";
-    if (lc.includes("seismic") || lc.includes("earthquake")) return "Seismic Analysis";
-    if (lc.includes("gravity") || lc.includes("magnetic")) return "Potential Fields";
-    if (lc.includes("groundwater") || lc.includes("aquifer")) return "Hydrogeological Analysis";
-    return msg.length > 25 ? msg.substring(0, 22) + "…" : msg;
-  };
+  const assignAiTopic = useCallback(async (convId: string, userMsg: string, reply: string) => {
+    try {
+      const response = await fetch("/api/agent/title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg, reply }),
+      });
+      const data = await response.json().catch(() => ({}));
+      const title = typeof data?.title === "string" ? data.title.trim() : "";
+      updateConversationTopic(convId, title || "New conversation");
+    } catch {
+      updateConversationTopic(convId, "New conversation");
+    }
+  }, [updateConversationTopic]);
 
   const handleAddConversation = () => {
     const limit = agentSettings?.maxTabCount?.value;
     if (limit !== "Unlimited" && limit !== undefined) {
       const limitNum = Number(limit);
-      if (!isNaN(limitNum) && conversations.length >= limitNum) {
+      const visibleCount = conversations.filter(c => !c.hidden).length;
+      if (!isNaN(limitNum) && visibleCount >= limitNum) {
         setShowLimitWarning(true);
         setTimeout(() => setShowLimitWarning(false), 3000);
         return;
@@ -664,6 +611,33 @@ export function AIPanel() {
     }
     addConversation();
   };
+
+  const handleUndo = (msgId: string) => {
+    const conv = conversations.find(c => c.id === activeConversationId);
+    if (!conv) return;
+    
+    const msgIndex = conv.messages.findIndex(m => m.id === msgId);
+    if (msgIndex === -1) return;
+    
+    const msg = conv.messages[msgIndex];
+    
+    setInputVal(msg.text);
+    
+    if (isGenerating) {
+      setConversationState(conv.id, { isGenerating: false });
+      agentStore.setStreaming(false);
+      agentStore.setOrchestratorThinking(false);
+    }
+    
+    useAppStore.getState().clearPendingFileUpdates();
+    
+    const newMessages = conv.messages.slice(0, msgIndex);
+    setConversationState(conv.id, { messages: newMessages });
+  };
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   const handleSend = useCallback(async (eOrPrompt?: React.MouseEvent | React.FormEvent | string) => {
     // If it's an event, it will be an object. If it's a direct string, it's a string.
@@ -674,49 +648,46 @@ export function AIPanel() {
     const textToSend = isString ? eOrPrompt : inputVal;
 
     if (!textToSend.trim() || isGenerating) return;
-
     const userMsg = textToSend.trim();
-    if (!isString) setInputVal("");
-    setHasSentMessage(true);
+    const convId = activeConversation.id;
 
-    if (enhancedMessages.length === 0) {
-      updateConversationTopic(activeConversation.id, generateTopic(userMsg));
-    }
+    if (!isString) setInputVal("");
+
+    const shouldTitle = activeConversation.messages.length === 0;
 
     const userMsgId = `msg_${Date.now()}_user`;
     
     // Persist user message to store immediately
-    addMessageToConversation(activeConversation.id, { 
+    addMessageToConversation(convId, { 
       id: userMsgId,
       sender: "user", 
       text: userMsg,
       timestamp: new Date().toISOString()
     });
 
-    setEnhancedMessages(prev => [...prev, {
-      id: userMsgId,
-      sender: "user",
-      text: userMsg,
-      timestamp: new Date().toISOString(),
-    }]);
-
+    isAutoScrollEnabled.current = true;
     setIsGenerating(true);
     agentStore.setOrchestratorThinking(true);
     agentStore.clearStream();
+    abortRef.current?.abort();
+    const abort = new AbortController();
+    abortRef.current = abort;
 
     const agentMsgId = `msg_${Date.now()}_agent`;
-    setCurrentStreamId(agentMsgId);
-    const thinkingStart = Date.now();
+    let actualThinkingStart: number | undefined;
+    let thinkingDurationRecorded: number | undefined;
+    let accumulatedText = "";
+    let preamble: StreamPreamble | null = null;
 
-    setEnhancedMessages(prev => [...prev, {
+    addMessageToConversation(convId, {
       id: agentMsgId,
       sender: "agent",
       text: "",
       preamble: null,
       isStreaming: true,
+      thinkingStartedAt: Date.now(),
       timestamp: new Date().toISOString(),
-      thinkingStartedAt: thinkingStart,
-    }]);
+    });
 
     try {
       // Build file content summaries for the orchestrator
@@ -739,13 +710,14 @@ export function AIPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: enrichedMessage,
-          sessionId: activeConversation.id,
+          sessionId: convId,
           mode: selectedMode === "Plan" ? "plan" : "interpret",
           snapshotData: scientificState.snapshot,
           projectName: currentProject || "",
           guestId: localStorage.getItem("gaid_guest_id") || undefined,
           model: selectedModel,
         }),
+        signal: abort.signal,
       });
 
       if (!response.ok) {
@@ -759,8 +731,6 @@ export function AIPanel() {
       agentStore.setStreaming(true);
 
       const reader = response.body.getReader();
-      let preamble: StreamPreamble | null = null;
-      let accumulatedText = "";
       let thought = ""; // internal reasoning shown in thought disclosure
 
       // ── Byte-scan state machine ──────────────────────────────────────────
@@ -792,7 +762,7 @@ let activityId: string | null = null;
           if (state === "scan") {
             if (byte === 0x00) { state = "preamble"; jsonBytes = []; i++; }
             else if (byte === 0x02) { state = "epilogue"; jsonBytes = []; i++; }
-            else { i++; } // skip stray bytes in scan mode
+            else { state = "text"; }
 
           } else if (state === "preamble") {
             if (byte === 0x0a) { // \n ends preamble JSON
@@ -810,7 +780,7 @@ let activityId: string | null = null;
                       : "Processing query…",
                     status: "running",
                     relatedToolId: null,
-                    conversationId: activeConversation.id,
+                    conversationId: convId,
                   });
                 }
               } catch { /* malformed preamble — ignore */ }
@@ -830,18 +800,31 @@ let activityId: string | null = null;
               accumulatedText += decoded;
               agentStore.appendStreamToken(decoded);
 
-              // Throttle React setState to ~60fps to avoid waterfall re-renders
+              if (actualThinkingStart === undefined) {
+                if (accumulatedText.includes("<think>") || accumulatedText.includes("<思考>")) {
+                  actualThinkingStart = Date.now();
+                }
+              }
+
+              if (thinkingDurationRecorded === undefined && actualThinkingStart !== undefined) {
+                if (accumulatedText.includes("</think>") || accumulatedText.includes("</思考>")) {
+                  thinkingDurationRecorded = Math.round((Date.now() - actualThinkingStart) / 1000);
+                }
+              }
+
               const now = Date.now();
-              if (now - lastTextUpdate > 16) {
+              const firstThinkChunk = actualThinkingStart !== undefined && lastTextUpdate === 0;
+              if (firstThinkChunk || now - lastTextUpdate > 16) {
                 lastTextUpdate = now;
                 const snap = accumulatedText;
                 const pSnap = preamble;
-                setEnhancedMessages(prev =>
-                  prev.map(m => m.id === agentMsgId
-                    ? { ...m, text: snap, preamble: pSnap, isStreaming: true }
-                    : m
-                  )
-                );
+                updateMessageInConversation(convId, agentMsgId, { 
+                  text: snap, 
+                  preamble: pSnap, 
+                  isStreaming: true,
+                  thinkingStartedAt: actualThinkingStart,
+                  thinkingDuration: thinkingDurationRecorded
+                });
               }
             }
 
@@ -918,66 +901,50 @@ let activityId: string | null = null;
       }
 
       // Finalize message
-      const thinkingDuration = Math.round((Date.now() - thinkingStart) / 1000);
-      setEnhancedMessages(prev =>
-        prev.map(m => m.id === agentMsgId
-          ? { 
-              ...m, 
-              text: accumulatedText, 
-              preamble, 
-              isStreaming: false, 
-              thinkingDuration, 
-              thought: thought || undefined,
-              awaitingApproval: epilogueSnapshot?.awaitingApproval ?? false,
-              taskFolder: epilogueSnapshot?.taskFolder
-            }
-          : m
-        )
-      );
+      const thinkingDuration = thinkingDurationRecorded ?? Math.round((Date.now() - (actualThinkingStart || Date.now())) / 1000);
+      updateMessageInConversation(convId, agentMsgId, {
+        text: accumulatedText,
+        preamble,
+        isStreaming: false,
+        thinkingDuration,
+        thought: thought || undefined,
+        awaitingApproval: (epilogueSnapshot as any)?.awaitingApproval ?? false,
+        taskFolder: (epilogueSnapshot as any)?.taskFolder
+      });
+
+      if (shouldTitle) {
+        void assignAiTopic(convId, userMsg, accumulatedText);
+      }
 
       agentStore.setStreaming(false);
       agentStore.clearStream();
       agentStore.setActiveAgent(null);
 
-      // Persist to legacy conversation store
-      addMessageToConversation(activeConversation.id, { 
-        id: agentMsgId,
-        sender: "agent", 
-        text: accumulatedText,
-        preamble: preamble ?? undefined,
-        thinkingStartedAt: thinkingStart,
-        thinkingDuration,
-        thought: thought || undefined,
-        awaitingApproval: epilogueSnapshot?.awaitingApproval ?? false,
-        taskFolder: epilogueSnapshot?.taskFolder,
-        timestamp: new Date().toISOString()
-      });
-
-
     } catch (err) {
-      const errorText = `Analysis failed: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`;
-      setEnhancedMessages(prev =>
-        prev.map(m => m.id === agentMsgId
-          ? { ...m, text: errorText, isStreaming: false }
-          : m
-        )
-      );
-      addMessageToConversation(activeConversation.id, { 
-        id: agentMsgId,
-        sender: "agent", 
-        text: errorText,
-        timestamp: new Date().toISOString()
-      });
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      if (aborted) {
+        const thinkingDuration = thinkingDurationRecorded ?? Math.round((Date.now() - (actualThinkingStart || Date.now())) / 1000);
+        updateMessageInConversation(convId, agentMsgId, {
+          text: accumulatedText,
+          preamble,
+          isStreaming: false,
+          thinkingDuration,
+        });
+      } else {
+        const errorText = `\n\n> ❌ **Connection Interrupted:** ${err instanceof Error ? err.message : "Unknown network error"}. If your machine went to sleep, the stream may have dropped.`;
+        const finalMsgText = accumulatedText ? accumulatedText + errorText : errorText.trimStart();
+        updateMessageInConversation(convId, agentMsgId, { text: finalMsgText, isStreaming: false });
+      }
     } finally {
-      setIsGenerating(false);
-      setCurrentStreamId(null);
+      if (abortRef.current === abort) abortRef.current = null;
+      setConversationState(convId, { isGenerating: false });
       agentStore.setOrchestratorThinking(false);
       agentStore.setStreaming(false);
     }
   }, [
-    inputVal, isGenerating, activeConversation, enhancedMessages.length, 
-    addMessageToConversation, agentStore, scientificState, projectFiles, 
-    fileContents, currentProject, selectedMode, updateConversationTopic
+    inputVal, isGenerating, activeConversation.id, activeConversation.messages.length, 
+    addMessageToConversation, updateMessageInConversation, setConversationState, agentStore, scientificState, projectFiles, 
+    fileContents, currentProject, selectedMode, updateConversationTopic, assignAiTopic
   ]);
 
   useEffect(() => {
@@ -1004,7 +971,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
     const approvalMsgId = `msg_${Date.now()}_approval`;
     const thinkingStart = Date.now();
     
-    setEnhancedMessages(prev => [...prev, {
+    addMessageToConversation(sessionId, {
       id: approvalMsgId,
       sender: "agent",
       text: "",
@@ -1012,7 +979,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
       isStreaming: true,
       timestamp: new Date().toISOString(),
       thinkingStartedAt: thinkingStart,
-    }]);
+    });
     
     try {
       const response = await fetch("/api/agent/approve-diurnal", {
@@ -1089,30 +1056,15 @@ const handleApproveDiurnal = async (sessionId: string) => {
           const slice = rawBuf.slice(textStart, textEnd);
           const decoded = dec.decode(slice, { stream: true });
           accumulated += decoded;
-          setEnhancedMessages(prev =>
-            prev.map(m => m.id === approvalMsgId
-              ? { ...m, text: accumulated, preamble, isStreaming: true }
-              : m
-            )
-          );
+          updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: true });
         }
       }
 
-      setEnhancedMessages(prev =>
-        prev.map(m => m.id === approvalMsgId
-          ? { ...m, text: accumulated, preamble, isStreaming: false }
-          : m
-        )
-      );
+      updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: false });
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setEnhancedMessages(prev =>
-        prev.map(m => m.id === approvalMsgId
-          ? { ...m, text: `Approval failed: ${errorMsg}`, isStreaming: false }
-          : m
-        )
-      );
+      updateMessageInConversation(sessionId, approvalMsgId, { text: `Approval failed: ${errorMsg}`, isStreaming: false });
     }
   };
 
@@ -1135,7 +1087,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
   const currentModeObj = modes.find(m => m.id === selectedMode) || modes[0];
 
   return (
-    <aside className="w-full flex flex-col bg-[#1e1e1e] text-[#cccccc] font-sans h-full select-none relative">
+    <aside className="w-full flex flex-col bg-[#1e1e1e] text-[#cccccc] font-sans h-full relative">
       {/* Tabs Header */}
       <div className="h-[35px] flex items-center bg-[#181818] shrink-0 relative z-20 select-none">
         <div className="flex-1 flex items-center h-full overflow-x-auto scrollbar-none">
@@ -1144,7 +1096,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
             return (
               <div
                 key={conv.id}
-                onClick={() => { setActiveConversationId(conv.id); setEnhancedMessages([]); }}
+                onClick={() => { setActiveConversationId(conv.id); }}
                 className={cn(
                   "h-full flex items-center gap-2 px-3 border-r border-[#2b2b2b] text-[11px] cursor-pointer transition-colors relative group min-w-[100px] max-w-[140px] rounded-t-md",
                   isActive
@@ -1214,6 +1166,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
               setInputVal={setInputVal}
               handleKeyDown={handleKeyDown}
               handleSend={handleSend}
+              handleStop={handleStop}
               isGenerating={isGenerating}
               dropdownOpen={dropdownOpen}
               setDropdownOpen={setDropdownOpen}
@@ -1231,66 +1184,119 @@ const handleApproveDiurnal = async (sessionId: string) => {
         )}
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-3">
 
           {/* Messages */}
           {enhancedMessages.map((msg) => (
             <div
               key={msg.id}
               className={cn(
-                "flex flex-col leading-relaxed font-sans",
+                "flex flex-col leading-relaxed font-sans group relative",
                 textSizeClass,
                 msg.sender === "user"
-                  ? "bg-[#007acc] text-white ml-auto max-w-[85%] rounded-lg p-2.5 shadow-sm"
+                  ? "bg-[#007acc] text-white ml-auto max-w-[85%] rounded-lg p-2.5 px-3 shadow-sm"
                   : "text-[var(--ws-text)] mr-auto max-w-full py-1"
               )}
             >
 {msg.sender === "user" ? (
-                 <p className="whitespace-pre-wrap">{msg.text}</p>
+                 <div className="flex flex-col">
+                   <p className="whitespace-pre-wrap">{msg.text}</p>
+                   <div className="flex items-center gap-1.5 mt-1.5 -mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                     <span className="text-[9px] text-white/70 mr-auto select-none">
+                       {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ""}
+                     </span>
+                     <CopyButton 
+                       text={msg.text}
+                       className="p-1 hover:bg-white/20 text-white/80 hover:text-white rounded" 
+                       iconClassName="h-3 w-3"
+                     />
+                     <button 
+                       className="p-1 hover:bg-white/20 text-white/80 hover:text-white transition-colors rounded" 
+                       title="Undo"
+                       onClick={() => handleUndo(msg.id!)}
+                     >
+                       <RotateCcw className="h-3 w-3" />
+                     </button>
+                   </div>
+                 </div>
                ) : (() => {
                  let displayThought = msg.thought || "";
                  let displayText = msg.text;
 
-                 // Extract <think> from LLM
-                 const thinkMatch = displayText.match(/<think>([\s\S]*?)<\/think>/);
-                 if (thinkMatch) {
-                   const llmThought = thinkMatch[1].trim();
-                   if (llmThought) {
-                     displayThought = llmThought;
-                   }
-                   displayText = displayText.replace(/<think>[\s\S]*?<\/think>/, "").trim();
-                 } else if (displayText.includes("<think>")) {
-                   // Still streaming <think>
-                   const parts = displayText.split("<think>");
-                   const llmThought = parts[1].trim();
-                   if (llmThought) {
-                     displayThought = llmThought;
-                   }
-                   displayText = parts[0].trim();
+                 // Extract all completed <think> blocks
+                 const thinkRegex = /<think>([\s\S]*?)<\/think>|<思考>([\s\S]*?)<\/思考>/g;
+                 let combinedThoughts = "";
+                 let match;
+                 while ((match = thinkRegex.exec(displayText)) !== null) {
+                   combinedThoughts += (match[1] || match[2]).trim() + "\n\n";
                  }
 
-                 const isStreamingThought = msg.isStreaming && !!displayThought && !displayText;
-                 const showThinkingIndicator = msg.isStreaming && msg.thinkingStartedAt && !displayThought && !displayText;
+                 if (combinedThoughts) {
+                   displayThought = combinedThoughts.trim();
+                   displayText = displayText.replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/g, "");
+                 }
+
+                 // Check if there is an unclosed think block (streaming)
+                 const openMatch = displayText.match(/<(?:think|思考)>/);
+                 if (openMatch && openMatch.index !== undefined) {
+                   const unclosedThought = displayText.slice(openMatch.index + openMatch[0].length);
+                   if (unclosedThought || openMatch) {
+                     displayThought = displayThought
+                       ? (unclosedThought ? displayThought + "\n\n" + unclosedThought : displayThought)
+                       : unclosedThought;
+                   }
+                   displayText = displayText.slice(0, openMatch.index).trim();
+                 }
+                 
+                 // Clean up any stray closing tags that were outside of matched blocks
+                 displayText = displayText.replace(/<\/(?:think|思考)>/g, "").trim();
+
+                 const stillThinking = Boolean(msg.isStreaming) && msg.thinkingDuration === undefined && !displayText;
+                 const showCompletedThought = !stillThinking && (Boolean(displayThought) || msg.thinkingDuration !== undefined);
+                 const hasProjectData = projectFiles.some((f) => Boolean(fileContents[f.id]?.trim()));
+                 const showConfidence = !msg.isStreaming
+                   && hasProjectData
+                   && Boolean(displayText.trim())
+                   && Boolean(msg.preamble?.confidence)
+                   && ((msg.preamble as StreamPreamble & { showConfidence?: boolean })?.showConfidence
+                     || (msg.preamble?.rulesMatched?.length ?? 0) > 0
+                     || (msg.preamble?.capabilityTrace?.length ?? 0) > 0);
 
                  return (
                  <>
-                   {/* Thought disclosure — shown when done or streaming thought */}
-                   {(msg.thinkingDuration !== undefined && !msg.isStreaming && displayThought) ? (
-                     <ThoughtDisclosure duration={msg.thinkingDuration} thought={displayThought} />
-                   ) : (isStreamingThought && displayThought) ? (
-                     <ThoughtDisclosure duration={Math.round((Date.now() - (msg.thinkingStartedAt || Date.now())) / 1000)} thought={displayThought} isStreaming={true} />
+                   {(stillThinking || showCompletedThought) ? (
+                     <ThoughtDisclosure
+                       duration={msg.thinkingDuration ?? 1}
+                       thought={displayThought || undefined}
+                       isThinking={stillThinking}
+                     />
                    ) : null}
-                   
-                   {/* Live thinking indicator — shown while streaming with no text and no thought yet */}
-                   {showThinkingIndicator && (
-                     <ThinkingIndicator startedAt={msg.thinkingStartedAt!} />
-                   )}
                    <StreamingMessage
                      content={displayText}
                      preamble={msg.preamble ?? null}
                      isStreaming={msg.isStreaming ?? false}
-                     isThinking={showThinkingIndicator || isStreamingThought}
+                     isThinking={Boolean(msg.isStreaming) && !displayText}
+                     showConfidence={showConfidence}
                    />
+                   {/* Action Bar */}
+                   {!msg.isStreaming && (
+                     <div className="flex items-center gap-2 mt-2 text-[#858585] text-[10px] w-full max-w-full">
+                       <span className="mr-auto select-none">
+                         {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ""}
+                       </span>
+                       <CopyButton 
+                         text={displayText}
+                         className="p-1 hover:text-[#cccccc] rounded hover:bg-white/5" 
+                         iconClassName="h-3.5 w-3.5"
+                       />
+                       <button className="p-1 hover:text-[#cccccc] transition-colors rounded hover:bg-white/5" title="Good response">
+                         <ThumbsUp className="h-3.5 w-3.5" />
+                       </button>
+                       <button className="p-1 hover:text-[#cccccc] transition-colors rounded hover:bg-white/5" title="Bad response">
+                         <ThumbsDown className="h-3.5 w-3.5" />
+                       </button>
+                     </div>
+                   )}
                    {/* Approval button for diurnal analysis plans */}
                    {!msg.isStreaming && msg.awaitingApproval && (
                      <div 
@@ -1328,8 +1334,8 @@ const handleApproveDiurnal = async (sessionId: string) => {
 
           {/* Generating indicator — only shown when no agent message bubble exists yet */}
           {isGenerating && agentStore.isOrchestratorThinking && enhancedMessages.length === 0 && (
-            <div className="bg-[#252526] border border-[#3c3c3c] rounded-lg p-3 mr-auto max-w-[85%]">
-              <ThinkingIndicator startedAt={Date.now()} />
+            <div className="mr-auto max-w-[85%] py-1">
+              <ThoughtDisclosure duration={1} isThinking thought="" />
             </div>
           )}
         </div>
@@ -1345,6 +1351,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
               setInputVal={setInputVal}
               handleKeyDown={handleKeyDown}
               handleSend={handleSend}
+              handleStop={handleStop}
               isGenerating={isGenerating}
               dropdownOpen={dropdownOpen}
               setDropdownOpen={setDropdownOpen}

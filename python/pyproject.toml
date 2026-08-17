@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "g-aid-intelligence-engine"
+version = "1.0.0"
+description = "FastAPI and LangGraph persistent backend for G-AID Geophysics Platform"
+authors = ["G-AID Core Team"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.16"
+fastapi = "^0.110.0"
+uvicorn = "^0.28.0"
+langgraph = "*"
+langchain-ollama = "*"
+pandas = "*"
+numpy = "*"
+scipy = "^1.12.0"
+pyvista = "^0.43.3"
+pydantic = "^2.6.4"
+pyinstaller = "^6.22.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
