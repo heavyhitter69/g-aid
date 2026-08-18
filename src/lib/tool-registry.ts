@@ -4,6 +4,7 @@
  */
 
 import crypto from "crypto";
+import { executePythonNode } from "@/lib/python-runtime";
 import type { ScientificTool, ToolExecutionRecord, AgentId } from "@/types/scientific";
 
 function sha256Json(inputs: Record<string, unknown>): string {
@@ -51,7 +52,7 @@ export const TOOL_REGISTRY: ScientificTool[] = [
     name: "Analytic Signal (Total Gradient)",
     version: "2.0.0",
     domain: "magnetic",
-    description: "Roest et al. 1992 total gradient via FFT derivatives.",
+    description: "G-AID MAGMAP: Roest et al. 1992 total gradient via FFT derivatives.",
     inputs: {
       outDir: { type: "string", required: true, description: "G-AID Output directory" },
       taskFolder: { type: "string", required: true, description: "Task folder" },
@@ -260,31 +261,19 @@ export async function executeTool(
   };
 
   try {
-    const response = await fetch("http://127.0.0.1:8000/api/v1/run-node", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ node_id: nodeId, parameters: inputs, input_artifacts: [] }),
-    });
-    const parsed = (await response.json()) as {
-      success?: boolean;
-      error?: string;
-      artifacts?: unknown[];
-      events?: unknown[];
-      detail?: string;
-    };
-    if (!response.ok || parsed.success === false) {
-      const message = parsed.error || parsed.detail || `run-node ${response.status}`;
+    const result = await executePythonNode(nodeId, "python/nodes/science_node.py", [], inputs);
+    if (!result.success) {
       const failed: ToolExecutionRecord = {
         ...record,
         status: "failed",
         completedAt: new Date().toISOString(),
-        errorMessage: message,
+        errorMessage: result.error || `${nodeId} failed`,
       };
       return failed;
     }
     const completed: ToolExecutionRecord = {
       ...record,
-      outputs: { artifacts: parsed.artifacts ?? [], events: parsed.events ?? [] },
+      outputs: { artifacts: result.artifacts ?? [], events: result.events ?? [] },
       status: "complete",
       completedAt: new Date().toISOString(),
     };

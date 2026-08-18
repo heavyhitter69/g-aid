@@ -9,6 +9,11 @@ import type {
 } from "@/types";
 import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
+import type { JobResults } from "@/lib/job-results";
+import type { WorkStep } from "@/lib/work-steps";
+import { conversationTitleFromText, isPlaceholderTopic } from "@/lib/conversation-title";
+import { defaultPluginEnabled } from "@/lib/plugins/catalog";
+import type { PluginSecrets } from "@/lib/plugins/types";
 
 export interface ConversationMessage {
   id?: string;
@@ -20,8 +25,19 @@ export interface ConversationMessage {
   thought?: string;
   awaitingApproval?: boolean;
   taskFolder?: string;
+  workSteps?: WorkStep[];
   timestamp?: string;
   isStreaming?: boolean;
+  interrupted?: boolean;
+  interruptKind?: "network" | "empty" | "stalled" | "engine";
+}
+
+export interface TimelineEvent {
+  id: string;
+  at: string;
+  action: "opened" | "saved" | "created" | "job";
+  label: string;
+  path?: string;
 }
 
 export interface Conversation {
@@ -39,6 +55,17 @@ export interface WorkbenchTab {
   title: string;
 }
 
+export interface PendingFileChange {
+  id: string;
+  name: string;
+  path: string;
+  kind: "created" | "edited";
+  previousContent: string;
+  content: string;
+  additions: number;
+  deletions: number;
+}
+
 export interface AgentSettings {
   textSize: "Small" | "Default" | "Large" | "Extra Large";
   submitWithCtrlEnter: boolean;
@@ -46,6 +73,7 @@ export interface AgentSettings {
   queueMessages: "Send after current message" | "Stop & send right away";
   agentAutocomplete: boolean;
   autoApproveModeTransitions: boolean;
+  orchestraChoice: "auto" | "fast" | "thinking";
 }
 
 export interface RecentProject {
@@ -63,8 +91,11 @@ interface AppState {
   selectedDiscipline: DisciplineId | null;
   assignedAgent: AgentProfile | null;
   workspaceView: WorkspaceView;
+  lastJobResults: JobResults | null;
   currentProject: string | null;
   workspaceRoot: string | null;
+  lastWorkspaceRoot: string | null;
+  lastCurrentProject: string | null;
   workspaceIndex: WorkspaceIndex | null;
   recentProjects: RecentProject[];
   processingStatus: "idle" | "running" | "complete" | "error";
@@ -81,6 +112,8 @@ interface AppState {
   privacyMode: "share" | "privacy";
   conversations: Conversation[];
   activeConversationId: string;
+  fileTimeline: TimelineEvent[];
+  pushTimelineEvent: (event: Omit<TimelineEvent, "id" | "at"> & { id?: string; at?: string }) => void;
   activeFile: string | null;
   workbenchTabs: WorkbenchTab[];
   activeWorkbenchTabId: string | null;
@@ -93,6 +126,9 @@ interface AppState {
   fileContents: Record<string, string>;
   agentSettings: AgentSettings;
   setAgentSettings: (settings: Partial<AgentSettings>) => void;
+  pluginState: { enabled: Record<string, boolean>; secrets: PluginSecrets };
+  setPluginEnabled: (id: string, enabled: boolean) => void;
+  setPluginSecret: (key: keyof PluginSecrets, value: string) => void;
   setAuthenticated: (value: boolean) => void;
   setUser: (user: UserProfile | null) => void;
   patchUser: (partial: Partial<UserProfile>) => void;
@@ -101,6 +137,7 @@ interface AppState {
   setAgent: (agent: AgentProfile | null) => void;
   completeOnboarding: () => void;
   setWorkspaceView: (view: WorkspaceView) => void;
+  presentJobResults: (results: JobResults) => void;
   setProcessingStatus: (status: "idle" | "running" | "complete" | "error") => void;
   setTheme: (theme: "light" | "dark") => void;
   toggleAgentSidebar: () => void;
@@ -133,6 +170,9 @@ interface AppState {
   setSaveAsDialogOpen: (value: boolean) => void;
   setFileContent: (fileName: string, content: string) => void;
   addConversation: () => void;
+  startBlankChat: () => void;
+  openChatFromHistory: (id: string) => void;
+  clearWindowWorkspace: () => void;
   hideConversation: (id: string) => void;
   removeConversation: (id: string) => void;
   updateConversationTopic: (id: string, topic: string) => void;
@@ -144,24 +184,45 @@ interface AppState {
   setHistoryModalOpen: (value: boolean) => void;
   pendingPrompt: string | null;
   setPendingPrompt: (prompt: string | null) => void;
-  pendingFileUpdates: { id: string, content?: string }[];
-  setPendingFileUpdates: (updates: { id: string, content?: string }[]) => void;
-  clearPendingFileUpdates: () => void;
-  applyPendingFileUpdates: () => void;
+  pendingFileChanges: PendingFileChange[];
+  enqueuePendingFileChanges: (changes: PendingFileChange[]) => void;
+  removePendingFileChange: (id: string) => void;
+  clearPendingFileChanges: () => void;
+}
+
+function prependTimeline(events: TimelineEvent[] | undefined, event: Omit<TimelineEvent, "id" | "at"> & { id?: string; at?: string }): TimelineEvent[] {
+  const next: TimelineEvent = {
+    id: event.id || `tl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    at: event.at || new Date().toISOString(),
+    action: event.action,
+    label: event.label,
+    path: event.path,
+  };
+  const withoutDup = (events || []).filter(
+    (item) => !(item.action === next.action && item.path && item.path === next.path && Date.now() - Date.parse(item.at) < 4000)
+  );
+  return [next, ...withoutDup].slice(0, 80);
 }
 
 function persistableConversations(conversations: Conversation[]): Conversation[] {
-  return conversations.map((conversation) => ({
-    id: conversation.id,
-    topic: conversation.topic,
-    hidden: conversation.hidden,
-    inputVal: conversation.inputVal,
-    isGenerating: false,
-    messages: conversation.messages.map((message) => ({
-      ...message,
-      isStreaming: false,
-    })),
-  }));
+  return conversations.map((conversation) => {
+    const firstUser = conversation.messages.find((message) => message.sender === "user")?.text || "";
+    const topic =
+      !isPlaceholderTopic(conversation.topic)
+        ? conversation.topic
+        : conversationTitleFromText(firstUser) || conversation.topic;
+    return {
+      id: conversation.id,
+      topic,
+      hidden: conversation.hidden,
+      inputVal: conversation.inputVal,
+      isGenerating: false,
+      messages: conversation.messages.map((message) => ({
+        ...message,
+        isStreaming: false,
+      })),
+    };
+  });
 }
 
 const initialState = {
@@ -172,8 +233,11 @@ const initialState = {
   selectedDiscipline: null,
   assignedAgent: null,
   workspaceView: "dashboard" as WorkspaceView,
+  lastJobResults: null as JobResults | null,
   currentProject: null as string | null,
   workspaceRoot: null as string | null,
+  lastWorkspaceRoot: null as string | null,
+  lastCurrentProject: null as string | null,
   workspaceIndex: null as WorkspaceIndex | null,
   recentProjects: [] as RecentProject[],
   processingStatus: "idle" as const,
@@ -191,6 +255,7 @@ const initialState = {
   conversations: [
     { id: "default", topic: "New Agent", messages: [] }
   ] as Conversation[],
+  fileTimeline: [] as TimelineEvent[],
   activeConversationId: "default",
   activeFile: null as string | null,
   workbenchTabs: [] as WorkbenchTab[],
@@ -209,10 +274,15 @@ const initialState = {
     queueMessages: "Send after current message" as const,
     agentAutocomplete: true,
     autoApproveModeTransitions: false,
+    orchestraChoice: "auto" as const,
+  },
+  pluginState: {
+    enabled: defaultPluginEnabled(),
+    secrets: {},
   },
   isHistoryModalOpen: false,
   pendingPrompt: null,
-  pendingFileUpdates: [] as { id: string, content?: string }[],
+  pendingFileChanges: [] as PendingFileChange[],
 };
 
 export const useAppStore = create<AppState>()(
@@ -220,6 +290,20 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       ...initialState,
       setAgentSettings: (settings) => set((s) => ({ agentSettings: { ...s.agentSettings, ...settings } })),
+      setPluginEnabled: (id, enabled) =>
+        set((s) => ({
+          pluginState: {
+            enabled: { ...(s.pluginState?.enabled || defaultPluginEnabled()), [id]: enabled },
+            secrets: s.pluginState?.secrets || {},
+          },
+        })),
+      setPluginSecret: (key, value) =>
+        set((s) => ({
+          pluginState: {
+            enabled: s.pluginState?.enabled || defaultPluginEnabled(),
+            secrets: { ...(s.pluginState?.secrets || {}), [key]: value },
+          },
+        })),
       setAuthenticated: (value) => set({ isAuthenticated: value }),
       setUser: (user) => set({ user }),
       patchUser: (partial) =>
@@ -232,12 +316,57 @@ export const useAppStore = create<AppState>()(
       completeOnboarding: () =>
         set({ onboardingComplete: true, onboardingStep: "complete" }),
       setWorkspaceView: (view) => set({ workspaceView: view }),
+      presentJobResults: (results) =>
+        set((s) => {
+          const id = "visualization";
+          const title = results.taskFolder || "Results";
+          const alreadyOpen = s.workbenchTabs.some((t) => t.id === id);
+          const workbenchTabs = alreadyOpen
+            ? s.workbenchTabs.map((t) => (t.id === id ? { ...t, title } : t))
+            : [...s.workbenchTabs, { id, type: "view" as const, title }];
+          const reveal =
+            results.activeLayerId ||
+            results.files.find((file: string) => /\.(tif|tiff|asc|npz|npy)$/i.test(file)) ||
+            results.productsRel;
+          return {
+            lastJobResults: results,
+            workbenchTabs,
+            activeWorkbenchTabId: id,
+            workspaceView: "visualization" as WorkspaceView,
+            activeFile: reveal,
+            fileTimeline: prependTimeline(s.fileTimeline, {
+              action: "job",
+              label: title,
+              path: typeof reveal === "string" ? reveal : undefined,
+            }),
+          };
+        }),
       setProcessingStatus: (status) => set({ processingStatus: status }),
       setTheme: (theme) => set({ theme }),
       toggleAgentSidebar: () => set((s) => ({ isAgentSidebarOpen: !s.isAgentSidebarOpen })),
       toggleTerminal: () => set((s) => ({ isTerminalOpen: !s.isTerminalOpen })),
-      toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
-      setChatPanelOpen: (value) => set({ isChatPanelOpen: value }),
+      toggleChatPanel: () => set((s) => {
+        if (s.isChatPanelOpen) return { isChatPanelOpen: false };
+        const visible = s.conversations.filter((c) => !c.hidden);
+        if (visible.length > 0) return { isChatPanelOpen: true };
+        const newId = `chat_${Date.now()}`;
+        return {
+          isChatPanelOpen: true,
+          conversations: [...s.conversations, { id: newId, topic: "New Agent", messages: [], hidden: false }],
+          activeConversationId: newId,
+        };
+      }),
+      setChatPanelOpen: (value) => set((s) => {
+        if (!value) return { isChatPanelOpen: false };
+        const visible = s.conversations.filter((c) => !c.hidden);
+        if (visible.length > 0) return { isChatPanelOpen: true };
+        const newId = `chat_${Date.now()}`;
+        return {
+          isChatPanelOpen: true,
+          conversations: [...s.conversations, { id: newId, topic: "New Agent", messages: [], hidden: false }],
+          activeConversationId: newId,
+        };
+      }),
       toggleLeftSidebar: () => set((s) => ({ isLeftSidebarOpen: !s.isLeftSidebarOpen })),
       setLeftSidebarOpen: (value) => set({ isLeftSidebarOpen: value }),
       setActiveLeftSidebarTab: (tab) => set({ activeLeftSidebarTab: tab }),
@@ -272,7 +401,11 @@ export const useAppStore = create<AppState>()(
           workbenchTabs: updatedTabs,
           activeWorkbenchTabId: id,
           workspaceView: view,
-          activeFile: file
+          activeFile: file,
+          fileTimeline:
+            type === "file"
+              ? prependTimeline(s.fileTimeline, { action: "opened", label: title, path: file || undefined })
+              : s.fileTimeline,
         };
       }),
       closeWorkbenchTab: (id) => set((s) => {
@@ -351,7 +484,15 @@ export const useAppStore = create<AppState>()(
         return {};
       }),
       saveFile: (fileName) => set((s) => ({
-        dirtyFiles: s.dirtyFiles.filter(f => f !== fileName)
+        dirtyFiles: s.dirtyFiles.filter(f => f !== fileName),
+        fileTimeline: prependTimeline(s.fileTimeline, {
+          action: "saved",
+          label: fileName.split(/[\\/]/).pop() || fileName,
+          path: fileName,
+        }),
+      })),
+      pushTimelineEvent: (event) => set((s) => ({
+        fileTimeline: prependTimeline(s.fileTimeline, event),
       })),
       saveAllFiles: () => set({ dirtyFiles: [] }),
       setProjectFiles: (files) => set({ projectFiles: files }),
@@ -370,13 +511,16 @@ export const useAppStore = create<AppState>()(
         const filtered = s.recentProjects.filter((p) => p.name !== projectName && p.path !== entry.path);
         return {
           currentProject: projectName,
+          lastCurrentProject: projectName,
+          lastWorkspaceRoot: path || s.workspaceRoot || s.lastWorkspaceRoot,
           recentProjects: [entry, ...filtered].slice(0, 10),
         };
       }),
-      setWorkspaceRoot: (root, index) => set({
+      setWorkspaceRoot: (root, index) => set((s) => ({
         workspaceRoot: root,
         workspaceIndex: index ?? null,
-      }),
+        ...(root ? { lastWorkspaceRoot: root } : {}),
+      })),
       setOpenFileDialogOpen: (value) => set({ isOpenFileDialogOpen: value }),
       setOpenFolderDialogOpen: (value) => set({ isOpenFolderDialogOpen: value }),
       setSaveAsDialogOpen: (value) => set({ isSaveAsDialogOpen: value }),
@@ -402,29 +546,58 @@ export const useAppStore = create<AppState>()(
           activeConversationId: newId,
         };
       }),
+      startBlankChat: () => set((s) => {
+        const kept = s.conversations
+          .filter((c) => c.messages.length > 0)
+          .map((c) => ({ ...c, hidden: true, isGenerating: false }));
+        const newId = `chat_${Date.now()}`;
+        return {
+          conversations: [...kept, { id: newId, topic: "New Agent", messages: [], hidden: false }],
+          activeConversationId: newId,
+          isChatPanelOpen: true,
+        };
+      }),
+      openChatFromHistory: (id) => set((s) => {
+        const kept = s.conversations
+          .filter((c) => c.messages.length > 0 || c.id === id)
+          .map((c) => ({
+            ...c,
+            hidden: c.id !== id,
+            isGenerating: false,
+          }));
+        if (!kept.some((c) => c.id === id)) {
+          kept.push({ id, topic: "New Agent", messages: [], hidden: false, isGenerating: false });
+        }
+        return {
+          conversations: kept,
+          activeConversationId: id,
+          isChatPanelOpen: true,
+        };
+      }),
+      clearWindowWorkspace: () => set({
+        currentProject: null,
+        workspaceRoot: null,
+        workspaceIndex: null,
+        projectFiles: [],
+        fileContents: {},
+        workbenchTabs: [],
+        activeFile: null,
+        activeWorkbenchTabId: null,
+        workspaceView: "dashboard",
+        lastJobResults: null,
+      }),
       hideConversation: (id) => set((s) => {
-        const updated = s.conversations.map(c => c.id === id ? { ...c, hidden: true } : c);
-        const visibleConvos = updated.filter(c => !c.hidden);
+        const updated = s.conversations.map((c) => (c.id === id ? { ...c, hidden: true } : c));
+        const visibleConvos = updated.filter((c) => !c.hidden);
         const hasRemaining = visibleConvos.length > 0;
-        
-        let nextActiveId = s.activeConversationId;
-        if (s.activeConversationId === id) {
-          nextActiveId = hasRemaining ? visibleConvos[visibleConvos.length - 1].id : "default";
-        }
-        
-        if (!hasRemaining) {
-          const newId = Date.now().toString();
-          return {
-            conversations: [...updated, { id: newId, topic: "New Agent", messages: [], hidden: false }],
-            activeConversationId: newId,
-            isChatPanelOpen: false
-          };
-        }
+        const nextActiveId = hasRemaining
+          ? (s.activeConversationId === id ? visibleConvos[visibleConvos.length - 1].id : s.activeConversationId)
+          : id;
 
         return {
           conversations: updated,
           activeConversationId: nextActiveId,
-          isChatPanelOpen: s.isChatPanelOpen
+          isChatPanelOpen: hasRemaining,
         };
       }),
       removeConversation: (id) => set((s) => {
@@ -462,32 +635,20 @@ export const useAppStore = create<AppState>()(
       reset: () => set(initialState),
       setHistoryModalOpen: (value) => set({ isHistoryModalOpen: value }),
       setPendingPrompt: (prompt) => set({ pendingPrompt: prompt }),
-      setPendingFileUpdates: (updates) => set({ pendingFileUpdates: updates }),
-      clearPendingFileUpdates: () => set({ pendingFileUpdates: [] }),
-      applyPendingFileUpdates: () => set((state) => {
-        const currentFiles = state.projectFiles;
-        const newFiles = state.pendingFileUpdates.filter(f => !currentFiles.some(existing => existing.id === f.id));
-        
-        const newProjectFiles = [...currentFiles, ...newFiles.map(f => ({
-          id: f.id,
-          name: f.id.split('/').pop() || f.id,
-          size: 0,
-          modified: new Date().toISOString()
-        } as any))];
-
-        const newFileContents = { ...state.fileContents };
-        state.pendingFileUpdates.forEach(f => {
-          if (f.content) {
-            newFileContents[f.id] = f.content;
-          }
-        });
-
-        return {
-          projectFiles: newProjectFiles,
-          fileContents: newFileContents,
-          pendingFileUpdates: [],
-        };
+      enqueuePendingFileChanges: (changes) => set((state) => {
+        if (!changes.length) return {};
+        const next = [...state.pendingFileChanges];
+        for (const change of changes) {
+          const idx = next.findIndex((item) => item.id === change.id);
+          if (idx >= 0) next[idx] = change;
+          else next.push(change);
+        }
+        return { pendingFileChanges: next };
       }),
+      removePendingFileChange: (id) => set((state) => ({
+        pendingFileChanges: state.pendingFileChanges.filter((item) => item.id !== id),
+      })),
+      clearPendingFileChanges: () => set({ pendingFileChanges: [] }),
     }),
     { 
       name: "gaid-app-store",
@@ -498,23 +659,40 @@ export const useAppStore = create<AppState>()(
         user: state.user,
         selectedDiscipline: state.selectedDiscipline,
         assignedAgent: state.assignedAgent,
-        currentProject: state.currentProject,
-        workspaceRoot: state.workspaceRoot,
+        lastCurrentProject: state.lastCurrentProject,
+        lastWorkspaceRoot: state.lastWorkspaceRoot,
         recentProjects: state.recentProjects,
         autoSave: state.autoSave,
         theme: state.theme,
         layoutMode: state.layoutMode,
         privacyMode: state.privacyMode,
         agentSettings: state.agentSettings,
+        pluginState: state.pluginState,
         conversations: persistableConversations(state.conversations),
+        fileTimeline: (state.fileTimeline || []).slice(0, 80),
+        isChatPanelOpen: state.isChatPanelOpen,
       }),
-      version: 1,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
         if (version === 0) {
-          // Force wipe stale state but keep their theme
           return { ...initialState, theme: persistedState?.theme || "dark" };
         }
-        return persistedState;
+        let next = persistedState || {};
+        if (version < 2) {
+          const { currentProject, workspaceRoot, ...rest } = next;
+          next = {
+            ...rest,
+            lastWorkspaceRoot: next.lastWorkspaceRoot || workspaceRoot || null,
+            lastCurrentProject: next.lastCurrentProject || currentProject || null,
+          };
+        }
+        if (version < 3) {
+          next = {
+            ...next,
+            pluginState: next.pluginState || { enabled: defaultPluginEnabled(), secrets: {} },
+          };
+        }
+        return next;
       },
     }
   )

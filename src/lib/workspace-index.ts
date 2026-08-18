@@ -33,17 +33,18 @@ export function formatWorkspaceForAgent(index: WorkspaceIndex | null, maxFiles =
   if (!index) return "";
   const lines: string[] = [
     `Root: ${index.root}`,
-    `Folders: ${index.folders.slice(0, 40).join(", ") || "(none)"}`,
-    `Files indexed: ${index.files.length}${index.truncated ? " (truncated)" : ""}`,
+    `Folders: ${index.folders.filter((f) => !isGaidOutputPath(f)).slice(0, 40).join(", ") || "(none)"}`,
+    `Files indexed: ${index.files.filter((f) => !isGaidOutputPath(f.relativePath)).length}${index.truncated ? " (truncated)" : ""}`,
   ];
 
-  const magnetic = index.files.filter((f) => f.kind === "gsm19-base" || f.kind === "magarrow");
-  const shown = (magnetic.length ? magnetic : index.files).slice(0, maxFiles);
+  const surveyFiles = index.files.filter((f) => !isGaidOutputPath(f.relativePath));
+  const magnetic = surveyFiles.filter((f) => f.kind === "gsm19-base" || f.kind === "magarrow");
+  const shown = (magnetic.length ? magnetic : surveyFiles).slice(0, maxFiles);
   for (const file of shown) {
     lines.push(`- ${file.relativePath} (${kindLabel(file.kind)}, ${formatSize(file.size)})`);
   }
-  if (index.files.length > shown.length) {
-    lines.push(`- … ${index.files.length - shown.length} more files`);
+  if (surveyFiles.length > shown.length) {
+    lines.push(`- … ${surveyFiles.length - shown.length} more files`);
   }
   return lines.join("\n");
 }
@@ -52,8 +53,8 @@ export function inferTargetFolder(
   message: string,
   index: WorkspaceIndex | null
 ): string {
-  const folders = index?.folders ?? [];
-  const files = index?.files ?? [];
+  const folders = (index?.folders ?? []).filter((f) => !isGaidOutputPath(f));
+  const files = (index?.files ?? []).filter((f) => !isGaidOutputPath(f.relativePath));
   const names = [
     ...folders.map((f) => f.replace(/\\/g, "/")),
     ...files.map((f) => f.relativePath.replace(/\\/g, "/").split("/")[0]).filter(Boolean),
@@ -79,6 +80,14 @@ export function inferTargetFolder(
 }
 
 export const GAID_OUTPUT_DIR = "G-AID Output";
+
+/** True for G-AID Output itself or anything nested under it. */
+export function isGaidOutputPath(rel: string): boolean {
+  return rel
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((part) => part.toLowerCase() === "g-aid output");
+}
 
 export type AnalysisIntent =
   | "diurnal"
@@ -120,6 +129,25 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   return null;
 }
 
+/** True when the user asked a definition / explainer, not to work their files. */
+export function isGeneralKnowledgeQuestion(message: string): boolean {
+  const t = message.trim();
+  if (!t || t.length > 220) return false;
+  if (detectAnalysisIntent(t)) return false;
+  if (/\b(my|this|the) (survey|data|folder|project|grid|file)s?\b/i.test(t)) return false;
+  return /^(what(?:'s|s)?|who(?:'s|s)?|define|explain|how does|how do|tell me about|why (?:is|are|do|does))\b/i.test(t);
+}
+
+/** Attach the folder catalog only when the user is talking about those files. */
+export function wantsWorkspaceContext(message: string): boolean {
+  const t = message.trim();
+  if (!t || isGeneralKnowledgeQuestion(t)) return false;
+  if (detectAnalysisIntent(t) || isProceedPhrase(t)) return true;
+  return /\b(survey|dataset|workspace|magarrow|gsm-?19|day\s*\d+|g-aid output|this (file|folder|project|grid)|my (data|survey|files)|look at (the |my )?(data|survey|files)|process (the |my |this )?(data|survey))\b/i.test(
+    t
+  );
+}
+
 export function isProceedPhrase(message: string): boolean {
   const t = message.trim().toLowerCase().replace(/[.!]+$/, "");
   return /^(yes[, ]+)?(proceed|go ahead|looks good|sounds good|approved|approve it|do it|run it|execute|lgtm|ok proceed|okay proceed)$/.test(t);
@@ -132,10 +160,12 @@ export function isDiurnalRunRequest(message: string): boolean {
 export function dayFolderNames(index: WorkspaceIndex | null): string[] {
   const names = new Set<string>();
   for (const folder of index?.folders ?? []) {
+    if (isGaidOutputPath(folder)) continue;
     const leaf = folder.replace(/\\/g, "/").split("/").pop() || folder;
     if (/^day\s*\d+$/i.test(leaf)) names.add(leaf);
   }
   for (const file of index?.files ?? []) {
+    if (isGaidOutputPath(file.relativePath)) continue;
     const leaf = file.relativePath.replace(/\\/g, "/").split("/")[0];
     if (leaf && /^day\s*\d+$/i.test(leaf)) names.add(leaf);
   }
@@ -147,7 +177,7 @@ export function dayFolderNames(index: WorkspaceIndex | null): string[] {
 }
 
 export function filesInTarget(index: WorkspaceIndex | null, targetFolder: string): WorkspaceIndexFile[] {
-  const files = index?.files ?? [];
+  const files = (index?.files ?? []).filter((file) => !isGaidOutputPath(file.relativePath));
   if (!targetFolder) return files;
   const prefix = targetFolder.replace(/\\/g, "/").replace(/\/$/, "");
   return files.filter((file) => {

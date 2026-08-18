@@ -1,4 +1,6 @@
 import fs from "fs";
+import os from "os";
+import path from "path";
 import { GAID_OUTPUT_DIR, type AnalysisIntent } from "@/lib/workspace-index";
 
 export type PlanSteps = {
@@ -43,6 +45,7 @@ export interface AgentPlan {
   plan: string;
   taskFolder: string;
   outputDir: string;
+  productsRel?: string;
   workspaceRoot: string;
   targetFolder: string;
   projectName: string;
@@ -64,6 +67,47 @@ if (!globalAny.PENDING_APPROVAL) {
   globalAny.PENDING_APPROVAL = {};
 }
 const PENDING_APPROVAL: Record<string, AgentPlan> = globalAny.PENDING_APPROVAL;
+const PLAN_STORE = path.join(os.tmpdir(), "g-aid-pending-plans.json");
+
+function loadPlansFromDisk(): Record<string, AgentPlan> {
+  try {
+    if (!fs.existsSync(PLAN_STORE)) return {};
+    const parsed = JSON.parse(fs.readFileSync(PLAN_STORE, "utf8")) as Record<string, AgentPlan>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePlansToDisk(plans: Record<string, AgentPlan>): void {
+  try {
+    fs.writeFileSync(PLAN_STORE, JSON.stringify(plans));
+  } catch {
+    /* testers can still retry in the same Node process */
+  }
+}
+
+export function getPendingPlan(sessionId: string): AgentPlan | undefined {
+  if (PENDING_APPROVAL[sessionId]) return PENDING_APPROVAL[sessionId];
+  const disk = loadPlansFromDisk();
+  if (disk[sessionId]) {
+    PENDING_APPROVAL[sessionId] = disk[sessionId];
+    return disk[sessionId];
+  }
+  return undefined;
+}
+
+export function setPendingPlan(sessionId: string, plan: AgentPlan): void {
+  PENDING_APPROVAL[sessionId] = plan;
+  savePlansToDisk({ ...loadPlansFromDisk(), ...PENDING_APPROVAL, [sessionId]: plan });
+}
+
+export function clearPendingPlan(sessionId: string): void {
+  delete PENDING_APPROVAL[sessionId];
+  const disk = loadPlansFromDisk();
+  delete disk[sessionId];
+  savePlansToDisk(disk);
+}
 
 const generateImplementationPlan = (
   projectName: string,
@@ -137,6 +181,7 @@ function nextTaskFolder(outputDir: string): string {
 const generateTasksMarkdown = (plan: {
   projectName: string;
   taskFolder: string;
+  productsRel?: string;
   targetFolder?: string;
   steps: PlanSteps;
   parameters?: { baseReference?: string };
@@ -147,7 +192,7 @@ const generateTasksMarkdown = (plan: {
     ``,
     `**Project:** ${plan.projectName}`,
     `**Target:** ${target}`,
-    `**Products:** \`${GAID_OUTPUT_DIR}/${plan.taskFolder}/\``,
+    `**Products:** \`${plan.productsRel || `${GAID_OUTPUT_DIR}/${plan.taskFolder}`}/\``,
     plan.parameters?.baseReference ? `**Base reference:** \`${plan.parameters.baseReference}\`` : "",
     ``,
     `This file is the working checklist. Items are checked off as G-AID finishes each step.`,
@@ -188,12 +233,12 @@ const generateTasksMarkdown = (plan: {
 
   if (plan.steps.igrf) lines.push(`- [ ] IGRF removal`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
   if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction`, ``);
-  if (plan.steps.level) lines.push(`- [ ] Tie-line levelling`, ``);
+  if (plan.steps.level) lines.push(`- [ ] Tie-line levelling`, `  - [ ] Classify traverse vs tie`, `  - [ ] Hold ties, shift traverses`, `  - [ ] 2-D grid microlevelling`, ``);
   if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
   if (plan.steps.rtp) lines.push(`- [ ] RTP`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
-  if (plan.steps.derivatives) lines.push(`- [ ] FFT derivatives`, `  - [ ] Analytic signal, 1VD, THD, tilt, continuation`, ``);
+  if (plan.steps.derivatives) lines.push(`- [ ] MAGMAP`, `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`, ``);
   if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction`, ``);
-  if (plan.steps.gis) lines.push(`- [ ] GIS export`, ``);
+  if (plan.steps.gis) lines.push(`- [ ] GIS export`, `  - [ ] Report maps (scale bar, north arrow, EPSG)`, ``);
   if (plan.steps.gravity) lines.push(`- [ ] Gravity reduction`, `  - [ ] Somigliana, free-air, Bouguer, Bullard B`, ``);
   if (plan.steps.residual) lines.push(`- [ ] Regional-residual separation`, ``);
   if (plan.steps.ert) lines.push(`- [ ] ERT pseudosection`, ``);
@@ -227,7 +272,7 @@ const checkPhaseInTasks = (content: string, phaseHeading: string): string => {
       if (inPhase && /^- \[[ x]\] Phase /.test(line)) {
         inPhase = false;
       }
-      if (inPhase && /^- \[[ x]\] (IGRF|Heading|Tie-line|Minimum-curvature|RTP|FFT derivatives|Lineament|GIS export|Gravity|Regional-residual|ERT|Seismic|Radiometric|GPR|Write products)/.test(line) && !headingRe.test(line)) {
+      if (inPhase && /^- \[[ x]\] (IGRF|Heading|Tie-line|Minimum-curvature|RTP|MAGMAP|FFT derivatives|Lineament|GIS export|Report maps|2-D microlevelling|Gravity|Regional-residual|ERT|Seismic|Radiometric|GPR|Write products)/.test(line) && !headingRe.test(line)) {
         inPhase = false;
       }
       if (inPhase && /^- \[[ x]\] Write products/.test(line) && !phaseHeading.startsWith("Write products")) {

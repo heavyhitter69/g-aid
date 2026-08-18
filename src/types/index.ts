@@ -56,7 +56,8 @@ export type WorkspaceView =
   | "reports"
   | "file-editor"
   | "hypotheses"
-  | "plan-review";
+  | "extensions"
+  | "review-changes"
 
 // Re-export all scientific types for convenience
 export type {

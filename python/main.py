@@ -11,6 +11,9 @@ from graph import stream_langgraph_agent
 ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+_meipass = getattr(sys, "_MEIPASS", None)
+if _meipass and _meipass not in sys.path:
+    sys.path.insert(0, _meipass)
 
 app = FastAPI(title="G-AID Core Intelligence Engine", version="1.0.0")
 
@@ -75,6 +78,39 @@ def run_pipeline_node(request: RunNodeRequest):
                 "severity": "fatal",
             }],
         }
+
+class IgrfRequest(BaseModel):
+    lat: float
+    lon: float
+    alt_km: float = 0.0
+    year: float | None = None
+
+
+@app.post("/api/v1/igrf")
+def igrf_point(request: IgrfRequest):
+    from datetime import datetime, timezone
+    from science.igrf import decimal_year, igrf13
+
+    year = request.year
+    if year is None:
+        year = decimal_year(datetime.now(timezone.utc).timestamp())
+    result = igrf13(request.lat, request.lon, request.alt_km, year)
+    return {
+        "source": "local-igrf13",
+        "lat": request.lat,
+        "lon": request.lon,
+        "alt_km": request.alt_km,
+        "year": result.year,
+        "x": result.x,
+        "y": result.y,
+        "z": result.z,
+        "f": result.f,
+        "h": result.h,
+        "inclination": result.inclination,
+        "declination": result.declination,
+        "extrapolated": result.extrapolated,
+    }
+
 
 if __name__ == "__main__":
     import multiprocessing

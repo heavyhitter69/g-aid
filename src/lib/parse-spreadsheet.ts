@@ -84,6 +84,8 @@ export function parseSpreadsheetRows(
 
   const ext = fileId?.split(".").pop()?.toLowerCase() ?? "";
   const lines = text.split(/\r?\n/);
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  if (lines[lines.length - 1]?.startsWith("[Truncated:")) lines.pop();
   const delimiter = detectDelimiter(lines[0] ?? "", ext);
 
   return lines.map((line) => parseDelimitedLine(line, delimiter));

@@ -11,7 +11,7 @@ export function ActivityBar() {
     { id: "dashboard", icon: Files, label: "explorer" },
     { id: "search", icon: Search, label: "search" },
     { id: "source-control", icon: GitBranch, label: "source control" },
-    { id: "extensions", icon: Wrench, label: "tools" },
+    { id: "extensions", icon: Wrench, label: "plugins" },
   ];
 
   const bottomIcons = [

@@ -12,8 +12,10 @@ import { DashboardView } from "@/components/workspace/dashboard-view";
 import { WorkflowBuilder } from "@/components/workflows/workflow-builder";
 import { VisualizationStudio } from "@/components/workspace/visualization-studio";
 import { AICenter } from "@/components/workspace/ai-center";
-import { SettingsView } from "@/components/workspace/settings-view";
+import { PluginStoreView } from "@/components/workspace/plugin-store";
 import { FileEditorView } from "@/components/workspace/file-editor";
+import { PendingChangesReview } from "@/components/workspace/pending-changes";
+import { REVIEW_TAB_ID } from "@/lib/pending-file-changes";
 import { useAppStore } from "@/store/app-store";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { ChevronRight, X, Settings, Table, Layers, Braces, FileCode, FileText, Folder, Search, FolderOpen, PanelLeft, Files, GitBranch, Wrench } from "lucide-react";
@@ -26,6 +28,12 @@ import { useScientificState } from "@/store/scientific-state";
 import type { ProjectFile } from "@/types/project";
 import { openWorkspaceFolder, applyWorkspaceIndex } from "@/lib/open-workspace";
 import { isDesktop } from "@/lib/desktop";
+import {
+  conversationFromUrl,
+  isFreshWindow,
+  readWindowSession,
+  writeWindowSession,
+} from "@/lib/window-session";
 
 export default function WorkspacePage() {
   const router = useRouter();
@@ -62,6 +70,8 @@ export default function WorkspacePage() {
     saveFile,
     setFileContent,
     addConversation,
+    startBlankChat,
+    clearWindowWorkspace,
     setActiveConversationId,
     setChatPanelOpen,
     toggleChatPanel,
@@ -97,22 +107,57 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     let cancelled = false;
-    const restore = () => {
-      const root = useAppStore.getState().workspaceRoot;
-      if (!isDesktop() || !root || !window.gaidDesktop?.indexWorkspace) return;
-      window.gaidDesktop
-        .indexWorkspace(root)
-        .then((index) => {
-          if (cancelled) return;
-          applyWorkspaceIndex(index);
-        })
-        .catch((err) => {
-          console.warn("Could not restore workspace folder:", err);
-          if (!cancelled) useAppStore.getState().setWorkspaceRoot(null, null);
-        });
+    let booted = false;
+
+    const bootWindow = () => {
+      if (booted) return;
+      booted = true;
+      const store = useAppStore.getState();
+      const conversationId = conversationFromUrl();
+      if (conversationId) {
+        store.openChatFromHistory(conversationId);
+      } else {
+        store.startBlankChat();
+      }
+
+      const restoreRoot = (root: string | null) => {
+        if (!root || !isDesktop() || !window.gaidDesktop?.indexWorkspace) return;
+        window.gaidDesktop
+          .indexWorkspace(root)
+          .then((index) => {
+            if (!cancelled) applyWorkspaceIndex(index);
+          })
+          .catch((err) => {
+            console.warn("Could not restore workspace folder:", err);
+            if (!cancelled) {
+              useAppStore.getState().clearWindowWorkspace();
+              writeWindowSession({ workspaceRoot: null, currentProject: null });
+            }
+          });
+      };
+
+      const existing = readWindowSession();
+      if (existing) {
+        restoreRoot(existing.workspaceRoot);
+        return;
+      }
+
+      if (isFreshWindow()) {
+        store.clearWindowWorkspace();
+        writeWindowSession({ workspaceRoot: null, currentProject: null });
+        return;
+      }
+
+      const lastRoot = store.lastWorkspaceRoot;
+      writeWindowSession({
+        workspaceRoot: lastRoot,
+        currentProject: store.lastCurrentProject,
+      });
+      restoreRoot(lastRoot);
     };
-    if (useAppStore.persist.hasHydrated()) restore();
-    const unsub = useAppStore.persist.onFinishHydration(restore);
+
+    if (useAppStore.persist.hasHydrated()) bootWindow();
+    const unsub = useAppStore.persist.onFinishHydration(bootWindow);
     return () => {
       cancelled = true;
       unsub();
@@ -185,26 +230,6 @@ export default function WorkspacePage() {
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const conversationId = new URLSearchParams(window.location.search).get("conversation");
-    if (!conversationId) return;
-
-    const openConversation = () => {
-      setActiveConversationId(conversationId);
-      setChatPanelOpen(true);
-    };
-
-    if (useAppStore.persist.hasHydrated()) {
-      openConversation();
-      return;
-    }
-
-    return useAppStore.persist.onFinishHydration(() => {
-      openConversation();
-    });
-  }, [setActiveConversationId, setChatPanelOpen]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 1. New Agent: Ctrl + Shift + L
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "l") {
@@ -262,10 +287,12 @@ export default function WorkspacePage() {
             </ul>
           </section>
         );
-      case "settings":
-        return <SettingsView />;
+      case "extensions":
+        return <PluginStoreView />;
       case "file-editor":
         return <FileEditorView />;
+      case "review-changes":
+        return <PendingChangesReview />;
       case "reports":
         return (
           <section className="p-8 bg-[#1e1e1e] h-full text-[#cccccc]">
@@ -311,7 +338,7 @@ export default function WorkspacePage() {
                 { id: "explorer", icon: Files, label: "Explorer" },
                 { id: "search", icon: Search, label: "Search" },
                 { id: "git", icon: GitBranch, label: "Source Control" },
-                { id: "extensions", icon: Wrench, label: "Tools" }
+                { id: "extensions", icon: Wrench, label: "Plugins" }
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeLeftSidebarTab === tab.id;
@@ -401,6 +428,9 @@ export default function WorkspacePage() {
                     if (tab.type === "settings") {
                       Icon = Settings;
                       fileColor = isActive ? "text-[#007acc]" : "text-[#858585] group-hover:text-[#cccccc]";
+                    } else if (tab.type === "view") {
+                      Icon = tab.id === REVIEW_TAB_ID ? GitBranch : Layers;
+                      fileColor = isActive ? "text-[#4ec9b0]" : "text-[#858585] group-hover:text-[#cccccc]";
                     } else if (tab.title.endsWith(".dat")) {
                       Icon = Table;
                       fileColor = "text-[#4fc1ff]";
@@ -544,7 +574,7 @@ export default function WorkspacePage() {
                 { id: "explorer", icon: Files, label: "Explorer" },
                 { id: "search", icon: Search, label: "Search" },
                 { id: "git", icon: GitBranch, label: "Source Control" },
-                { id: "extensions", icon: Wrench, label: "Tools" }
+                { id: "extensions", icon: Wrench, label: "Plugins" }
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeLeftSidebarTab === tab.id;

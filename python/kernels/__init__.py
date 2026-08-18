@@ -47,11 +47,15 @@ def get_handler(node_id: str):
         "igrf_corrector": igrf_corrector,
         "heading_lag_corrector": heading_lag_corrector,
         "tie_line_leveler": tie_line_leveler,
+        "microleveller": microleveller,
         "mag_gridder": mag_gridder,
+        "grid_microleveller": grid_microleveller,
         "rtp_filter": rtp_filter,
         "fft_derivatives": fft_derivatives,
+        "map_composer": map_composer,
         "gis_export": gis_export,
         "lineament_extractor": lineament_extractor,
+        "euler_deconvolution": euler_deconvolution_node,
         "gravity_reduce": gravity_reduce,
         "regional_residual": regional_residual,
         "ert_pseudosection": ert_pseudosection,
@@ -223,7 +227,13 @@ def tie_line_leveler(payload: dict) -> dict:
     work["x"] = east
     work["y"] = north
     work["magnetic_field"] = work[col]
-    leveled, info = tie_line_level(work, radius_m=float(_params(payload).get("tieRadiusM") or 15.0))
+    leveled, info = tie_line_level(
+        work,
+        radius_m=float(_params(payload).get("tieRadiusM") or 25.0),
+        hold=str(_params(payload).get("levelHold") or "ties"),
+        degree=int(_params(payload).get("levelDegree") or 0),
+        max_shift_nT=float(_params(payload).get("maxLevelShiftNT") or 80.0),
+    )
     leveled["leveled_magnetic_field"] = leveled["magnetic_field"]
     # restore lon/lat for GIS if original was geographic
     leveled["easting"] = east
@@ -233,7 +243,7 @@ def tie_line_leveler(payload: dict) -> dict:
     path = os.path.join(out, "airborne_leveled.csv")
     leveled.to_csv(path, index=False)
     qc_path = write_json(os.path.join(out, "leveling_qc.json"), info)
-    write_lineage(out, node_id, "Mittal 1984 least-squares mis-tie", info, [src], [path])
+    write_lineage(out, node_id, "Oasis-style statistical levelling; ties held (Mittal 1984)", info, [src], [path])
     events = [{"type": "NODE_PROGRESS", "message": f"Tie-line levelling: {info}"}]
     return {
         "artifacts": [
@@ -241,6 +251,129 @@ def tie_line_leveler(payload: dict) -> dict:
             make_artifact("artifact-level-qc-1", "qc_report", "json", qc_path, node_id, [src]),
         ],
         "events": events,
+    }
+
+
+def microleveller(payload: dict) -> dict:
+    if not step_enabled(payload, "level", default=True):
+        return skipped("microleveller", "not in plan")
+    from science.magnetics import microlevel_along_line
+
+    node_id = "microleveller"
+    out = task_dir(payload)
+    src = _find(out, "airborne_leveled.csv", "airborne_heading_lag.csv", "airborne_igrf.csv", "airborne_corrected.csv")
+    df = pd.read_csv(src)
+    col = _value_column(df)
+    leveled, info = microlevel_along_line(
+        df,
+        col,
+        window=int(_params(payload).get("microlevelWindow") or 101),
+        max_amp_nT=float(_params(payload).get("microlevelMaxAmpNT") or 8.0),
+    )
+    path = os.path.join(out, "airborne_microleveled.csv")
+    leveled.to_csv(path, index=False)
+    write_json(os.path.join(out, "microlevel_qc.json"), info)
+    events = [{"type": "NODE_PROGRESS", "message": f"Microlevelling: {info}"}]
+    if not info.get("applied"):
+        events.append({"type": "QC_WARNING", "severity": "warning", "message": info.get("reason", "microlevel not applied")})
+    return {
+        "artifacts": [make_artifact("artifact-microlevel-1", "processed_dataset", "csv", path, node_id, [src], info)],
+        "events": events,
+    }
+
+
+def _tmi_basename(out: str) -> str:
+    if os.path.isfile(os.path.join(out, "tmi_microleveled.npz")):
+        return "tmi_microleveled"
+    return "tmi_grid"
+
+
+def _run_grid_microlevel(payload: dict, out: str, grid, crs) -> dict:
+    from science.gis import export_grid_bundle
+    from science.magnetics import microlevel_grid
+
+    params = _params(payload)
+    spacing = params.get("lineSpacingM")
+    azimuth = params.get("flightAzimuthDeg")
+    qc_path = os.path.join(out, "leveling_qc.json")
+    if os.path.isfile(qc_path):
+        with open(qc_path, encoding="utf-8") as handle:
+            level_qc = json.load(handle)
+        spacing = spacing or level_qc.get("line_spacing_m")
+        azimuth = azimuth if azimuth is not None else level_qc.get("flight_azimuth_deg")
+    if not spacing:
+        return {
+            "artifacts": [],
+            "events": [{"type": "NODE_PROGRESS", "message": "grid_microleveller skipped: no line spacing (need ties/traverses or lineSpacingM)"}],
+        }
+    leveled, info = microlevel_grid(
+        grid,
+        float(spacing),
+        float(azimuth or 0.0),
+        max_amp_nT=float(params.get("gridMicrolevelMaxAmpNT") or 6.0),
+    )
+    paths = export_grid_bundle(leveled, out, "tmi_microleveled", crs)
+    np.savez(
+        os.path.join(out, "tmi_microleveled.npz"),
+        values=leveled.masked(),
+        x0=leveled.x0,
+        y0=leveled.y0,
+        dx=leveled.dx,
+        dy=leveled.dy,
+        crs=grid.crs_epsg,
+    )
+    write_json(os.path.join(out, "grid_microlevel_qc.json"), info)
+    artifacts = [make_artifact(f"artifact-tmi-ml-{ext}", "grid", ext, p, "mag_gridder", [], info) for ext, p in paths.items()]
+    return {
+        "artifacts": artifacts,
+        "events": [{"type": "NODE_PROGRESS", "message": f"2-D microlevel removed {info.get('rms_removed_nT', 0):.3f} nT RMS corrugation."}],
+    }
+
+
+def grid_microleveller(payload: dict) -> dict:
+    if not step_enabled(payload, "level", default=True):
+        return skipped("grid_microleveller", "not in plan")
+    from science.crs import CRS
+    from science.gis import export_grid_bundle
+    from science.magnetics import microlevel_grid
+
+    node_id = "grid_microleveller"
+    out = task_dir(payload)
+    grid = _load_grid(out, "tmi_grid")
+    params = _params(payload)
+    spacing = params.get("lineSpacingM")
+    azimuth = params.get("flightAzimuthDeg")
+    qc_path = os.path.join(out, "leveling_qc.json")
+    if os.path.isfile(qc_path):
+        with open(qc_path, encoding="utf-8") as handle:
+            level_qc = json.load(handle)
+        spacing = spacing or level_qc.get("line_spacing_m")
+        azimuth = azimuth if azimuth is not None else level_qc.get("flight_azimuth_deg")
+    if not spacing:
+        return skipped("grid_microleveller", "no line spacing (need ties/traverses or lineSpacingM)")
+    leveled, info = microlevel_grid(
+        grid,
+        float(spacing),
+        float(azimuth or 0.0),
+        max_amp_nT=float(params.get("gridMicrolevelMaxAmpNT") or 6.0),
+    )
+    crs = CRS(grid.crs_epsg, f"EPSG:{grid.crs_epsg}", "projected")
+    paths = export_grid_bundle(leveled, out, "tmi_microleveled", crs)
+    np.savez(
+        os.path.join(out, "tmi_microleveled.npz"),
+        values=leveled.masked(),
+        x0=leveled.x0,
+        y0=leveled.y0,
+        dx=leveled.dx,
+        dy=leveled.dy,
+        crs=grid.crs_epsg,
+    )
+    write_json(os.path.join(out, "grid_microlevel_qc.json"), info)
+    write_lineage(out, node_id, info.get("formula", "Minty 1991 2-D microlevel"), info, ["tmi_grid"], list(paths.values()))
+    artifacts = [make_artifact(f"artifact-tmi-ml-{ext}", "grid", ext, p, node_id, [], info) for ext, p in paths.items()]
+    return {
+        "artifacts": artifacts,
+        "events": [{"type": "NODE_PROGRESS", "message": f"2-D microlevel removed {info.get('rms_removed_nT', 0):.3f} nT RMS corrugation."}],
     }
 
 
@@ -253,7 +386,7 @@ def mag_gridder(payload: dict) -> dict:
 
     node_id = "mag_gridder"
     out = task_dir(payload)
-    src = _find(out, "airborne_leveled.csv", "airborne_heading_lag.csv", "airborne_igrf.csv", "airborne_corrected.csv")
+    src = _find(out, "airborne_microleveled.csv", "airborne_leveled.csv", "airborne_heading_lag.csv", "airborne_igrf.csv", "airborne_corrected.csv")
     df = pd.read_csv(src)
     col = _value_column(df)
     east, north, crs = project_points(df["x"], df["y"])
@@ -276,7 +409,12 @@ def mag_gridder(payload: dict) -> dict:
     artifacts = [
         make_artifact(f"artifact-grid-{ext}", "grid", ext, p, node_id, [src], meta) for ext, p in paths.items()
     ]
-    return {"artifacts": artifacts, "events": [{"type": "NODE_PROGRESS", "message": f"Gridded {grid.nx}×{grid.ny} at {grid.dx:.2f} m, EPSG:{crs.epsg}."}]}
+    events = [{"type": "NODE_PROGRESS", "message": f"Gridded {grid.nx}×{grid.ny} at {grid.dx:.2f} m, EPSG:{crs.epsg}."}]
+    if step_enabled(payload, "level", default=True):
+        extra = _run_grid_microlevel(payload, out, grid, crs)
+        artifacts.extend(extra["artifacts"])
+        events.extend(extra["events"])
+    return {"artifacts": artifacts, "events": events}
 
 
 def _load_grid(out: str, basename: str = "tmi_grid"):
@@ -307,7 +445,7 @@ def rtp_filter(payload: dict) -> dict:
 
     node_id = "rtp_filter"
     out = task_dir(payload)
-    grid = _load_grid(out)
+    grid = _load_grid(out, _tmi_basename(out))
     params = _params(payload)
     inc = params.get("inclination")
     dec = params.get("declination")
@@ -358,24 +496,131 @@ def fft_derivatives(payload: dict) -> dict:
     if not step_enabled(payload, "derivatives", default=True):
         return skipped("fft_derivatives", "not in plan")
     from science.crs import CRS
-    from science.fft_filters import derivative_suite, upward_continue
+    from science.fft_filters import (
+        butterworth_highpass,
+        derivative_suite,
+        pseudo_gravity,
+        upward_continue,
+    )
     from science.gis import export_grid_bundle
 
     node_id = "fft_derivatives"
     out = task_dir(payload)
-    basename = "rtp_grid" if os.path.isfile(os.path.join(out, "rtp_grid.npz")) else "tmi_grid"
-    grid = _load_grid(out, basename)
-    suite = derivative_suite(grid)
-    height = float(_params(payload).get("continuationHeightM") or 50.0)
+    params = _params(payload)
+    if os.path.isfile(os.path.join(out, "rtp_grid.npz")):
+        source = "rtp_grid"
+    elif os.path.isfile(os.path.join(out, "rte_grid.npz")):
+        source = "rte_grid"
+    else:
+        source = _tmi_basename(out)
+    grid = _load_grid(out, source)
+    suite = derivative_suite(grid, downward_m=float(params.get("downwardHeightM") or 50.0))
+    height = float(params.get("continuationHeightM") or 50.0)
     suite[f"uc_{int(height)}m"] = upward_continue(grid, height)
+    suite["pseudo_gravity"] = pseudo_gravity(grid)
+    hp_cut = params.get("highpassCutoffM")
+    if hp_cut:
+        suite[f"hp_{int(float(hp_cut))}m"] = butterworth_highpass(grid, float(hp_cut))
     artifacts = []
     crs = CRS(grid.crs_epsg, f"EPSG:{grid.crs_epsg}", "projected")
+    products = []
+    tmi_name = _tmi_basename(out)
+    products.append({"id": "TMI", "file": tmi_name, "units": "nT", "formula": "Residual total magnetic intensity after reduction chain"})
+    if source == "rtp_grid":
+        products.append({"id": "RTP", "file": "rtp_grid", "units": "nT", "formula": "Blakely 1995 eq. 12.18; Li 2008 damper if |I|<15°"})
+    if source == "rte_grid":
+        products.append({"id": "RTE", "file": "rte_grid", "units": "nT", "formula": "Reduction to equator (low-latitude alternative to RTP)"})
+    id_map = {
+        "analytic_signal": ("AS", "nT/m", "Roest, Verhoef & Pilkington 1992 total gradient"),
+        "1vd": ("1VD", "nT/m", "Blakely 1995 first vertical derivative"),
+        "2vd": ("2VD", "nT/m²", "Blakely 1995 second vertical derivative"),
+        "thd": ("THD", "nT/m", "Total horizontal derivative"),
+        "tilt": ("TILT", "deg", "Miller & Singh 1994 tilt angle"),
+        "pseudo_gravity": ("PG", "nT·m", "Baranov 1957 pseudo-gravity"),
+    }
     for name, g in suite.items():
         paths = export_grid_bundle(g, out, name, crs)
         np.savez(os.path.join(out, f"{name}.npz"), values=g.masked(), x0=g.x0, y0=g.y0, dx=g.dx, dy=g.dy, crs=grid.crs_epsg)
         artifacts.append(make_artifact(f"artifact-{name}-tif", "grid", "tif", paths["tif"], node_id))
-    write_lineage(out, node_id, "Blakely 1995 FFT derivatives; Roest et al. 1992 analytic signal", {"source": basename}, [basename], [a["path"] for a in artifacts])
-    return {"artifacts": artifacts, "events": [{"type": "NODE_PROGRESS", "message": f"Wrote {len(suite)} derivative grids from {basename}."}]}
+        label, units, formula = id_map.get(name, (name.upper(), g.units, "Blakely 1995 FFT operator"))
+        products.append({"id": label, "file": name, "units": units, "formula": formula})
+    igrf = {}
+    igrf_path = os.path.join(out, "igrf_qc.json")
+    if os.path.isfile(igrf_path):
+        with open(igrf_path, encoding="utf-8") as handle:
+            igrf = json.load(handle)
+    manifest = {
+        "name": "G-AID MAGMAP",
+        "source_grid": source,
+        "inclination_deg": igrf.get("mean_inclination_deg"),
+        "declination_deg": igrf.get("mean_declination_deg"),
+        "products": products,
+        "citations": [
+            "Blakely (1995) Potential Theory in Gravity and Magnetic Applications, ch. 12",
+            "Roest, Verhoef & Pilkington (1992) Magnetic interpretation using the 3-D analytic signal",
+            "Miller & Singh (1994) Potential field tilt",
+            "Baranov (1957) A new method for interpretation of aeromagnetic maps",
+            "Li (2008) Magnetic reduction-to-the-pole at low latitudes",
+        ],
+    }
+    write_json(os.path.join(out, "magmap_manifest.json"), manifest)
+    write_lineage(
+        out,
+        node_id,
+        "G-AID MAGMAP: Blakely 1995 FFT suite on RTP/TMI",
+        {"source": source},
+        [source],
+        [a["path"] for a in artifacts],
+    )
+    return {
+        "artifacts": artifacts,
+        "events": [{"type": "NODE_PROGRESS", "message": f"MAGMAP wrote {len(suite)} products from {source}."}],
+    }
+
+
+def map_composer(payload: dict) -> dict:
+    if not (step_enabled(payload, "gis", default=True) or step_enabled(payload, "grid", default=True)):
+        return skipped("map_composer", "not in plan")
+    from science.map_figure import write_potential_field_map
+
+    node_id = "map_composer"
+    out = task_dir(payload)
+    survey = str(_params(payload).get("projectName") or "")
+    specs = [
+        (_tmi_basename(out), "TMI residual", "nT", "RdBu_r"),
+        ("rtp_grid", "RTP", "nT", "RdBu_r"),
+        ("rte_grid", "RTE", "nT", "RdBu_r"),
+        ("1vd", "First vertical derivative", "nT/m", "RdBu_r"),
+        ("analytic_signal", "Analytic signal", "nT/m", "cividis"),
+        ("thd", "Total horizontal derivative", "nT/m", "cividis"),
+        ("tilt", "Tilt angle", "deg", "RdBu_r"),
+    ]
+    artifacts = []
+    written = []
+    for basename, product, units, cmap in specs:
+        npz = os.path.join(out, f"{basename}.npz")
+        if not os.path.isfile(npz):
+            continue
+        grid = _load_grid(out, basename)
+        png = os.path.join(out, f"map_{basename}.png")
+        write_potential_field_map(
+            grid,
+            png,
+            title="",
+            product=product,
+            units=units,
+            survey=survey,
+            cmap=cmap,
+            hillshade=True,
+        )
+        artifacts.append(make_artifact(f"artifact-map-{basename}", "plot", "png", png, node_id))
+        written.append(product)
+    if not artifacts:
+        return skipped("map_composer", "no grids to map")
+    return {
+        "artifacts": artifacts,
+        "events": [{"type": "NODE_PROGRESS", "message": f"Wrote report maps: {', '.join(written)}."}],
+    }
 
 
 def gis_export(payload: dict) -> dict:
@@ -388,7 +633,7 @@ def gis_export(payload: dict) -> dict:
     artifacts = []
     events = []
     try:
-        src = _find(out, "airborne_leveled.csv", "airborne_igrf.csv", "airborne_corrected.csv")
+        src = _find(out, "airborne_microleveled.csv", "airborne_leveled.csv", "airborne_igrf.csv", "airborne_corrected.csv")
         df = pd.read_csv(src)
         col = _value_column(df)
         path = os.path.join(out, "flight_path.geojson")
@@ -398,6 +643,9 @@ def gis_export(payload: dict) -> dict:
         events.append({"type": "NODE_PROGRESS", "message": "Wrote flight_path.geojson (EPSG:4326)."})
     except FileNotFoundError as exc:
         events.append({"type": "QC_WARNING", "severity": "warning", "message": str(exc)})
+    maps = map_composer(payload)
+    artifacts.extend(maps.get("artifacts") or [])
+    events.extend(maps.get("events") or [])
     return {"artifacts": artifacts, "events": events}
 
 
@@ -426,10 +674,44 @@ def lineament_extractor(payload: dict) -> dict:
     }
 
 
+def euler_deconvolution_node(payload: dict) -> dict:
+    if not step_enabled(payload, "derivatives", default=True):
+        return skipped("euler_deconvolution", "not in plan")
+    from science.euler import euler_deconvolution
+    from science.gis import write_geojson_points
+
+    node_id = "euler_deconvolution"
+    out = task_dir(payload)
+    name = "rtp_grid" if os.path.isfile(os.path.join(out, "rtp_grid.npz")) else "tmi_grid"
+    grid = _load_grid(out, name)
+    result = euler_deconvolution(
+        grid,
+        structural_index=float(_params(payload).get("structuralIndex") or 1.0),
+        window=int(_params(payload).get("eulerWindow") or 10),
+    )
+    sols = result["solutions"]
+    csv_path = os.path.join(out, "euler_solutions.csv")
+    pd.DataFrame(sols).to_csv(csv_path, index=False) if sols else pd.DataFrame(columns=["x", "y", "depth_m"]).to_csv(csv_path, index=False)
+    if sols:
+        write_geojson_points(
+            [s["x"] for s in sols],
+            [s["y"] for s in sols],
+            sols,
+            os.path.join(out, "euler_solutions.geojson"),
+            crs_epsg=grid.crs_epsg,
+        )
+    write_json(os.path.join(out, "euler_qc.json"), {k: v for k, v in result.items() if k != "solutions"})
+    return {
+        "artifacts": [make_artifact("artifact-euler", "vector", "csv", csv_path, node_id)],
+        "events": [{"type": "NODE_PROGRESS", "message": f"Euler deconvolution: {len(sols)} solutions (SI={result['structural_index']})."}],
+    }
+
+
 def gravity_reduce(payload: dict) -> dict:
     if not step_enabled(payload, "gravity", default=True):
         return skipped("gravity_reduce", "not in plan")
-    from science.gravity import latitude_free_air_bouguer
+    from science.gravity import latitude_free_air_bouguer, terrain_correction_prisms
+    from science.gis import read_ascii_grid
 
     node_id = "gravity_reduce"
     out = task_dir(payload)
@@ -445,12 +727,36 @@ def gravity_reduce(payload: dict) -> dict:
     for key, val in reduced.items():
         if key != "density_gcc":
             df[key] = val
+    events = []
+    formula = "Somigliana + 0.3086h − 2πGρh + Bullard B (Moritz 2000; LaFehr 1991)"
+    dem_path = _params(payload).get("demPath")
+    if not dem_path:
+        base = str(_params(payload).get("baseDir") or "")
+        for root in (out, base):
+            if not root:
+                continue
+            for name in ("dem.asc", "DEM.asc"):
+                cand = os.path.join(root, name)
+                if os.path.isfile(cand):
+                    dem_path = cand
+                    break
+            if dem_path:
+                break
+    if dem_path and os.path.isfile(dem_path):
+        from science.crs import project_points
+        dem = read_ascii_grid(dem_path)
+        east, north, _crs = project_points(df["x"], df["y"])
+        tc = terrain_correction_prisms(east, north, df[hcol].to_numpy(), dem, density)
+        df["terrain_mgal"] = tc
+        df["bouguer_mgal"] = df["bouguer_mgal"].to_numpy() + tc
+        formula += "; Nagy 1966 prism terrain"
+        events.append({"type": "NODE_PROGRESS", "message": f"Terrain correction from {os.path.basename(dem_path)}."})
     path = os.path.join(out, "gravity_reduced.csv")
     df.to_csv(path, index=False)
-    write_json(os.path.join(out, "gravity_qc.json"), {"density_gcc": density, "formula": "Somigliana + 0.3086h − 2πGρh + Bullard B (Moritz 2000; LaFehr 1991)"})
+    write_json(os.path.join(out, "gravity_qc.json"), {"density_gcc": density, "formula": formula, "dem": dem_path})
     return {
         "artifacts": [make_artifact("artifact-grav-1", "processed_dataset", "csv", path, node_id, [src])],
-        "events": [{"type": "NODE_PROGRESS", "message": f"Bouguer reduction at {density} g/cm³."}],
+        "events": events + [{"type": "NODE_PROGRESS", "message": f"Bouguer reduction at {density} g/cm³."}],
     }
 
 
@@ -540,7 +846,9 @@ def ert_invert(payload: dict) -> dict:
 def seismic_process(payload: dict) -> dict:
     if not step_enabled(payload, "seismic", default=True):
         return skipped("seismic_process", "not in plan")
-    from science.seismic import agc, bandpass, nmo_correct, power_spectral_density, read_segy
+    from science.seismic import agc, bandpass, kirchhoff_time_migrate_2d, nmo_correct, pick_horizon, power_spectral_density, read_segy
+    from science.gis import write_ascii_grid
+    from science.grid import Grid
 
     node_id = "seismic_process"
     out = task_dir(payload)
@@ -558,6 +866,26 @@ def seismic_process(payload: dict) -> dict:
     nmo = nmo_correct(traces_agc, segy.offsets_m, segy.dt_s, float(vel)) if vel else None
     psd = power_spectral_density(traces_bp, segy.dt_s, int(params.get("window_length") or 256))
     np.savez(os.path.join(out, "seismic_processed.npz"), traces=traces_agc, dt=segy.dt_s, offsets=segy.offsets_m, nmo=nmo if nmo is not None else np.array([]))
+    section = traces_agc
+    ntr, ns = section.shape
+    step_t = max(1, ntr // 400)
+    step_s = max(1, ns // 500)
+    preview = section[::step_t, ::step_s]
+    grid = Grid(values=preview.T, x0=0.0, y0=0.0, dx=float(np.nanmedian(np.diff(segy.offsets_m))) if len(segy.offsets_m) > 1 else 1.0, dy=segy.dt_s * step_s, crs_epsg=0, units="amp", name="seismic_section")
+    write_ascii_grid(grid, os.path.join(out, "seismic_section.asc"))
+    seed_tr = int(ntr // 2)
+    seed_s = int(np.argmax(np.abs(section[seed_tr])))
+    picks = pick_horizon(section, seed_tr, seed_s)
+    pd.DataFrame({"trace": np.arange(ntr), "sample": picks["sample"], "confidence": picks["confidence"]}).to_csv(os.path.join(out, "horizon_picks.csv"), index=False)
+    events = [{"type": "NODE_PROGRESS", "message": f"SEG-Y {segy.n_traces} traces, dominant f={psd['dominant_frequency_hz']:.1f} Hz."}]
+    vel_mig = params.get("migrateVelocityMs") or vel
+    if vel_mig and ntr * ns <= 120000:
+        dx = float(np.nanmedian(np.diff(segy.offsets_m))) if len(segy.offsets_m) > 1 else 10.0
+        migrated = kirchhoff_time_migrate_2d(section[:: max(1, ntr // 80), :: max(1, ns // 200)], segy.dt_s * max(1, ns // 200), dx * max(1, ntr // 80), float(vel_mig))
+        np.savez(os.path.join(out, "seismic_migrated.npz"), traces=migrated)
+        events.append({"type": "NODE_PROGRESS", "message": "Kirchhoff time migration written (downsampled)."})
+    elif vel_mig:
+        events.append({"type": "QC_WARNING", "severity": "warning", "message": "Section too large for Kirchhoff in this run; set migrateVelocityMs on a cropped line."})
     qc = {
         "n_traces": segy.n_traces,
         "ns": segy.ns,
@@ -565,10 +893,11 @@ def seismic_process(payload: dict) -> dict:
         "format_code": segy.format_code,
         "psd": psd,
         "nmo_applied": vel is not None,
-        "formula": "Butterworth bandpass + RMS AGC; NMO t^2=t0^2+x^2/v^2 if velocity given",
+        "horizon": {"seed_trace": seed_tr, "seed_sample": seed_s, **{k: v for k, v in picks.items() if k != "sample"}},
+        "formula": "Butterworth bandpass + RMS AGC; NMO t^2=t0^2+x^2/v^2 if velocity given; Sheriff & Geldart horizon track",
     }
     path = write_json(os.path.join(out, "seismic_qc.json"), qc)
-    return {"artifacts": [make_artifact("artifact-segy", "seismic", "json", path, node_id, [src], qc)], "events": [{"type": "NODE_PROGRESS", "message": f"SEG-Y {segy.n_traces} traces, dominant f={psd['dominant_frequency_hz']:.1f} Hz."}]}
+    return {"artifacts": [make_artifact("artifact-segy", "seismic", "json", path, node_id, [src], qc)], "events": events}
 
 
 def radiometric_correct(payload: dict) -> dict:
@@ -608,6 +937,8 @@ def gpr_process(payload: dict) -> dict:
         return skipped("gpr_process", "not in plan")
     from formats import parse_dzt
     from science.gpr import process_section
+    from science.gis import write_ascii_grid
+    from science.grid import Grid
 
     node_id = "gpr_process"
     out = task_dir(payload)
@@ -624,6 +955,15 @@ def gpr_process(payload: dict) -> dict:
         migrated=result["migrated"] if result["migrated"] is not None else np.array([]),
         dt=dzt["dt_s"],
         dx=dzt["dx_m"],
+    )
+    section = result["bandpassed"]
+    ntr, ns = np.atleast_2d(section).shape
+    step_t = max(1, ntr // 400)
+    step_s = max(1, ns // 500)
+    preview = np.atleast_2d(section)[::step_t, ::step_s]
+    write_ascii_grid(
+        Grid(values=preview.T, x0=0.0, y0=0.0, dx=float(dzt["dx_m"]) * step_t, dy=float(dzt["dt_s"]) * step_s, crs_epsg=0, units="amp", name="gpr_section"),
+        os.path.join(out, "gpr_section.asc"),
     )
     qc = {"time_zero_sample": result["time_zero_sample"], "n_traces": dzt["n_traces"], "dt_s": dzt["dt_s"], "formula": result["formula"]}
     path = write_json(os.path.join(out, "gpr_qc.json"), qc)

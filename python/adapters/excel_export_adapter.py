@@ -3,12 +3,13 @@ import os
 import hashlib
 from datetime import datetime
 import pandas as pd
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_vendor = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_vendor")
+if os.path.isdir(_vendor) and _vendor not in sys.path:
+    sys.path.insert(0, _vendor)
+import et_xmlfile  # noqa: F401 — bundled with the frozen engine
+import openpyxl  # noqa: F401 — pandas ExcelWriter looks this up lazily
 from core.node_runner import run_node
 
 def export_excel(payload: dict) -> dict:
@@ -24,51 +25,16 @@ def export_excel(payload: dict) -> dict:
         
     df = pd.read_csv(corrected_path)
     events = []
-    
-    # out_dir is already set above from payload
-    plot_path = os.path.join(out_dir, task_folder, "mag_map.png")
     excel_path = os.path.join(out_dir, task_folder, "diurnal_analysis.xlsx")
-    
-    # 1. Generate spatial plot using matplotlib
-    plt.figure(figsize=(10, 8))
-    # Normalize timestamps to display a continuous path
-    scatter = plt.scatter(df['x'], df['y'], c=df['corrected_magnetic_field'], cmap='jet', s=1)
-    plt.colorbar(scatter, label='Corrected Magnetic Field (nT)')
-    plt.title('Airborne Magnetic Survey - Diurnally Corrected')
-    plt.xlabel('Longitude')
-    plt.ylabel('Latitude')
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    
-    events.append({
-        "type": "NODE_PROGRESS",
-        "message": "Generated spatial magnetic field plot (mag_map.png)."
-    })
-    
-    artifacts = [{
-        "id": "artifact-mag-map-1",
-        "type": "plot",
-        "format": "png",
-        "lineage": ["artifact-airborne-corrected-1"],
-        "generated_by_node": node_id,
-        "checksum": hashlib.sha256(open(plot_path, 'rb').read()).hexdigest(),
-        "created_at": datetime.utcnow().isoformat() + "Z",
-        "path": plot_path
-    }]
+    artifacts = []
 
     try:
         with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
             df_downsampled = df.iloc[::10, :]
             df_downsampled.to_excel(writer, sheet_name='Corrected Data', index=False)
-            workbook = writer.book
-            worksheet = workbook.create_sheet('Plots')
-            from openpyxl.drawing.image import Image
-            img = Image(plot_path)
-            worksheet.add_image(img, 'A1')
         events.append({
             "type": "NODE_PROGRESS",
-            "message": "Generated Excel workbook with downsampled data and embedded spatial plot."
+            "message": "Generated Excel workbook with downsampled diurnal-corrected samples."
         })
         artifacts.append({
             "id": "artifact-excel-workbook-1",

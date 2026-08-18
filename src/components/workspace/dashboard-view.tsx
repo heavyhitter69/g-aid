@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { FolderOpen, DownloadCloud, TerminalSquare, Clock, Folder } from "lucide-react";
+import { useState } from "react";
+import { FolderOpen, DownloadCloud, Clock, Folder } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
-import { openWorkspaceAt, openWorkspaceFolder } from "@/lib/open-workspace";
+import { cloneGitRepoAndOpen, openWorkspaceAt, openWorkspaceFolder } from "@/lib/open-workspace";
 import { isAbsoluteDiskPath } from "@/lib/workspace-index";
 
 function timeAgo(iso: string): string {
@@ -21,11 +22,35 @@ function timeAgo(iso: string): string {
 
 export function DashboardView() {
   const { currentProject, recentProjects } = useAppStore();
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneUrl, setCloneUrl] = useState("");
+  const [cloneError, setCloneError] = useState("");
+  const [cloning, setCloning] = useState(false);
 
   const openPicker = () => void openWorkspaceFolder();
 
+  const submitClone = async () => {
+    const url = cloneUrl.trim();
+    if (!url) {
+      setCloneError("Enter a git URL, for example https://github.com/org/repo.git");
+      return;
+    }
+    setCloning(true);
+    setCloneError("");
+    try {
+      const opened = await cloneGitRepoAndOpen(url);
+      if (opened) {
+        setCloneOpen(false);
+        setCloneUrl("");
+      }
+    } catch (err) {
+      setCloneError(err instanceof Error ? err.message : "Could not clone");
+    } finally {
+      setCloning(false);
+    }
+  };
+
   if (currentProject) {
-    // Show keyboard shortcuts when a project IS opened
     return (
       <div className="h-full bg-[var(--ws-panel)] flex items-center justify-center select-none relative">
         <div className="flex flex-col items-center opacity-60">
@@ -54,11 +79,9 @@ export function DashboardView() {
     );
   }
 
-  // Show the Start Screen when NO project is opened
   return (
     <div className="h-full bg-[var(--ws-panel)] flex items-center justify-center select-none overflow-y-auto">
       <div className="flex flex-col max-w-3xl w-full px-8 py-12">
-        {/* Logo and Plan */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
             <Image src="/g-aid logo.png" alt="G-AID" width={140} height={40} className="object-contain" priority />
@@ -68,8 +91,7 @@ export function DashboardView() {
           </div>
         </div>
 
-        {/* Action Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
           <button 
             onClick={openPicker}
             className="flex flex-col items-start p-5 bg-[var(--ws-panel-alt)] hover:bg-[var(--ws-panel-hover)] border border-[var(--ws-border)] rounded-xl transition-colors cursor-pointer text-left group"
@@ -77,17 +99,56 @@ export function DashboardView() {
             <FolderOpen className="h-5 w-5 text-[#cccccc] group-hover:text-white mb-3" />
             <span className="text-[#cccccc] group-hover:text-white font-medium text-sm">Open project</span>
           </button>
-          <button className="flex flex-col items-start p-5 bg-[var(--ws-panel-alt)] hover:bg-[var(--ws-panel-hover)] border border-[var(--ws-border)] rounded-xl transition-colors cursor-pointer text-left group">
+          <button
+            onClick={() => {
+              setCloneOpen(true);
+              setCloneError("");
+            }}
+            className="flex flex-col items-start p-5 bg-[var(--ws-panel-alt)] hover:bg-[var(--ws-panel-hover)] border border-[var(--ws-border)] rounded-xl transition-colors cursor-pointer text-left group"
+          >
             <DownloadCloud className="h-5 w-5 text-[#cccccc] group-hover:text-white mb-3" />
             <span className="text-[#cccccc] group-hover:text-white font-medium text-sm">Clone repo</span>
           </button>
-          <button className="flex flex-col items-start p-5 bg-[var(--ws-panel-alt)] hover:bg-[var(--ws-panel-hover)] border border-[var(--ws-border)] rounded-xl transition-colors cursor-pointer text-left group">
-            <TerminalSquare className="h-5 w-5 text-[#cccccc] group-hover:text-white mb-3" />
-            <span className="text-[#cccccc] group-hover:text-white font-medium text-sm">Connect via SSH</span>
-          </button>
         </div>
 
-        {/* Recent Projects */}
+        {cloneOpen && (
+          <div className="mb-10 p-4 bg-[var(--ws-panel-alt)] border border-[var(--ws-border)] rounded-xl">
+            <p className="text-sm text-[#cccccc] mb-2">Clone a Git repository</p>
+            <input
+              autoFocus
+              value={cloneUrl}
+              onChange={(e) => setCloneUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submitClone();
+                if (e.key === "Escape") setCloneOpen(false);
+              }}
+              placeholder="https://github.com/org/repo.git"
+              className="w-full bg-[#2a2d2e] border border-[#3c3c3c] rounded px-2 py-1.5 text-sm text-[#cccccc] outline-none mb-3"
+            />
+            {cloneError ? <p className="text-[11px] text-[#f48771] mb-3">{cloneError}</p> : null}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={cloning}
+                onClick={() => void submitClone()}
+                className="bg-[#007acc] hover:bg-[#0062a3] disabled:opacity-60 text-white py-1.5 px-3 rounded text-xs font-medium border-none cursor-pointer"
+              >
+                {cloning ? "Cloning…" : "Clone"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCloneOpen(false)}
+                className="text-[#cccccc] py-1.5 px-3 rounded text-xs border border-[#3c3c3c] bg-transparent cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-[10px] text-[#6a6a6a] mt-3">
+              Git must be installed. After you click Clone, choose the folder to clone into.
+            </p>
+          </div>
+        )}
+
         <div>
           <h3 className="text-[#858585] text-xs font-semibold mb-4 px-2">Recent projects</h3>
           <div className="flex flex-col">
@@ -136,4 +197,3 @@ export function DashboardView() {
     </div>
   );
 }
-

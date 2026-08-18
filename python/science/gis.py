@@ -18,6 +18,42 @@ from science.crs import CRS, CRS_WGS84, utm_crs
 from science.grid import Grid
 
 
+def read_ascii_grid(path: str) -> Grid:
+    with open(path, encoding="utf-8", errors="ignore") as handle:
+        lines = handle.read().splitlines()
+    meta: dict[str, float] = {}
+    i = 0
+    while i < min(12, len(lines)):
+        parts = lines[i].split()
+        if len(parts) < 2:
+            break
+        key = parts[0].lower()
+        if key not in {"ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "nodata_value"}:
+            break
+        meta[key] = float(parts[1])
+        i += 1
+    nx = int(meta["ncols"])
+    ny = int(meta["nrows"])
+    vals: list[float] = []
+    for line in lines[i:]:
+        for part in line.split():
+            vals.append(float(part))
+            if len(vals) >= nx * ny:
+                break
+        if len(vals) >= nx * ny:
+            break
+    arr = np.array(vals[: nx * ny], float).reshape(ny, nx)
+    return Grid(
+        values=arr,
+        x0=meta.get("xllcorner", 0.0),
+        y0=meta.get("yllcorner", 0.0),
+        dx=meta.get("cellsize", 1.0),
+        dy=meta.get("cellsize", 1.0),
+        nodata=meta.get("nodata_value", -9999.0),
+        name=os.path.splitext(os.path.basename(path))[0],
+    )
+
+
 def write_ascii_grid(grid: Grid, path: str, crs: CRS | None = None) -> str:
     crs = crs or CRS(grid.crs_epsg, f"EPSG:{grid.crs_epsg}", "projected" if grid.crs_epsg != 4326 else "geographic")
     data = grid.masked()

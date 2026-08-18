@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+import { conversationTitleFromText, isPlaceholderTopic } from "@/lib/conversation-title";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -8,11 +10,11 @@ function cleanTitle(raw: string): string {
   const line = text
     .split("\n")
     .map((entry) => entry.trim())
-    .find((entry) => entry && !entry.startsWith("<") && !/^thinking/i.test(entry));
+    .find((entry) => entry && !entry.startsWith("<") && !/^thinking/i.test(entry) && !isPlaceholderTopic(entry));
   text = (line || text).replace(/^["'“”‘’#*\-\s]+|["'“”‘’.,:;]+$/g, "").trim();
   text = text.replace(/\s+/g, " ");
   if (text.length > 60) text = `${text.slice(0, 57)}…`;
-  return text;
+  return isPlaceholderTopic(text) ? "" : text;
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -29,14 +31,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     return Response.json({ error: "message is required" }, { status: 400 });
   }
 
+  const fallback = conversationTitleFromText(message);
   const prompt = `Write a short conversation title of 3 to 7 words for this chat. Reply with the title only. No quotes, no punctuation, no explanation.\n\nUser: ${message}\nAssistant: ${reply || "(pending)"}`;
 
   const payload = {
-    model: "deepseek-r1:8b",
+    model: "g-aid-orchestra-fast",
     messages: [{ role: "user", content: prompt }],
     stream: false,
     think: false,
-    options: { temperature: 0.2, num_predict: 32 },
+    options: { temperature: 0.1, num_predict: 48 },
   };
 
   try {
@@ -44,28 +47,32 @@ export async function POST(request: NextRequest): Promise<Response> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(12000),
     });
 
-    if (response.status === 400) {
+    if (response.status === 400 || response.status === 404) {
       const { think, ...withoutThink } = payload;
       void think;
+      const fallback = {
+        ...withoutThink,
+        model: response.status === 404 ? "deepseek-r1:8b" : withoutThink.model,
+      };
       response = await fetch("http://127.0.0.1:11434/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(withoutThink),
-        signal: AbortSignal.timeout(20000),
+        body: JSON.stringify(fallback),
+        signal: AbortSignal.timeout(12000),
       });
     }
 
     if (!response.ok) {
-      return Response.json({ title: "New conversation" });
+      return Response.json({ title: fallback || "New conversation" });
     }
 
     const data = await response.json();
     const title = cleanTitle(data?.message?.content || "");
-    return Response.json({ title: title || "New conversation" });
+    return Response.json({ title: title || fallback || "New conversation" });
   } catch {
-    return Response.json({ title: "New conversation" });
+    return Response.json({ title: fallback || "New conversation" });
   }
 }

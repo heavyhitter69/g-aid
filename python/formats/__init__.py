@@ -7,6 +7,7 @@ x,y are native file coordinates (lon/lat or projected); crs_epsg records which.
 
 from __future__ import annotations
 
+import csv
 import os
 import re
 from datetime import datetime, timezone
@@ -20,23 +21,90 @@ DATE_PATTERNS = [
     re.compile(r"(\d{1,2})[./\-](\d{1,2})[./\-](20\d{2})"),
 ]
 
+_ROMAN_MONTHS = {
+    "I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6,
+    "VII": 7, "VIII": 8, "IX": 9, "X": 10, "XI": 11, "XII": 12,
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}
+_ROMAN_PAT = re.compile(
+    r"\b(\d{1,2})\s+(XII|XI|IX|X|VIII|VII|VI|IV|V|III|II|I|"
+    r"JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{2}|\d{4})\b",
+    re.I,
+)
+
+
+def _full_year(year: int) -> int:
+    if year < 100:
+        return 2000 + year if year < 80 else 1900 + year
+    return year
+
+
+def _from_roman_match(match: re.Match[str]) -> datetime | None:
+    day = int(match.group(1))
+    month = _ROMAN_MONTHS.get(match.group(2).upper())
+    year = _full_year(int(match.group(3)))
+    if month is None:
+        return None
+    try:
+        return datetime(year, month, day, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
 
 def parse_header_date(text: str) -> datetime | None:
+    """Read a survey date from instrument headers. Never invent one.
+
+    Gem Systems GSM-19 stamps the survey on the /ID line as ``25 IV 26``
+    (day, Roman month, 2-digit year). The firmware banner ``23 VI 2022`` is
+    not the flight date and is ignored when an /ID stamp exists.
+    """
+    lines = text.splitlines()
+    for line in lines:
+        if "/id" in line.lower():
+            match = _ROMAN_PAT.search(line)
+            if match:
+                parsed = _from_roman_match(match)
+                if parsed:
+                    return parsed
+            for pat in DATE_PATTERNS:
+                num = pat.search(line)
+                if not num:
+                    continue
+                g = num.groups()
+                try:
+                    if len(g[0]) == 4:
+                        return datetime(int(g[0]), int(g[1]), int(g[2]), tzinfo=timezone.utc)
+                    day, month, year = int(g[0]), int(g[1]), int(g[2])
+                    if month > 12:
+                        day, month = month, day
+                    return datetime(year, month, day, tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+
+    cleaned = "\n".join(
+        line for line in lines
+        if not line.lower().startswith("/gps") and "v7." not in line.lower()
+    )
     for pat in DATE_PATTERNS:
-        match = pat.search(text)
+        match = pat.search(cleaned)
         if not match:
             continue
         g = match.groups()
-        if len(g[0]) == 4:
-            y, mo, d = int(g[0]), int(g[1]), int(g[2])
-        else:
-            d, mo, y = int(g[0]), int(g[1]), int(g[2])
-            if mo > 12:
-                d, mo = mo, d
         try:
+            if len(g[0]) == 4:
+                y, mo, d = int(g[0]), int(g[1]), int(g[2])
+            else:
+                d, mo, y = int(g[0]), int(g[1]), int(g[2])
+                if mo > 12:
+                    d, mo = mo, d
             return datetime(y, mo, d, tzinfo=timezone.utc)
         except ValueError:
             continue
+
+    match = _ROMAN_PAT.search(cleaned)
+    if match:
+        return _from_roman_match(match)
     return None
 
 
@@ -99,10 +167,49 @@ def _norm(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(name).lower())
 
 
+def _read_magarrow_table(path: str) -> pd.DataFrame:
+    """Read MagArrow CSV the way Oasis / QGIS do: keep named columns, ignore NMEA extras.
+
+    GPS-fix rows embed ``$GNGGA`` / ``$GNRMC`` in single quotes, which pandas'
+    default reader treats as extra commas and aborts the whole file.
+    """
+    with open(path, "r", errors="ignore", newline="") as handle:
+        first = handle.readline()
+        if not first.strip():
+            raise ValueError(f"MagArrow file {os.path.basename(path)} is empty")
+        header = next(csv.reader([first], skipinitialspace=True))
+        names = [c.strip() for c in header]
+        width = len(names)
+        if width < 6:
+            raise ValueError(f"MagArrow file {os.path.basename(path)} has no usable header")
+
+        body: list[list[str]] = []
+        for quote in ("'", '"'):
+            handle.seek(0)
+            handle.readline()
+            reader = csv.reader(handle, delimiter=",", quotechar=quote, skipinitialspace=True)
+            rows = []
+            for row in reader:
+                if not row or all(not cell.strip() for cell in row):
+                    continue
+                if len(row) > width:
+                    row = row[:width]
+                elif len(row) < width:
+                    row = row + [""] * (width - len(row))
+                rows.append(row)
+            if rows:
+                body = rows
+                break
+        if not body:
+            raise ValueError(f"MagArrow file {os.path.basename(path)} has no data rows")
+    return pd.DataFrame(body, columns=names)
+
+
 def parse_magarrow(path: str) -> pd.DataFrame:
-    raw = pd.read_csv(path, low_memory=False)
+    raw = _read_magarrow_table(path)
     cols = {_norm(c): c for c in raw.columns}
-    def pick(*names):
+
+    def pick(*names: str) -> str | None:
         for n in names:
             if n in cols:
                 return cols[n]
@@ -110,24 +217,25 @@ def parse_magarrow(path: str) -> pd.DataFrame:
 
     lat_c = pick("latitude", "lat", "y")
     lon_c = pick("longitude", "lon", "long", "x")
-    mag_c = pick("mag", "magnetic", "nT", "nt", "tmi", "magnt")
+    mag_c = pick("mag", "magnetic", "nt", "tmi", "magnt")
     date_c = pick("date")
     time_c = pick("time")
     alt_c = pick("altitude", "alt", "height", "msl", "hae")
     if lat_c is None or lon_c is None or mag_c is None:
-        # MagArrow sometimes has extra commas; fall back to positional
-        df_pos = pd.read_csv(path, names=list(range(80)), skiprows=1, low_memory=False)
+        # Positional fallback when headers are missing but the MagArrow layout is standard
+        df_pos = raw.copy()
+        df_pos.columns = list(range(len(df_pos.columns)))
         out = pd.DataFrame(
             {
-                "Date": df_pos[1],
-                "Time": df_pos[2],
-                "y": pd.to_numeric(df_pos[3], errors="coerce"),
-                "x": pd.to_numeric(df_pos[4], errors="coerce"),
-                "magnetic_field": pd.to_numeric(df_pos[5], errors="coerce"),
+                "Date": df_pos[1] if 1 in df_pos.columns else df_pos.iloc[:, 1],
+                "Time": df_pos[2] if 2 in df_pos.columns else df_pos.iloc[:, 2],
+                "y": pd.to_numeric(df_pos.iloc[:, 3], errors="coerce"),
+                "x": pd.to_numeric(df_pos.iloc[:, 4], errors="coerce"),
+                "magnetic_field": pd.to_numeric(df_pos.iloc[:, 5], errors="coerce"),
             }
         )
         if df_pos.shape[1] > 10:
-            out["z"] = pd.to_numeric(df_pos[10], errors="coerce")
+            out["z"] = pd.to_numeric(df_pos.iloc[:, 10], errors="coerce")
         else:
             out["z"] = np.nan
         out["datetime_str"] = out["Date"].astype(str) + " " + out["Time"].astype(str)
@@ -158,6 +266,15 @@ def parse_magarrow(path: str) -> pd.DataFrame:
     # pandas NaT became large ints sometimes
     out = out[out["timestamp"] > 0]
     return out.reset_index(drop=True)
+
+
+def magarrow_survey_date(df: pd.DataFrame) -> datetime | None:
+    if df is None or df.empty or "timestamp" not in df.columns:
+        return None
+    ts = df["timestamp"].dropna()
+    if ts.empty:
+        return None
+    return datetime.fromtimestamp(float(ts.iloc[0]), tz=timezone.utc).replace(tzinfo=None)
 
 
 def parse_geosoft_xyz(path: str) -> pd.DataFrame:

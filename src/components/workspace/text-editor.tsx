@@ -130,7 +130,7 @@ export function TextEditor({
             style={{ minHeight: lineCount * LINE_HEIGHT }}
           >
             <div
-              className="sticky left-0 z-10 shrink-0 bg-[#1e1e1e] text-[#858585] font-mono text-[13px] text-right select-none border-r border-[#2b2b2b]"
+              className="sticky left-0 z-0 shrink-0 bg-[#1e1e1e] text-[#858585] font-mono text-[13px] text-right select-none border-r border-[#2b2b2b]"
               aria-hidden
               style={{
                 paddingTop: useVirtualGutter ? gutterStart * LINE_HEIGHT : 0,

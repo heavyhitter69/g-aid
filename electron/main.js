@@ -25,7 +25,8 @@ if (dev) {
 }
 
 let mainWindow;
-const extraWindows = [];
+const windows = [];
+let pendingNewWindows = 0;
 let pythonProcess = null;
 let ollamaProcess = null;
 let authBaseUrl = process.env.GAID_AUTH_URL || "";
@@ -57,25 +58,106 @@ function browserWindowOptions() {
   };
 }
 
-function trackExtraWindow(win) {
-  extraWindows.push(win);
+function wantsNewWindow(argv = process.argv) {
+  return argv.some((arg) => arg === "--new-window");
+}
+
+function registerWindow(win) {
+  windows.push(win);
+  if (!mainWindow || mainWindow.isDestroyed()) mainWindow = win;
   win.on("closed", () => {
-    const index = extraWindows.indexOf(win);
-    if (index >= 0) extraWindows.splice(index, 1);
+    const index = windows.indexOf(win);
+    if (index >= 0) windows.splice(index, 1);
+    if (mainWindow === win) mainWindow = windows[0] || null;
   });
+}
+
+function attachWindowGuards(win, fallbackUrl) {
+  win.webContents.on("render-process-gone", (_event, details) => {
+    log("Renderer gone", details && details.reason);
+    if (win && !win.isDestroyed()) {
+      setTimeout(() => {
+        if (win && !win.isDestroyed()) win.reload();
+      }, 400);
+    }
+  });
+  win.webContents.on("did-fail-load", (_event, code, desc, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return;
+    log("did-fail-load", code, desc, url);
+    setTimeout(() => {
+      if (win && !win.isDestroyed() && fallbackUrl) win.loadURL(fallbackUrl);
+    }, 800);
+  });
+}
+
+function workspaceUrl(pathname, openPath, extra = {}) {
+  const page = typeof pathname === "string" && pathname.startsWith("/") ? pathname : "/workspace";
+  const [path, existingQuery] = page.split("?");
+  const params = new URLSearchParams(existingQuery || "");
+  if (openPath) params.set("open", openPath);
+  if (extra.fresh) params.set("fresh", "1");
+  const qs = params.toString();
+  return `http://${hostname}:${serverPort}${path}${qs ? `?${qs}` : ""}`;
+}
+
+async function openWorkspaceWindow({ pathname, openPath, splash = false, fresh } = {}) {
+  if (!serverPort) {
+    pendingNewWindows += 1;
+    return null;
+  }
+  const useFresh =
+    fresh ??
+    (!openPath && !(typeof pathname === "string" && /[?&]conversation=/.test(pathname)));
+  const win = new BrowserWindow(browserWindowOptions());
+  registerWindow(win);
+  const url = workspaceUrl(pathname, openPath, { fresh: useFresh });
+  log("Opening window:", url);
+  attachWindowGuards(win, url);
+  if (splash) {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml())}`);
+    win.show();
+    win.focus();
+    await fadeSplashThenLoad(win, url);
+  } else {
+    await win.loadURL(url);
+    win.show();
+    win.focus();
+  }
+  return win;
+}
+
+async function flushPendingWindows() {
+  while (pendingNewWindows > 0) {
+    pendingNewWindows -= 1;
+    await openWorkspaceWindow();
+  }
+}
+
+function setWindowsJumpList() {
+  if (process.platform !== "win32") return;
+  try {
+    const program = process.execPath;
+    const args = dev
+      ? `${JSON.stringify(path.resolve(process.argv[1] || "."))} --new-window`
+      : "--new-window";
+    app.setUserTasks([
+      {
+        program,
+        arguments: args,
+        iconPath: program,
+        iconIndex: 0,
+        title: "New Window",
+        description: "Open a new G-AID window",
+      },
+    ]);
+  } catch (err) {
+    log("Jump list failed", err);
+  }
 }
 
 async function openAuxWindow(pathname) {
   if (typeof pathname !== "string" || !pathname.startsWith("/workspace")) return;
-  if (!serverPort) return;
-
-  const win = new BrowserWindow(browserWindowOptions());
-  trackExtraWindow(win);
-  const url = `http://${hostname}:${serverPort}${pathname}`;
-  log("Opening auxiliary window:", url);
-  await win.loadURL(url);
-  win.show();
-  win.focus();
+  await openWorkspaceWindow({ pathname });
 }
 
 function logPath() {
@@ -196,6 +278,64 @@ function startOllamaDaemon() {
     OLLAMA_HOST: "127.0.0.1:11434",
     OLLAMA_LIBRARY_PATH: ollamaDir,
   });
+  setTimeout(ensureOrchestraModel, 3000);
+  setTimeout(ensureFastOrchestra, 4000);
+}
+
+function orchestraModelfilePath() {
+  const candidates = [
+    path.join(app.getAppPath(), "ollama", "Modelfile"),
+    path.join(process.resourcesPath, "app", "ollama", "Modelfile"),
+    path.join(process.resourcesPath, "ai", "Modelfile"),
+    path.join(__dirname, "..", "ollama", "Modelfile"),
+  ];
+  return candidates.find((entry) => fs.existsSync(entry)) || null;
+}
+
+function orchestraFastModelfilePath() {
+  const candidates = [
+    path.join(app.getAppPath(), "ollama", "Modelfile.fast"),
+    path.join(process.resourcesPath, "app", "ollama", "Modelfile.fast"),
+    path.join(process.resourcesPath, "ai", "Modelfile.fast"),
+    path.join(__dirname, "..", "ollama", "Modelfile.fast"),
+  ];
+  return candidates.find((entry) => fs.existsSync(entry)) || null;
+}
+
+function ollamaEnv() {
+  const ollamaDir = path.join(process.resourcesPath, "ai");
+  return {
+    OLLAMA_MODELS: path.join(ollamaDir, "models"),
+    OLLAMA_HOST: "127.0.0.1:11434",
+    OLLAMA_LIBRARY_PATH: ollamaDir,
+  };
+}
+
+function ensureFastOrchestra() {
+  const ollamaDir = path.join(process.resourcesPath, "ai");
+  const ollamaPath = path.join(ollamaDir, "ollama.exe");
+  const modelfile = orchestraFastModelfilePath();
+  if (!fs.existsSync(ollamaPath) || !modelfile) {
+    log("Orchestra Fast model or Modelfile missing");
+    return;
+  }
+  spawnHidden(ollamaPath, ["create", "g-aid-orchestra-fast", "-f", modelfile], ollamaEnv());
+}
+
+function ensureOrchestraModel() {
+  const modelfile = orchestraModelfilePath();
+  if (!modelfile) {
+    log("Orchestra Modelfile missing");
+    return;
+  }
+  const ollamaDir = path.join(process.resourcesPath, "ai");
+  const ollamaPath = path.join(ollamaDir, "ollama.exe");
+  if (!fs.existsSync(ollamaPath)) return;
+  spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], {
+    OLLAMA_MODELS: path.join(ollamaDir, "models"),
+    OLLAMA_HOST: "127.0.0.1:11434",
+    OLLAMA_LIBRARY_PATH: ollamaDir,
+  });
 }
 
 function listenOnPort(server, port) {
@@ -240,10 +380,10 @@ function splashLogoSrc() {
   return "";
 }
 
-async function fadeSplashThenLoad(url) {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+async function fadeSplashThenLoad(win, url) {
+  if (!win || win.isDestroyed()) return;
   try {
-    await mainWindow.webContents.executeJavaScript(`
+    await win.webContents.executeJavaScript(`
       (() => new Promise((resolve) => {
         const wrap = document.getElementById("wrap");
         const logo = document.querySelector(".logo");
@@ -276,7 +416,7 @@ async function fadeSplashThenLoad(url) {
   } catch (err) {
     log("Splash fade skipped", err);
   }
-  await mainWindow.loadURL(url);
+  await win.loadURL(url);
 }
 
 function splashHtml() {
@@ -334,6 +474,7 @@ function splashHtml() {
 
 async function createWindow() {
   mainWindow = new BrowserWindow(browserWindowOptions());
+  registerWindow(mainWindow);
 
   await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml())}`);
   mainWindow.show();
@@ -379,10 +520,13 @@ async function createWindow() {
     ? `http://${hostname}:${serverPort}/workspace?open=${encodeURIComponent(openedFile)}`
     : `http://${hostname}:${serverPort}/workspace`;
 
-  await fadeSplashThenLoad(startUrl);
+  await fadeSplashThenLoad(mainWindow, startUrl);
   mainWindow.show();
   mainWindow.focus();
   if (pendingAuthUrl) sendAuthUrl(pendingAuthUrl);
+  attachWindowGuards(mainWindow, startUrl);
+  setWindowsJumpList();
+  await flushPendingWindows();
 
   if (dev) {
     mainWindow.webContents.openDevTools({ mode: "detach" });
@@ -401,10 +545,14 @@ ipcMain.handle("open-aux-window", async (_event, pathname) => {
   await openAuxWindow(pathname);
 });
 
-ipcMain.handle("pick-folder", async (event) => {
+ipcMain.handle("open-new-window", async () => {
+  await openWorkspaceWindow();
+});
+
+ipcMain.handle("pick-folder", async (event, options) => {
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   const result = await dialog.showOpenDialog(win, {
-    title: "Open Folder",
+    title: (options && options.title) || "Open Folder",
     properties: ["openDirectory"],
   });
   if (result.canceled || !result.filePaths[0]) return null;
@@ -423,8 +571,86 @@ ipcMain.handle("create-workspace-file", async (_event, root, relativePath, conte
   return workspaceFs.writeWorkspaceFile(root, relativePath, content ?? "");
 });
 
+ipcMain.handle("save-workspace-file", async (_event, root, relativePath, content) => {
+  return workspaceFs.saveWorkspaceFile(root, relativePath, content ?? "");
+});
+
 ipcMain.handle("create-workspace-folder", async (_event, root, relativePath) => {
   return workspaceFs.mkdirWorkspace(root, relativePath);
+});
+
+ipcMain.handle("delete-workspace-path", async (_event, root, relativePath) => {
+  const { full, relativePath: rel } = workspaceFs.resolveWorkspacePath(root, relativePath);
+  if (!fs.existsSync(full)) throw new Error(`Not found: ${rel}`);
+  await shell.trashItem(full);
+  return rel;
+});
+
+ipcMain.handle("move-workspace-path", async (_event, root, fromRel, destFolderRel) => {
+  return workspaceFs.moveWorkspacePath(root, fromRel, destFolderRel || "");
+});
+
+ipcMain.handle("copy-workspace-path", async (_event, root, fromRel, destFolderRel) => {
+  return workspaceFs.copyWorkspacePath(root, fromRel, destFolderRel || "");
+});
+
+ipcMain.handle("rename-workspace-path", async (_event, root, fromRel, newName) => {
+  return workspaceFs.renameWorkspacePath(root, fromRel, newName);
+});
+
+ipcMain.handle("clone-git-repo", async (_event, url, destParent) => {
+  const raw = String(url || "").trim();
+  if (!raw) throw new Error("Enter a git URL");
+  if (!/^(https?:\/\/|git@|ssh:\/\/)/i.test(raw) && !/github\.com|gitlab\.com|bitbucket\.org/i.test(raw)) {
+    throw new Error("Enter a git URL, for example https://github.com/org/repo.git");
+  }
+  const parent = path.resolve(String(destParent || ""));
+  if (!parent || !fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) {
+    throw new Error("Choose a folder to clone into");
+  }
+  const cleaned = raw.replace(/\.git$/i, "").replace(/\/+$/, "");
+  const name = cleaned.split(/[:/\\]/).filter(Boolean).pop() || "repo";
+  const dest = path.join(parent, name);
+  if (fs.existsSync(dest)) throw new Error(`Already exists: ${dest}`);
+  return await new Promise((resolve, reject) => {
+    const child = spawn("git", ["clone", raw, dest], { windowsHide: true });
+    let err = "";
+    child.stderr.on("data", (chunk) => {
+      err += chunk.toString();
+    });
+    child.on("error", (error) => {
+      if (error && error.code === "ENOENT") {
+        reject(new Error("Git is not installed. Install Git from git-scm.com and try again."));
+      } else {
+        reject(error);
+      }
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve(dest);
+      else reject(new Error((err || `git clone failed (${code})`).trim()));
+    });
+  });
+});
+
+ipcMain.handle("show-item-in-folder", async (_event, root, relativePath) => {
+  const resolvedRoot = path.resolve(root);
+  const full = relativePath ? path.resolve(resolvedRoot, relativePath) : resolvedRoot;
+  if (!workspaceFs.isInsideRoot(resolvedRoot, full)) {
+    throw new Error("Path is outside the open workspace");
+  }
+  if (!fs.existsSync(full)) throw new Error(`Not found: ${relativePath || root}`);
+  shell.showItemInFolder(full);
+});
+
+ipcMain.handle("open-path", async (_event, root, relativePath) => {
+  const resolvedRoot = path.resolve(root);
+  const full = relativePath ? path.resolve(resolvedRoot, relativePath) : resolvedRoot;
+  if (!workspaceFs.isInsideRoot(resolvedRoot, full)) {
+    throw new Error("Path is outside the open workspace");
+  }
+  if (!fs.existsSync(full)) throw new Error(`Not found: ${relativePath || root}`);
+  const err = await shell.openPath(full);
+  if (err) throw new Error(err);
 });
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -442,18 +668,23 @@ if (!gotTheLock) {
       return;
     }
 
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
+    if (wantsNewWindow(commandLine)) {
+      void openWorkspaceWindow();
+      return;
+    }
 
-      const filePath = getOpenedFilePath(commandLine);
-      if (filePath) {
-        log("Second instance opened with:", filePath);
-        mainWindow.loadURL(
-          `http://${hostname}:${serverPort}/workspace?open=${encodeURIComponent(filePath)}`
-        );
-      }
+    const filePath = getOpenedFilePath(commandLine);
+    if (filePath) {
+      log("Second instance opened with:", filePath);
+      void openWorkspaceWindow({ openPath: filePath });
+      return;
+    }
+
+    const win = BrowserWindow.getFocusedWindow() || mainWindow || windows[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
     }
   });
 

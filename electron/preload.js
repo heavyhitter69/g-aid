@@ -43,14 +43,31 @@ contextBridge.exposeInMainWorld("gaidDesktop", {
   getAuthBaseUrl: () => ipcRenderer.invoke("get-auth-base-url"),
   getPendingAuthUrl: () => ipcRenderer.invoke("get-pending-auth"),
   openAuxWindow: (pathname) => ipcRenderer.invoke("open-aux-window", pathname),
-  pickFolder: () => ipcRenderer.invoke("pick-folder"),
+  openNewWindow: () => ipcRenderer.invoke("open-new-window"),
+  pickFolder: (options) => ipcRenderer.invoke("pick-folder", options || {}),
   indexWorkspace: (root) => ipcRenderer.invoke("index-workspace", root),
   readWorkspaceFile: (root, relativePath) =>
     ipcRenderer.invoke("read-workspace-file", root, relativePath),
   createWorkspaceFile: (root, relativePath, content) =>
     ipcRenderer.invoke("create-workspace-file", root, relativePath, content ?? ""),
+  saveWorkspaceFile: (root, relativePath, content) =>
+    ipcRenderer.invoke("save-workspace-file", root, relativePath, content ?? ""),
   createWorkspaceFolder: (root, relativePath) =>
     ipcRenderer.invoke("create-workspace-folder", root, relativePath),
+  deleteWorkspacePath: (root, relativePath) =>
+    ipcRenderer.invoke("delete-workspace-path", root, relativePath),
+  moveWorkspacePath: (root, fromRel, destFolderRel) =>
+    ipcRenderer.invoke("move-workspace-path", root, fromRel, destFolderRel || ""),
+  copyWorkspacePath: (root, fromRel, destFolderRel) =>
+    ipcRenderer.invoke("copy-workspace-path", root, fromRel, destFolderRel || ""),
+  renameWorkspacePath: (root, fromRel, newName) =>
+    ipcRenderer.invoke("rename-workspace-path", root, fromRel, newName),
+  cloneGitRepo: (url, destParent) =>
+    ipcRenderer.invoke("clone-git-repo", url, destParent),
+  showItemInFolder: (root, relativePath) =>
+    ipcRenderer.invoke("show-item-in-folder", root, relativePath || ""),
+    openPath: (root, relativePath) =>
+      ipcRenderer.invoke("open-path", root, relativePath || ""),
   dismissBootCover: () => dismissBootCover(),
   onAuthCallback: (callback) => {
     const listener = (_event, url) => callback(url);

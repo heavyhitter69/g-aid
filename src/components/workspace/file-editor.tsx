@@ -5,6 +5,9 @@ import { useAppStore } from "@/store/app-store";
 import { fetchFileText } from "@/lib/supabase/storage";
 import { readRegisteredFile, hasRegisteredFile } from "@/lib/file-registry";
 import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
+import { companionAsciiPath, fileExt, isBinaryMapFile, isImageFile, isNumpyFile } from "@/lib/survey-file-kinds";
+import { CrsCard, GridMapView, JsonCard, NumpyCard, PointsMapView, extractLineStrings, extractLonLat, parseEsriAscii, parseXyzPoints } from "@/components/workspace/grid-map-view";
+import { epsgZone, looksLonLat, utmZoneFromLon, wgs84ToUtm } from "@/lib/wgs84-utm";
 import { X, Play, RefreshCw, Save, Database, Table, Map, Braces, Settings2, FileText, CheckCircle2, AlertCircle, Layers, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Sparkles, Eye, ZoomIn, ZoomOut, RotateCw, Printer, Download, Maximize2, ChevronRight, Loader2, Copy, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TextEditor } from "@/components/workspace/text-editor";
@@ -29,6 +32,7 @@ export function FileEditorView() {
     fileContents,
     setFileContent,
     currentProject,
+    workspaceRoot,
   } = useAppStore();
   const [inversionLoading, setInversionLoading] = useState(false);
   const [inversionProgress, setInversionProgress] = useState<string[]>([]);
@@ -39,6 +43,8 @@ export function FileEditorView() {
   const [isFetchingContent, setIsFetchingContent] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [reviewText, setReviewText] = useState("");
+  const [mapOverlay, setMapOverlay] = useState<{ x: number; y: number }[]>([]);
+  const [mapLines, setMapLines] = useState<{ x: number; y: number }[][]>([]);
 
   // Lazy-load file content when a tab is opened
   useEffect(() => {
@@ -49,8 +55,10 @@ export function FileEditorView() {
     setIsFetchingContent(true);
 
     (async () => {
-      // 1. Try local file registry first (files opened from disk this session)
-      if (hasRegisteredFile(activeFile)) {
+      const ext = fileExt(activeFile);
+      const skipText = isBinaryMapFile(activeFile) || isImageFile(activeFile) || isNumpyFile(activeFile);
+
+      if (hasRegisteredFile(activeFile) && !skipText) {
         const text = await readRegisteredFile(activeFile);
         if (text !== null) {
           setFileContent(activeFile, text);
@@ -59,19 +67,42 @@ export function FileEditorView() {
         }
       }
 
-      // 1b. Desktop workspace: read from the real folder on disk
       const root = useAppStore.getState().workspaceRoot;
       if (root && window.gaidDesktop?.readWorkspaceFile) {
         try {
-          const result = await window.gaidDesktop.readWorkspaceFile(root, activeFile);
-          if (result?.text !== undefined) {
+          const companion = companionAsciiPath(activeFile);
+          let result;
+          try {
+            result = await window.gaidDesktop.readWorkspaceFile(root, companion || activeFile);
+          } catch {
+            result = companion
+              ? await window.gaidDesktop.readWorkspaceFile(root, activeFile)
+              : null;
+          }
+          if (result?.media) {
+            setFileContent(activeFile, result.media);
+            setIsFetchingContent(false);
+            return;
+          }
+          if (result?.text) {
             setFileContent(activeFile, result.text);
+            setIsFetchingContent(false);
+            return;
+          }
+          if (result?.binary) {
+            setFileContent(activeFile, "");
             setIsFetchingContent(false);
             return;
           }
         } catch (err) {
           console.warn("Desktop workspace read failed:", err);
         }
+      }
+
+      if (skipText || ext === "xlsx") {
+        setFileContent(activeFile, "");
+        setIsFetchingContent(false);
+        return;
       }
 
       // 2. Try Supabase Storage (for files uploaded by authenticated users) or local server
@@ -98,6 +129,79 @@ export function FileEditorView() {
       setIsFetchingContent(false);
     })();
   }, [activeFile]);
+
+  useEffect(() => {
+    if (!activeFile) {
+      setMapOverlay([]);
+      setMapLines([]);
+      return;
+    }
+    const ext = fileExt(activeFile);
+    if (!["tif", "tiff", "asc", "grd", "npz", "npy"].includes(ext)) {
+      setMapOverlay([]);
+      return;
+    }
+    const desktop = window.gaidDesktop;
+    const root = workspaceRoot;
+    const gridText = fileContents[activeFile];
+    if (!root || !desktop?.readWorkspaceFile || !gridText) {
+      setMapOverlay([]);
+      return;
+    }
+    const rel = activeFile.replace(/\\/g, "/");
+    const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "";
+    const flight = dir ? `${dir}/flight_path.geojson` : "flight_path.geojson";
+    const lineaments = dir ? `${dir}/lineaments.geojson` : "lineaments.geojson";
+    const prj = rel.replace(/\.(tif|tiff|asc|grd|npz|npy)$/i, ".prj");
+    let cancelled = false;
+    (async () => {
+      let epsg = 0;
+      try {
+        const prjFile = await desktop.readWorkspaceFile(root, prj);
+        const hit = prjFile?.text?.match(/AUTHORITY\["EPSG","(\d+)"\]/g);
+        const last = hit?.[hit.length - 1]?.match(/\d+/)?.[0];
+        if (last) epsg = parseInt(last, 10);
+      } catch {
+        /* no prj */
+      }
+      try {
+        const geo = await desktop.readWorkspaceFile(root, flight);
+        if (cancelled || !geo?.text) {
+          setMapOverlay([]);
+          return;
+        }
+        const pts = extractLonLat(geo.text);
+        const grid = parseEsriAscii(gridText);
+        if (!pts.length) {
+          setMapOverlay([]);
+          return;
+        }
+        const sample = pts[0];
+        if (grid && looksLonLat(sample.x, sample.y) && Math.abs(grid.xllcorner) > 180) {
+          const zone = epsgZone(epsg)?.zone ?? utmZoneFromLon(sample.x);
+          setMapOverlay(
+            pts.map((p) => {
+              const { easting, northing } = wgs84ToUtm(p.x, p.y, zone);
+              return { x: easting, y: northing };
+            })
+          );
+        } else {
+          setMapOverlay(pts);
+        }
+      } catch {
+        if (!cancelled) setMapOverlay([]);
+      }
+      try {
+        const lin = await desktop.readWorkspaceFile(root, lineaments);
+        if (!cancelled) setMapLines(lin?.text ? extractLineStrings(lin.text) : []);
+      } catch {
+        if (!cancelled) setMapLines([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFile, workspaceRoot, fileContents[activeFile ?? ""]]);
 
   // Reset states when active file changes
   useEffect(() => {
@@ -152,12 +256,77 @@ export function FileEditorView() {
   const isExcel = ["xlsx"].includes(ext);
   const isPdf = ext === "pdf";
   const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
+  const isRaster = ["tif", "tiff", "asc", "grd"].includes(ext);
+  const isNpz = ["npz", "npy"].includes(ext);
+  const isPrj = ext === "prj";
+  const isGeojson = ext === "geojson";
+  const isXyz = ext === "xyz";
+  const isJson = ext === "json";
   const isMd = ext === "md" || ext === "mdx" || activeFile === "Implementation Plan" || activeFile === "Implementation Plan.md" || activeFile === "tasks.md";
   const useSpreadsheet =
     isSpreadsheet &&
     !(DEMO_MOCK_FILES.includes(activeFile) && fileContents[activeFile] === undefined);
   const useTextEditor =
-    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf && !isExcel && !isImage && !isMd;
+    !isDemoMock && !isWordDoc && !useSpreadsheet && !isPdf && !isExcel && !isImage && !isMd && !isRaster && !isPrj && !isGeojson && !isXyz && !isJson && !isNpz;
+
+  if (isRaster) {
+    const grid = parseEsriAscii(fileContents[activeFile] || "");
+    return (
+      <GridMapView
+        title={activeFile.split("/").pop() || activeFile}
+        grid={grid}
+        overlay={mapOverlay}
+        overlayLines={mapLines}
+        note={grid ? undefined : "Could not decode this raster. G-AID reads its own GeoTIFF and NumPy grids, or a companion .asc."}
+      />
+    );
+  }
+
+  if (isNpz) {
+    const grid = parseEsriAscii(fileContents[activeFile] || "");
+    if (grid) {
+      return (
+        <GridMapView
+          title={activeFile.split("/").pop() || activeFile}
+          grid={grid}
+          overlay={mapOverlay}
+          overlayLines={mapLines}
+        />
+      );
+    }
+    return <NumpyCard title={activeFile.split("/").pop() || activeFile} />;
+  }
+
+  if (isPrj) {
+    return <CrsCard title={activeFile.split("/").pop() || activeFile} wkt={fileContents[activeFile] || ""} />;
+  }
+
+  if (isGeojson) {
+    const pts = extractLonLat(fileContents[activeFile] || "");
+    return (
+      <PointsMapView
+        title={activeFile.split("/").pop() || activeFile}
+        points={pts}
+        note="No coordinates found in this GeoJSON."
+      />
+    );
+  }
+
+  if (isXyz) {
+    const pts = parseXyzPoints(fileContents[activeFile] || "");
+    return (
+      <PointsMapView
+        title={activeFile.split("/").pop() || activeFile}
+        points={pts}
+        colorByZ
+        note="No XYZ points found in this file."
+      />
+    );
+  }
+
+  if (isJson) {
+    return <JsonCard title={activeFile.split("/").pop() || activeFile} text={fileContents[activeFile] || ""} />;
+  }
 
   if (isMd) {
     const isPlan = activeFile === "Implementation Plan" || activeFile === "Implementation Plan.md" || activeFile === "tasks.md";
@@ -242,14 +411,14 @@ export function FileEditorView() {
   }
 
   if (isImage) {
-    const fileEntry = useAppStore.getState().projectFiles.find(f => f.id === activeFile);
-    const src = fileEntry?.path || "";
+    const stored = fileContents[activeFile] || "";
+    const src = stored.startsWith("data:") ? stored : "";
     return (
       <div className="flex-1 bg-[#1e1e1e] flex items-center justify-center h-full w-full p-8 overflow-auto">
          {src ? (
             <img src={src} alt={activeFile} className="max-w-full max-h-full object-contain drop-shadow-2xl border border-[#2b2b2b] rounded-md bg-[#252526] p-2" />
          ) : (
-            <div className="text-[#858585]">Could not resolve image path.</div>
+            <div className="text-[#858585]">Could not preview this image.</div>
          )}
       </div>
     );
@@ -275,10 +444,11 @@ export function FileEditorView() {
   }
 
   if (useSpreadsheet) {
+    const raw = fileContents[activeFile] ?? "";
     return (
       <SpreadsheetView
         filePath={activeFile}
-        content={fileContents[activeFile] ?? ""}
+        content={ext === "xyz" ? raw.replace(/[ \t]+/g, ",") : raw}
         onChange={(value) => {
           setFileDirty(activeFile, true);
           setFileContent(activeFile, value);

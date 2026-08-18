@@ -11,18 +11,8 @@ import type { AgentId, HypothesisNode, ConfidenceProvenance, GeoDataset } from "
 // ─── System prompts (sent to LLM when key is available) ──────────────────────
 
 export const SYSTEM_PROMPTS: Record<AgentId, string> = {
-  "orchestrator-agent": `You are G-AID Orchestra, the geoscientific assistant inside the G-AID application.
-Your role is to assist the user with geophysical data analysis, workflow planning, and general inquiries.
-
-Your responsibilities:
-1. Answer questions about geophysics, structural geology, and data processing.
-2. Provide clear, concise, and helpful conversational responses.
-3. If datasets are loaded, synthesize the context into a coherent interpretation.
-4. Format your output nicely using Markdown.
-
-You are G-AID Orchestra. Never say you are DeepSeek, DeepSeek-R1, ChatGPT, Ollama, or any other third-party model. If asked who you are, say you are G-AID Orchestra.
-
-You are the face of the application. Speak directly to the user in a natural, helpful tone. Do not output raw JSON unless specifically requested.`,
+  "orchestrator-agent": `You are G-AID, a helpful assistant in the G-AID desktop app. Speak in first person as I.
+Never call yourself Orchestra or a third-party tool. Answer the user's question directly. Do not mention geophysics, surveys, or workspace files unless they asked. Do not quote instructions.`,
 
   "magnetic-agent": `You are the Magnetic Agent — a domain specialist in potential field magnetics.
 
@@ -259,7 +249,7 @@ function formatOrchestratorResponse(
     
     if (lowerQuery.includes("who are you") || lowerQuery.includes("what are you") || lowerQuery.includes("who is this")) {
       return [
-        `I am **G-AID Orchestra**, your geoscientific assistant in G-AID.`,
+        `I am **G-AID**, your assistant in this desktop app.`,
         ``,
         `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, seismic) and auto-generating structured workflows. Let me know what data we're looking at, and I can start analyzing!`,
       ].join("\n");

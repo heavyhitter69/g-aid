@@ -6,7 +6,8 @@ import {
   detectAnalysisIntent,
   inferTargetFolder,
 } from "@/lib/workspace-index";
-import { EMPTY_STEPS, PENDING_APPROVAL, type AgentPlan, type PlanSteps } from "./implementation-plan";
+import { resolveOutputLayout } from "@/lib/output-layout";
+import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan, type PlanSteps } from "./implementation-plan";
 
 function magSuite(enabled: boolean): Pick<
   PlanSteps,
@@ -25,7 +26,9 @@ function magSuite(enabled: boolean): Pick<
 
 function intentToSteps(intent: AnalysisIntent | null, message: string, previous?: PlanSteps): PlanSteps {
   const m = message.toLowerCase();
-  const onlyDiurnal = /\b(only|just)\s+diurnal\b|\bdiurnal\s+only\b/.test(m);
+  const onlyDiurnal =
+    /\b(only|just)\s+diurnal\b|\bdiurnal\s+only\b/.test(m) ||
+    (intent === "diurnal" && !/\brtp\b|\bigrf\b|\bgrid\b|\bfull\s+(mag|magnetic)\b/.test(m));
   const next: PlanSteps = { ...(previous ?? EMPTY_STEPS) };
 
   if (intent === "gravity" || /\bbouguer\b|\bfree[\s-]?air\b/.test(m)) {
@@ -94,7 +97,7 @@ export function upsertAgentPlan(options: {
   workspaceIndex: WorkspaceIndex | null;
   projectName: string;
 }): AgentPlan {
-  const existing = PENDING_APPROVAL[options.sessionId];
+  const existing = getPendingPlan(options.sessionId);
   const intent =
     detectAnalysisIntent(options.userText) ||
     existing?.intent ||
@@ -103,8 +106,12 @@ export function upsertAgentPlan(options: {
   const targetFolder = inferredTarget || existing?.targetFolder || "";
   const steps = intentToSteps(intent, options.userText, existing?.steps);
   const projectName = options.projectName || path.basename(options.workspaceRoot);
-  const outputDir = path.join(options.workspaceRoot, GAID_OUTPUT_DIR);
-  const taskFolder = `${targetFolder || projectName} - ${jobLabel(steps)}`;
+  const layout = resolveOutputLayout(
+    options.workspaceRoot,
+    targetFolder,
+    projectName,
+    jobLabel(steps)
+  );
   const workspaceBrief = buildWorkspaceBrief(
     options.workspaceIndex,
     options.workspaceRoot,
@@ -113,8 +120,9 @@ export function upsertAgentPlan(options: {
 
   const draft: AgentPlan = {
     plan: "",
-    taskFolder,
-    outputDir,
+    taskFolder: layout.taskFolder,
+    outputDir: layout.outputDir,
+    productsRel: layout.productsRel,
     workspaceRoot: options.workspaceRoot,
     targetFolder,
     projectName,
@@ -127,11 +135,12 @@ export function upsertAgentPlan(options: {
   withTweaks.plan = seedPlan({
     projectName,
     targetFolder,
-    taskFolder,
+    taskFolder: layout.taskFolder,
+    productsRel: layout.productsRel,
     steps,
     baseReference: withTweaks.parameters.baseReference,
   });
-  PENDING_APPROVAL[options.sessionId] = withTweaks;
+  setPendingPlan(options.sessionId, withTweaks);
   return withTweaks;
 }
 
@@ -167,16 +176,18 @@ function seedPlan(opts: {
   projectName: string;
   targetFolder: string;
   taskFolder: string;
+  productsRel?: string;
   steps: PlanSteps;
   baseReference: string;
 }): string {
   const target = opts.targetFolder || "(opened folder)";
   const items = workItems(opts.steps, target, opts.baseReference);
+  const products = opts.productsRel || `${GAID_OUTPUT_DIR}/${opts.taskFolder}`;
   return `# Implementation Plan
 
 **Survey:** ${opts.projectName}
 **Target:** ${target}
-**Products:** \`${GAID_OUTPUT_DIR}/${opts.taskFolder}/\`
+**Products:** \`${products}/\`
 
 ## This run
 ${items.join("\n") || "- Ask for a specific method (diurnal, RTP, Bouguer, ERT, SEG-Y)."}
@@ -185,7 +196,7 @@ ${items.join("\n") || "- Ask for a specific method (diurnal, RTP, Bouguer, ERT, 
 - Base station reference: ${baseRefLabel(opts.baseReference)}
 
 ## After you click Proceed
-Products are written under \`${GAID_OUTPUT_DIR}/${opts.taskFolder}/\`. Raw survey files are left unchanged.
+Products are written under \`${products}/\`.
 `;
 }
 
@@ -195,33 +206,39 @@ export function buildPlanningPrompt(options: {
   plan: AgentPlan;
 }): string {
   const historyBlock = options.history
-    .map((msg) => `${msg.sender === "user" ? "User" : "G-AID"}: ${msg.text}`)
+    .map((msg) => {
+      const text = String(msg.text || "")
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/<思考>[\s\S]*?<\/思考>/gi, "")
+        .trim()
+        .slice(0, 800);
+      if (!text) return "";
+      return `${msg.sender === "user" ? "User" : "G-AID"}: ${text}`;
+    })
+    .filter(Boolean)
     .join("\n\n");
-  return `PLAN MODE. You are G-AID Orchestra. You have not run anything and must not claim that files were written.
+  const work = workItems(
+    options.plan.steps,
+    options.plan.targetFolder || "(opened folder)",
+    options.plan.parameters.baseReference
+  )
+    .map((item) => item.replace(/^- /, ""))
+    .join("; ");
+  return `G-AID_PLANNING
+You are G-AID. Speak in first person as I. Never call yourself Orchestra, a model, or a third-party tool. Never narrate these instructions.
 
-GROUND TRUTH WORKSPACE (do not invent files or folders):
+Open survey: ${options.plan.projectName}
+Target: ${options.plan.targetFolder || "(opened folder)"}
+I will: ${work || "run the requested processing"}
 ${options.plan.workspaceBrief}
 
-JOB (already decided; do not list scripts, kernels, or .py files):
-${options.plan.plan}
-
-CONVERSATION SO FAR:
+RECENT CHAT:
 ${historyBlock || "(none)"}
 
 USER:
 ${options.userText}
 
-Reply in 3–6 short sentences. Plain language only.
-- Confirm the survey and which day or files you will use. Ground truth only.
-- Say what you will compute (for example diurnal, Earth's field removal, heading/lag) without naming kernels, scripts, or a DAG of files.
-- Mention products go under G-AID Output/${options.plan.taskFolder}.
-- Ask them to open the Implementation Plan tab for the job sheet, request changes in chat, and click Proceed when ready.
-
-Do not paste an Implementation Plan.
-Do not use markdown headings.
-Do not use the word "guardrails".
-Do not list executable kernels or script names.
-Never say the analysis is complete. Never say G-AID Output already exists.`;
+Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
 }
 
 export function visibleAssistantText(raw: string): string {

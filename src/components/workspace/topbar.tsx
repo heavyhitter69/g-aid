@@ -8,14 +8,12 @@ import { cn } from "@/lib/utils";
 import { isDesktop } from "@/lib/desktop";
 import { openWorkspaceFolder } from "@/lib/open-workspace";
 
-function CursorChatIcon({ className }: { className?: string }) {
+function CursorChatIcon({ className, active }: { className?: string; active?: boolean }) {
   return (
-    <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden>
+    <svg viewBox="0 0 16 16" className={className} aria-hidden>
       <path
         d="M3.25 2.75h9.5A1.75 1.75 0 0 1 14.5 4.5v5.75a1.75 1.75 0 0 1-1.75 1.75H8.06L5.2 14.4a.4.4 0 0 1-.7-.27v-2.13H3.25A1.75 1.75 0 0 1 1.5 10.25V4.5A1.75 1.75 0 0 1 3.25 2.75Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
+        fill={active ? "#ffffff" : "#9B9B9B"}
       />
     </svg>
   );
@@ -24,7 +22,8 @@ function CursorChatIcon({ className }: { className?: string }) {
 export function Topbar() {
   const { 
     currentProject, 
-    toggleChatPanel, 
+    toggleChatPanel,
+    isChatPanelOpen,
     setActiveLeftSidebarTab,
     setLeftSidebarOpen,
     openWorkbenchTab,
@@ -46,6 +45,16 @@ export function Topbar() {
     setDesktop(isDesktop());
   }, []);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toLowerCase() !== "n") return;
+      event.preventDefault();
+      void window.gaidDesktop?.openNewWindow?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Flat interface — all properties optional so any property access is safe
   // after `item.type === "divider"` early-return guard in the render loop
   interface MenuItem {
@@ -59,6 +68,8 @@ export function Topbar() {
   }
 
   const fileMenuItems: MenuItem[] = [
+    { label: "New Window", shortcut: "Ctrl+Shift+N", action: "new-window" },
+    { type: "divider" },
     { label: "Open File...", shortcut: "Ctrl+O", action: "open-file" },
     { label: "Open Folder...", shortcut: "Ctrl+M Ctrl+O", action: "open-folder" },
     { label: "Open Workspace from File..." },
@@ -146,6 +157,8 @@ export function Topbar() {
                       onClick={() => {
                         if (isAutoSave) {
                           setAutoSave(!autoSave);
+                        } else if (item.action === "new-window") {
+                          void window.gaidDesktop?.openNewWindow?.();
                         } else if (item.action === "settings") {
                           openWorkbenchTab("settings", "settings", "Settings");
                         } else if (item.action === "open-file") {
@@ -266,10 +279,11 @@ export function Topbar() {
         <div className="relative group flex items-center h-full">
           <button 
             onClick={toggleChatPanel} 
-            className="h-full px-2 hover:bg-white/10 flex items-center justify-center transition-colors"
+            className="h-full px-2 flex items-center justify-center transition-colors hover:bg-white/10"
             title="Chat"
+            aria-pressed={isChatPanelOpen}
           >
-            <CursorChatIcon className="h-[16px] w-[16px]" />
+            <CursorChatIcon className="h-[16px] w-[16px]" active={isChatPanelOpen} />
           </button>
           <div className="absolute top-[105%] left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2b2b2b] text-[#cccccc] text-[10px] px-2 py-1 rounded shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-150 z-50 whitespace-nowrap font-sans font-medium">
             Chat

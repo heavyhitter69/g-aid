@@ -99,18 +99,48 @@ export function SpreadsheetView({
     [parsedRows]
   );
 
-  const displayRowCount = Math.min(rowCount, EDITOR_PREVIEW_ROW_CAP);
-  const capped = parsedRows.length > EDITOR_PREVIEW_ROW_CAP;
+  const isDesktop =
+    typeof window !== "undefined" && Boolean(window.gaidDesktop);
+  const displayRowCount = isDesktop
+    ? rowCount
+    : Math.min(rowCount, EDITOR_PREVIEW_ROW_CAP);
+  const capped = !isDesktop && parsedRows.length > EDITOR_PREVIEW_ROW_CAP;
+  const virtualize = displayRowCount > 64;
+
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewH, setViewH] = useState(480);
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const sync = () => setViewH(el.clientHeight);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [filePath]);
+
+  const visStart = virtualize
+    ? Math.max(0, Math.floor(scrollTop / DEFAULT_ROW_H) - 20)
+    : 0;
+  const visEnd = virtualize
+    ? Math.min(
+        displayRowCount,
+        visStart + Math.ceil(viewH / DEFAULT_ROW_H) + 40
+      )
+    : displayRowCount;
 
   useEffect(() => {
     setSelection({ startRow: 0, startCol: 0, endRow: 0, endCol: 0 });
     setColWidths(Array.from({ length: colCount }, () => DEFAULT_COL_W));
-    setRowHeights(Array.from({ length: displayRowCount }, () => DEFAULT_ROW_H));
+    setRowHeights(virtualize ? [] : Array.from({ length: displayRowCount }, () => DEFAULT_ROW_H));
     setEditingCell(null);
-  }, [filePath, colCount, displayRowCount]);
+    setScrollTop(0);
+  }, [filePath, colCount, displayRowCount, virtualize]);
 
   const getColWidth = (col: number) => colWidths[col] ?? DEFAULT_COL_W;
-  const getRowHeight = (row: number) => rowHeights[row] ?? DEFAULT_ROW_H;
+  const getRowHeight = (row: number) =>
+    virtualize ? DEFAULT_ROW_H : (rowHeights[row] ?? DEFAULT_ROW_H);
 
   const getCell = (row: number, col: number): string =>
     parsedRows[row]?.[col] ?? "";
@@ -333,7 +363,13 @@ export function SpreadsheetView({
         </div>
       )}
 
-      <div ref={gridRef} className="flex-1 min-h-0 overflow-auto bg-[#e8e8e8] relative spreadsheet-container">
+      <div
+        ref={gridRef}
+        className="flex-1 min-h-0 overflow-auto bg-[#e8e8e8] relative spreadsheet-container"
+        onScroll={(e) => {
+          if (virtualize) setScrollTop(e.currentTarget.scrollTop);
+        }}
+      >
         <table
           className="border-collapse text-[11px] spreadsheet-grid"
           style={{ tableLayout: "fixed" }}
@@ -383,7 +419,16 @@ export function SpreadsheetView({
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: displayRowCount }).map((_, row) => {
+            {virtualize && visStart > 0 ? (
+              <tr style={{ height: visStart * DEFAULT_ROW_H }}>
+                <td
+                  colSpan={colCount + 1}
+                  style={{ height: visStart * DEFAULT_ROW_H, padding: 0, border: 0 }}
+                />
+              </tr>
+            ) : null}
+            {Array.from({ length: visEnd - visStart }).map((_, i) => {
+              const row = visStart + i;
               const rowSelected =
                 selection.startRow <= row &&
                 selection.endRow >= row &&
@@ -487,6 +532,18 @@ export function SpreadsheetView({
                 </tr>
               );
             })}
+            {virtualize && visEnd < displayRowCount ? (
+              <tr style={{ height: (displayRowCount - visEnd) * DEFAULT_ROW_H }}>
+                <td
+                  colSpan={colCount + 1}
+                  style={{
+                    height: (displayRowCount - visEnd) * DEFAULT_ROW_H,
+                    padding: 0,
+                    border: 0,
+                  }}
+                />
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -516,6 +573,9 @@ export function SpreadsheetView({
         </button>
         <span className="ml-auto pr-2 text-[10px] text-[#888] truncate max-w-[40%]">
           {fileName}
+          {parsedRows.length
+            ? ` · ${parsedRows.length.toLocaleString()} rows`
+            : ""}
           {selRows > 1 || selCols > 1
             ? ` · ${selRows}×${selCols} selected`
             : ""}

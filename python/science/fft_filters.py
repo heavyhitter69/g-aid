@@ -227,11 +227,51 @@ def downward_continue(grid: Grid, height_m: float, alpha: float = 0.5) -> Grid:
     return grid.copy_with(_crop(out, pads, grid.values.shape), name=f"dc_{int(height_m)}m", units=grid.units)
 
 
-def derivative_suite(grid: Grid) -> dict[str, Grid]:
-    return {
+def butterworth_highpass(grid: Grid, cutoff_m: float, order: int = 4) -> Grid:
+    """Isotropic Butterworth high-pass. Cutoff is wavelength in metres."""
+    spec, pads, kx, ky, k = _fft_prepare(grid)
+    kc = 2.0 * np.pi / max(float(cutoff_m), grid.dx)
+    hp = 1.0 / (1.0 + (kc / np.where(k == 0.0, 1.0, k)) ** (2 * int(order)))
+    hp[0, 0] = 0.0
+    out = np.real(np.fft.ifft2(spec * hp))
+    return grid.copy_with(_crop(out, pads, grid.values.shape), name=f"hp_{int(cutoff_m)}m", units=grid.units)
+
+
+def decorrugate(grid: Grid, line_spacing_m: float, flight_azimuth_deg: float = 0.0) -> Grid:
+    """Directional Butterworth high-pass across flight lines (Minty 1991-style decorrugation).
+
+    Flight azimuth 0 = northbound. Cutoff wavelength = 4 × line spacing.
+    """
+    spec, pads, kx, ky, k = _fft_prepare(grid)
+    az = math.radians(float(flight_azimuth_deg))
+    k_across = kx * math.cos(az) + ky * math.sin(az)
+    cutoff = 2.0 * math.pi / max(4.0 * float(line_spacing_m), grid.dx)
+    hp = (k_across ** 2) / (k_across ** 2 + cutoff ** 2)
+    out = np.real(np.fft.ifft2(spec * hp))
+    g = grid.copy_with(_crop(out, pads, grid.values.shape), name="decorrugated", units=grid.units)
+    g.metadata = {**grid.metadata, "line_spacing_m": float(line_spacing_m), "flight_azimuth_deg": float(flight_azimuth_deg)}
+    return g
+
+
+def pseudo_gravity(grid: Grid) -> Grid:
+    """Baranov (1957) pseudo-gravity: integrate TMI in wavenumber domain (× 1/|k|).
+
+    Apply to an RTP grid when possible. Output units are relative (nT·m).
+    """
+    spec, pads, kx, ky, k = _fft_prepare(grid)
+    operator = np.where(k == 0.0, 0.0, 1.0 / k)
+    out = np.real(np.fft.ifft2(spec * operator))
+    return grid.copy_with(_crop(out, pads, grid.values.shape), name="pseudo_gravity", units=f"{grid.units}·m")
+
+
+def derivative_suite(grid: Grid, downward_m: float = 50.0) -> dict[str, Grid]:
+    suite = {
         "analytic_signal": analytic_signal(grid),
         "1vd": vertical_derivative(grid, 1),
         "2vd": vertical_derivative(grid, 2),
         "thd": total_horizontal_derivative(grid),
         "tilt": tilt_angle(grid),
     }
+    if downward_m and downward_m > 0:
+        suite[f"dc_{int(downward_m)}m"] = downward_continue(grid, downward_m)
+    return suite

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Trash2, X } from "lucide-react";
 import { useAppStore, type Conversation } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import { displayConversationTopic } from "@/lib/conversation-title";
 
 interface ConversationHistoryModalProps {
   onClose: () => void;
@@ -29,6 +30,14 @@ function formatTimeAgo(iso?: string): string {
   return `${yr} yr${yr === 1 ? "" : "s"} ago`;
 }
 
+function firstUserText(convo: Conversation): string {
+  return convo.messages.find((message) => message.sender === "user")?.text || "";
+}
+
+function topicOf(convo: Conversation): string {
+  return displayConversationTopic(convo.topic, firstUserText(convo));
+}
+
 function lastResponseAt(convo: Conversation): string | undefined {
   for (let i = convo.messages.length - 1; i >= 0; i--) {
     const message = convo.messages[i];
@@ -45,6 +54,7 @@ export function ConversationHistoryModal({ onClose }: ConversationHistoryModalPr
     conversations,
     activeConversationId,
     setActiveConversationId,
+    openChatFromHistory,
     setChatPanelOpen,
     removeConversation,
     currentProject,
@@ -82,9 +92,11 @@ export function ConversationHistoryModal({ onClose }: ConversationHistoryModalPr
     };
   }, [onClose]);
 
-  const filteredConvos = conversations.filter(
-    (c) => c.messages.length > 0 && c.topic.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConvos = conversations.filter((c) => {
+    if (!c.messages.length) return false;
+    const haystack = `${topicOf(c)} ${firstUserText(c)}`.toLowerCase();
+    return haystack.includes(searchQuery.toLowerCase());
+  });
 
   const currentConvos = filteredConvos.filter((c) => c.id === activeConversationId);
   const runningConvos = filteredConvos.filter((c) => c.isGenerating && c.id !== activeConversationId);
@@ -98,8 +110,7 @@ export function ConversationHistoryModal({ onClose }: ConversationHistoryModalPr
   const orderedConvos = [...currentConvos, ...runningConvos, ...recentConvos];
 
   const openInCurrentWindow = (convo: Conversation) => {
-    setActiveConversationId(convo.id);
-    setChatPanelOpen(true);
+    openChatFromHistory(convo.id);
     onClose();
   };
 
@@ -271,7 +282,7 @@ export function ConversationHistoryModal({ onClose }: ConversationHistoryModalPr
                               )}
                             >
                               <div className="flex items-baseline gap-2 min-w-0 flex-1">
-                                <span className="truncate font-medium">{convo.topic}</span>
+                                <span className="truncate font-medium">{topicOf(convo)}</span>
                                 {currentProject && (
                                   <span className="truncate text-[11px] text-[#666] font-normal max-w-[38%]">
                                     {currentProject}

@@ -4,7 +4,7 @@
  */
 
 import type { NextRequest } from "next/server";
-import { PENDING_APPROVAL } from "./implementation-plan";
+import { getPendingPlan } from "./implementation-plan";
 import { buildPlanningPrompt, upsertAgentPlan } from "./agent-plan";
 import { patchStreamEpilogue } from "./stream-epilogue";
 import { streamPlanDecision } from "../execute-plan";
@@ -14,18 +14,12 @@ import {
   splitUserAndContext,
   type WorkspaceIndex,
 } from "@/lib/workspace-index";
+import { streamOrchestra } from "@/lib/ollama-orchestra";
+import type { PluginState } from "@/lib/plugins";
+import { resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const ORCHESTRA_IDENTITY = `You are G-AID Orchestra. Never say you are DeepSeek or any other model. If asked who you are, say you are G-AID Orchestra.
-
-`;
-
-function withOrchestraIdentity(message: string): string {
-  if (message.startsWith("You are G-AID Orchestra")) return message;
-  return `${ORCHESTRA_IDENTITY}${message}`;
-}
 
 const encoder = new TextEncoder();
 
@@ -42,7 +36,7 @@ function streamAgentResponse(
             agentId: "orchestrator-agent",
             confidence: 0.9,
             showConfidence: true,
-            capabilityTrace: ["G-AID Orchestra"],
+            capabilityTrace: ["G-AID"],
             ...preamble,
           })}\n`
         )
@@ -70,7 +64,7 @@ async function proxyPython(
       pythonResponse = await fetch("http://127.0.0.1:8000/api/v1/orchestrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: withOrchestraIdentity(prompt), session_id: sessionId }),
+        body: JSON.stringify({ prompt, session_id: sessionId }),
       });
       break;
     } catch (err) {
@@ -99,6 +93,32 @@ async function proxyPython(
   });
 }
 
+async function proxyOrchestra(
+  prompt: string,
+  sessionId: string,
+  epiloguePatch?: Record<string, unknown>,
+  onComplete?: (raw: string) => void,
+  lookupQuery?: string,
+  pluginState?: Partial<PluginState>,
+  speed?: "fast" | "thinking",
+  resumePartial?: string
+): Promise<Response> {
+  try {
+    const body = await streamOrchestra(prompt, { lookupQuery, pluginState, speed, resumePartial });
+    const patched = epiloguePatch
+      ? patchStreamEpilogue(body, epiloguePatch, onComplete)
+      : body;
+    return new Response(patched, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Transfer-Encoding": "chunked",
+      },
+    });
+  } catch {
+    return proxyPython(prompt, sessionId, epiloguePatch, onComplete);
+  }
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
   let body;
   try {
@@ -107,20 +127,23 @@ export async function POST(request: NextRequest): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { message, sessionId, workspaceRoot, workspaceIndex, projectName, history } = body as {
+  const { message, sessionId, workspaceRoot, workspaceIndex, projectName, history, pluginState, orchestraChoice, resumePartial } = body as {
     message?: string;
     sessionId?: string;
     workspaceRoot?: string;
     workspaceIndex?: WorkspaceIndex | null;
     projectName?: string;
     history?: { sender: string; text: string }[];
+    pluginState?: Partial<PluginState>;
+    orchestraChoice?: OrchestraChoice | string;
+    resumePartial?: string;
   };
   if (!message || !sessionId) {
     return Response.json({ error: "message and sessionId are required" }, { status: 400 });
   }
 
   const { userText } = splitUserAndContext(message);
-  const pending = PENDING_APPROVAL[sessionId];
+  const pending = getPendingPlan(sessionId);
   const intent = detectAnalysisIntent(userText);
   const root = typeof workspaceRoot === "string" ? workspaceRoot.trim() : "";
 
@@ -131,6 +154,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   const planTurn = Boolean(intent || pending);
+  const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn });
   if (planTurn && !root) {
     return streamAgentResponse(
       "Open the survey folder first (**File → Open Folder**). Open the main survey (for example TEMA SURVEY), not a single day, so I can see DAY 1, DAY 2, … and write results to `G-AID Output` under that folder.",
@@ -152,7 +176,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         history: Array.isArray(history) ? history.slice(-8) : [],
         plan,
       });
-      return await proxyPython(
+      return await proxyOrchestra(
         prompt,
         sessionId,
         {
@@ -160,11 +184,15 @@ export async function POST(request: NextRequest): Promise<Response> {
           awaitingApproval: true,
           taskFolder: plan.taskFolder,
           implementationPlanContent: plan.plan,
-        }
+        },
+        undefined,
+        undefined,
+        undefined,
+        speed
       );
     }
 
-    return await proxyPython(message, sessionId);
+    return await proxyOrchestra(message, sessionId, undefined, undefined, userText, pluginState, speed, resumePartial);
   } catch (error: unknown) {
     console.error("Failed to proxy to Python backend:", error);
     const err = error as { message?: string };

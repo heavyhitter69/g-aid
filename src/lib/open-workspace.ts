@@ -6,6 +6,7 @@ import { useAppStore } from "@/store/app-store";
 import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
 import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
+import { writeWindowSession } from "@/lib/window-session";
 
 function folderNameFromRoot(root: string): string {
   const trimmed = root.replace(/[\\/]+$/, "");
@@ -43,6 +44,7 @@ export function applyWorkspaceIndex(index: WorkspaceIndex): void {
   store.setWorkspaceRoot(index.root, index);
   store.setCurrentProject(name, index.root, files.filter((f) => f.type === "file").length);
   store.setProjectFiles(files);
+  writeWindowSession({ workspaceRoot: index.root, currentProject: name });
   useAppStore.setState({
     workbenchTabs: [],
     fileContents: {},
@@ -59,13 +61,11 @@ export async function refreshWorkspaceIndex(): Promise<boolean> {
   if (!root || !window.gaidDesktop?.indexWorkspace) return false;
   const index = await window.gaidDesktop.indexWorkspace(root);
   const indexed = indexToProjectFiles(index);
-  const extras = store.projectFiles.filter((file) => {
-    if (isTemporaryWorkspaceFile(file.id) || isTemporaryWorkspaceFile(file.name)) return false;
-    const p = (file.path || file.id).replace(/\\/g, "/").toLowerCase();
-    return p.startsWith("g-aid output/") || p.includes("/g-aid output/");
-  });
+  const keep = store.projectFiles.filter(
+    (file) => isTemporaryWorkspaceFile(file.id) || isTemporaryWorkspaceFile(file.name)
+  );
   const byId = new Map(indexed.map((file) => [file.id, file]));
-  for (const extra of extras) {
+  for (const extra of keep) {
     if (!byId.has(extra.id)) byId.set(extra.id, extra);
   }
   const merged = [...byId.values()];
@@ -130,6 +130,158 @@ export async function createWorkspaceEntry(
     ]);
   }
   return rel;
+}
+
+export async function deleteWorkspaceEntry(rel: string): Promise<void> {
+  const prefix = sanitizeWorkspaceRelativePath(rel);
+  const store = useAppStore.getState();
+  const root = store.workspaceRoot;
+  if (root && window.gaidDesktop?.deleteWorkspacePath) {
+    await window.gaidDesktop.deleteWorkspacePath(root, prefix);
+    await refreshWorkspaceIndex();
+  } else {
+    store.setProjectFiles(
+      store.projectFiles.filter((file) => {
+        const id = file.id.replace(/\\/g, "/");
+        return id !== prefix && !id.startsWith(`${prefix}/`);
+      })
+    );
+  }
+
+  const latest = useAppStore.getState();
+  const contents = { ...latest.fileContents };
+  for (const key of Object.keys(contents)) {
+    const id = key.replace(/\\/g, "/");
+    if (id === prefix || id.startsWith(`${prefix}/`)) delete contents[key];
+  }
+  const tabs = [...latest.workbenchTabs];
+  for (const tab of tabs) {
+    if (tab.type !== "file") continue;
+    const fileId = tab.id.replace(/^file:/, "").replace(/\\/g, "/");
+    if (fileId === prefix || fileId.startsWith(`${prefix}/`)) {
+      latest.closeWorkbenchTab(tab.id);
+    }
+  }
+  const job = latest.lastJobResults;
+  if (job) {
+    const jobFolder = job.productsRel.replace(/\\/g, "/");
+    const removedJob = jobFolder === prefix || jobFolder.startsWith(`${prefix}/`);
+    if (removedJob) {
+      latest.closeWorkbenchTab("visualization");
+      useAppStore.setState({ lastJobResults: null });
+    } else if (prefix.startsWith(`${jobFolder}/`)) {
+      const files = job.files.filter((file: string) => {
+        const id = file.replace(/\\/g, "/");
+        return id !== prefix && !id.startsWith(`${prefix}/`);
+      });
+      useAppStore.setState({ lastJobResults: { ...job, files } });
+    }
+  }
+  useAppStore.setState({ fileContents: contents });
+}
+
+function posixPath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+function remapId(id: string, fromPrefix: string, toPrefix: string): string {
+  const n = posixPath(id);
+  if (n === fromPrefix) return toPrefix;
+  if (n.startsWith(`${fromPrefix}/`)) return `${toPrefix}${n.slice(fromPrefix.length)}`;
+  return id;
+}
+
+export function remapWorkspacePaths(fromPrefix: string, toPrefix: string): void {
+  const from = posixPath(fromPrefix);
+  const to = posixPath(toPrefix);
+  if (!from || from === to) return;
+  const state = useAppStore.getState();
+  const fileContents: Record<string, string> = {};
+  for (const [key, value] of Object.entries(state.fileContents)) {
+    fileContents[remapId(key, from, to)] = value;
+  }
+  const workbenchTabs = state.workbenchTabs.map((tab) => {
+    if (tab.type !== "file") return tab;
+    const old = tab.id.replace(/^file:/, "");
+    const next = remapId(old, from, to);
+    if (next === old) return tab;
+    return { ...tab, id: `file:${next}`, title: next.split("/").pop() || tab.title };
+  });
+  let activeFile = state.activeFile;
+  if (activeFile) activeFile = remapId(activeFile, from, to);
+  let activeWorkbenchTabId = state.activeWorkbenchTabId;
+  if (activeWorkbenchTabId?.startsWith("file:")) {
+    activeWorkbenchTabId = `file:${remapId(activeWorkbenchTabId.replace(/^file:/, ""), from, to)}`;
+  }
+  let lastJobResults = state.lastJobResults;
+  if (lastJobResults) {
+    lastJobResults = {
+      ...lastJobResults,
+      productsRel: remapId(lastJobResults.productsRel, from, to),
+      files: lastJobResults.files.map((file: string) => remapId(file, from, to)),
+      activeLayerId: lastJobResults.activeLayerId
+        ? remapId(lastJobResults.activeLayerId, from, to)
+        : undefined,
+    };
+  }
+  useAppStore.setState({
+    fileContents,
+    workbenchTabs,
+    activeFile,
+    activeWorkbenchTabId,
+    lastJobResults,
+  });
+}
+
+export async function moveWorkspaceEntry(fromRel: string, destFolderRel: string): Promise<string> {
+  const from = sanitizeWorkspaceRelativePath(fromRel);
+  const dest = destFolderRel ? sanitizeWorkspaceRelativePath(destFolderRel) : "";
+  const store = useAppStore.getState();
+  const root = store.workspaceRoot;
+  if (!root || !window.gaidDesktop?.moveWorkspacePath) {
+    throw new Error("Open a folder on disk first");
+  }
+  const next = await window.gaidDesktop.moveWorkspacePath(root, from, dest);
+  remapWorkspacePaths(from, next);
+  await refreshWorkspaceIndex();
+  return next;
+}
+
+export async function copyWorkspaceEntry(fromRel: string, destFolderRel: string): Promise<string> {
+  const from = sanitizeWorkspaceRelativePath(fromRel);
+  const dest = destFolderRel ? sanitizeWorkspaceRelativePath(destFolderRel) : "";
+  const store = useAppStore.getState();
+  const root = store.workspaceRoot;
+  if (!root || !window.gaidDesktop?.copyWorkspacePath) {
+    throw new Error("Open a folder on disk first");
+  }
+  const next = await window.gaidDesktop.copyWorkspacePath(root, from, dest);
+  await refreshWorkspaceIndex();
+  return next;
+}
+
+export async function renameWorkspaceEntry(fromRel: string, newName: string): Promise<string> {
+  const from = sanitizeWorkspaceRelativePath(fromRel);
+  const store = useAppStore.getState();
+  const root = store.workspaceRoot;
+  if (!root || !window.gaidDesktop?.renameWorkspacePath) {
+    throw new Error("Open a folder on disk first");
+  }
+  const next = await window.gaidDesktop.renameWorkspacePath(root, from, newName.trim());
+  remapWorkspacePaths(from, next);
+  await refreshWorkspaceIndex();
+  return next;
+}
+
+export async function cloneGitRepoAndOpen(url: string): Promise<boolean> {
+  const desktop = window.gaidDesktop;
+  if (!desktop?.cloneGitRepo || !desktop.pickFolder) {
+    throw new Error("Clone is available in the G-AID desktop app");
+  }
+  const destParent = await desktop.pickFolder({ title: "Choose a folder to clone into" });
+  if (!destParent) return false;
+  const cloned = await desktop.cloneGitRepo(url, destParent);
+  return openWorkspaceAt(cloned);
 }
 
 export async function openWorkspaceAt(root: string): Promise<boolean> {

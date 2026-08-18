@@ -2,10 +2,13 @@ import fs from "fs";
 import path from "path";
 import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
+import { workStepFromEvent } from "@/lib/work-steps";
 import {
   generateTasksMarkdown,
   checkPhaseInTasks,
-  PENDING_APPROVAL,
+  getPendingPlan,
+  clearPendingPlan,
+  setPendingPlan,
   type AgentPlan,
 } from "./orchestrate/implementation-plan";
 
@@ -24,20 +27,25 @@ const enc = (s: string) => encoder.encode(s);
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function uniquifyFolder(outputDir: string, name: string): string {
-  let candidate = name;
+  let candidate = name.replace(/[\\/]+/g, " ").trim() || "results";
+  const base = candidate;
   let n = 2;
   while (fs.existsSync(path.join(outputDir, candidate))) {
-    candidate = `${name} ${n}`;
+    candidate = `${base} ${n}`;
     n += 1;
   }
   return candidate;
 }
 
-function relativeOutput(taskFolder: string, fileName: string): string {
-  return `${GAID_OUTPUT_DIR}/${taskFolder}/${fileName}`;
+function relativeToWorkspace(workspaceRoot: string, absPath: string): string {
+  return path.relative(workspaceRoot, absPath).replace(/\\/g, "/");
 }
 
-function collectTaskFiles(outputDir: string, taskFolder: string): ProjectFileUpdate[] {
+function collectTaskFiles(
+  workspaceRoot: string,
+  outputDir: string,
+  taskFolder: string
+): ProjectFileUpdate[] {
   const skip = new Set(["implementation-plan.md", "tasks.md"]);
   const taskDir = path.join(outputDir, taskFolder);
   const projectFilesUpdates: ProjectFileUpdate[] = [];
@@ -46,11 +54,12 @@ function collectTaskFiles(outputDir: string, taskFolder: string): ProjectFileUpd
     if (skip.has(fName.toLowerCase())) continue;
     const filePath = path.join(taskDir, fName);
     if (!fs.statSync(filePath).isFile()) continue;
+    const rel = relativeToWorkspace(workspaceRoot, filePath);
     projectFilesUpdates.push({
-      id: relativeOutput(taskFolder, fName),
+      id: rel,
       name: fName,
       type: "file",
-      path: relativeOutput(taskFolder, fName),
+      path: rel,
     });
   }
   return projectFilesUpdates;
@@ -104,10 +113,14 @@ const NODE_PHASE: Record<string, string> = {
   heading_lag_corrector: "Heading and lag correction",
   tie_line_leveler: "Tie-line levelling",
   mag_gridder: "Minimum-curvature gridding",
+  grid_microleveller: "2-D microlevelling",
   rtp_filter: "RTP",
-  fft_derivatives: "FFT derivatives",
+  fft_derivatives: "MAGMAP",
+  map_composer: "Report maps",
   lineament_extractor: "Lineament extraction",
   gis_export: "GIS export",
+  microleveller: "Microlevelling",
+  euler_deconvolution: "Euler deconvolution",
   gravity_reduce: "Gravity reduction",
   regional_residual: "Regional-residual separation",
   ert_pseudosection: "ERT pseudosection",
@@ -124,7 +137,7 @@ async function runDiurnalPipeline(
   enqueue: (s: string) => void,
   onTasks: (content: string) => void,
   tasksContent: { current: string }
-): Promise<ProjectFileUpdate[]> {
+): Promise<{ files: ProjectFileUpdate[]; ok: boolean }> {
   const { MagneticPreprocessingPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
   const pipeline = new MagneticPreprocessingPipeline();
   const pipelineParams = {
@@ -143,9 +156,11 @@ async function runDiurnalPipeline(
   };
 
   const checked = new Set<string>();
-  await pipeline.runPipeline([], async (event) => {
+  let failed = false;
+  const ok = await pipeline.runPipeline([], async (event) => {
     if (event.type === "NODE_PROGRESS") {
-      enqueue(`- 🔧 **${event.nodeId || "Step"}**: ${event.message}\n`);
+      const step = workStepFromEvent(event.nodeId, event.message || "");
+      if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
       const phase = event.nodeId ? NODE_PHASE[event.nodeId] : undefined;
       if (phase && !checked.has(phase)) {
         checked.add(phase);
@@ -153,6 +168,7 @@ async function runDiurnalPipeline(
         onTasks(tasksContent.current);
       }
     } else if (event.type === "NODE_COMPLETED" && event.nodeId) {
+      enqueue(`\x02${JSON.stringify({ type: "work_step", id: event.nodeId, done: true })}\n`);
       const phase = NODE_PHASE[event.nodeId];
       if (phase && !checked.has(phase)) {
         checked.add(phase);
@@ -160,20 +176,29 @@ async function runDiurnalPipeline(
         onTasks(tasksContent.current);
       }
     } else if (event.type === "QC_WARNING") {
-      enqueue(`- ⚠️ **QC ${event.severity?.toUpperCase()}**: ${event.message}\n`);
+      enqueue(`\x02${JSON.stringify({
+        type: "work_step",
+        id: `qc:${event.message?.slice(0, 40)}`,
+        label: event.message || "Quality note",
+        status: "warning",
+      })}\n`);
     } else if (event.type === "PIPELINE_FAILED") {
+      failed = true;
       enqueue(`- ❌ **Pipeline Error**: ${event.message}\n`);
     }
   }, pipelineParams);
 
-  return collectTaskFiles(pending.outputDir, pending.taskFolder);
+  return {
+    files: collectTaskFiles(pending.workspaceRoot, pending.outputDir, pending.taskFolder),
+    ok: Boolean(ok) && !failed,
+  };
 }
 
 export function streamPlanDecision(sessionId: string, decision: "approve" | "reject"): ReadableStream<Uint8Array> {
   return new ReadableStream({
     async start(controller) {
       const enqueue = (s: string) => controller.enqueue(enc(s));
-      const pending = PENDING_APPROVAL[sessionId];
+      const pending = getPendingPlan(sessionId);
       try {
         if (!pending) {
           enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0 })}\n`);
@@ -186,21 +211,29 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
         if (decision === "reject") {
           enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0.8 })}\n`);
           await delay(40);
-          enqueue("Plan cancelled. Raw survey files were not changed.");
-          delete PENDING_APPROVAL[sessionId];
+          enqueue("Plan cancelled.");
+          clearPendingPlan(sessionId);
           enqueue(`\n\x02${JSON.stringify({ type: "execution_complete", awaitingApproval: false })}\n`);
           controller.close();
           return;
         }
 
-        pending.taskFolder = uniquifyFolder(pending.outputDir, pending.taskFolder);
+        const dest = path.join(pending.outputDir, pending.taskFolder);
+        if (!fs.existsSync(dest)) {
+          pending.taskFolder = uniquifyFolder(pending.outputDir, pending.taskFolder);
+        }
+        pending.productsRel = path
+          .relative(pending.workspaceRoot, path.join(pending.outputDir, pending.taskFolder))
+          .replace(/\\/g, "/");
         fs.mkdirSync(path.join(pending.outputDir, pending.taskFolder), { recursive: true });
+        setPendingPlan(sessionId, pending);
 
         const tasksContent = { current: generateTasksMarkdown(pending) };
 
         enqueue(`\x00${JSON.stringify({
           agentId: "magnetic-agent",
-          confidence: 0.95,
+          confidence: 0,
+          showConfidence: false,
           capabilityTrace: pending.steps.diurnal ? ["diurnal-correction"] : ["planning"],
         })}\n`);
         enqueue(`\x02${JSON.stringify({
@@ -208,7 +241,7 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           projectFilesUpdates: [tasksUpdate(tasksContent.current, true)],
         })}\n`);
         await delay(40);
-        enqueue(`**Plan approved.** Created \`tasks.md\` and working through it. Products go to \`${GAID_OUTPUT_DIR}/${pending.taskFolder}/\`. Raw files will not be modified.\n\n`);
+        enqueue(`**Plan approved.** Working through the checklist.\n\n`);
 
         const onTasks = (content: string) => {
           enqueue(`\x02${JSON.stringify({
@@ -224,13 +257,15 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           pending.steps.igrf ||
           pending.steps.grid ||
           pending.steps.rtp;
+        let ranOk = true;
         if (mag) {
           const created = await runDiurnalPipeline(pending, enqueue, onTasks, tasksContent);
-          projectFilesUpdates.push(...created);
+          projectFilesUpdates.push(...created.files);
+          ranOk = created.ok;
         }
 
         if (pending.steps.gravity || pending.steps.ert || pending.steps.seismic || pending.steps.gpr || pending.steps.radiometrics) {
-          const { GravityPipeline, ResistivityPipeline, SeismicPipeline } = await import(
+          const { GravityPipeline, ResistivityPipeline, SeismicPipeline, GprPipeline, RadiometricPipeline } = await import(
             "@/pipeline/MagneticPreprocessingPipeline"
           );
           const { PipelineEngine } = await import("@/pipeline/PipelineEngine");
@@ -240,6 +275,7 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
             else if (pending.steps.seismic) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".sgy", ".segy"]);
             else if (pending.steps.gpr) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".dzt"]);
             else if (pending.steps.radiometrics) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".csv"]);
+            else pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".las"]);
           }
           const extraParams = {
             projectName: pending.projectName,
@@ -252,50 +288,99 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
             steps: pending.steps,
           };
           const runExtra = async (pipeline: InstanceType<typeof PipelineEngine>) => {
-            await pipeline.runPipeline([], async (event) => {
+            const extraOk = await pipeline.runPipeline([], async (event) => {
               if (event.type === "NODE_PROGRESS") {
-                enqueue(`- 🔧 **${event.nodeId || "Step"}**: ${event.message}\n`);
+                const step = workStepFromEvent(event.nodeId, event.message || "");
+                if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
                 const phase = event.nodeId ? NODE_PHASE[event.nodeId] : undefined;
                 if (phase) {
                   tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
                   onTasks(tasksContent.current);
                 }
               } else if (event.type === "QC_WARNING") {
-                enqueue(`- ⚠️ **QC ${event.severity?.toUpperCase()}**: ${event.message}\n`);
+                enqueue(`\x02${JSON.stringify({
+                  type: "work_step",
+                  id: `qc:${event.message?.slice(0, 40)}`,
+                  label: event.message || "Quality note",
+                  status: "warning",
+                })}\n`);
               } else if (event.type === "PIPELINE_FAILED") {
+                ranOk = false;
                 enqueue(`- ❌ **Pipeline Error**: ${event.message}\n`);
               }
             }, extraParams);
+            if (!extraOk) ranOk = false;
           };
           if (pending.steps.gravity) await runExtra(new GravityPipeline());
           if (pending.steps.ert) await runExtra(new ResistivityPipeline());
           if (pending.steps.seismic) await runExtra(new SeismicPipeline());
+          if (pending.steps.gpr) await runExtra(new GprPipeline());
+          if (pending.steps.radiometrics) await runExtra(new RadiometricPipeline());
         }
 
-        const latest = collectTaskFiles(pending.outputDir, pending.taskFolder);
+        const lasPath = findWorkspaceFile(pending.workspaceRoot, [".las"]);
+        if (lasPath) {
+          const { WellLogPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
+          const lasPipe = new WellLogPipeline();
+          const lasOk = await lasPipe.runPipeline([], async (event) => {
+            if (event.type === "NODE_PROGRESS") {
+              const step = workStepFromEvent(event.nodeId, event.message || "");
+              if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
+            } else if (event.type === "PIPELINE_FAILED") {
+              ranOk = false;
+              enqueue(`- ❌ **Pipeline Error**: ${event.message}\n`);
+            }
+          }, {
+            projectName: pending.projectName,
+            targetFolder: pending.targetFolder || "",
+            taskFolder: pending.taskFolder,
+            baseDir: pending.workspaceRoot,
+            outDir: pending.outputDir,
+            inputPath: lasPath,
+            steps: pending.steps,
+          });
+          if (!lasOk) ranOk = false;
+        }
+
+        const latest = collectTaskFiles(pending.workspaceRoot, pending.outputDir, pending.taskFolder);
         const seen = new Set(projectFilesUpdates.map((f) => f.path));
         for (const file of latest) {
           if (!seen.has(file.path)) projectFilesUpdates.push(file);
         }
 
+        if (!ranOk) {
+          onTasks(tasksContent.current);
+          enqueue(`\n\nStopped. This run did not finish. Click Proceed to retry — the plan is still here.`);
+          enqueue(`\n\x02${JSON.stringify({
+            type: "execution_failed",
+            agentId: "magnetic-agent",
+            taskFolder: pending.taskFolder,
+            awaitingApproval: true,
+            projectFilesUpdates,
+          })}\n`);
+          controller.close();
+          return;
+        }
+
         tasksContent.current = checkPhaseInTasks(tasksContent.current, `Write products to ${GAID_OUTPUT_DIR}`);
         onTasks(tasksContent.current);
 
-        enqueue(`\n\n✅ **Done.** All tasks in \`tasks.md\` are complete. Products are in \`${GAID_OUTPUT_DIR}/${pending.taskFolder}/\`.`);
+        enqueue(`\n\nFinished. Results are on the map.`);
         enqueue(`\n\x02${JSON.stringify({
           type: "execution_complete",
           agentId: "magnetic-agent",
           taskFolder: pending.taskFolder,
+          productsRel: pending.productsRel,
           awaitingApproval: false,
           projectFilesUpdates,
         })}\n`);
-        delete PENDING_APPROVAL[sessionId];
+        clearPendingPlan(sessionId);
         controller.close();
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
         console.error("Plan execution failed:", errorMsg);
         enqueue(`\n❌ **Execution Failed**: ${errorMsg}`);
-        enqueue(`\n\x02${JSON.stringify({ type: "execution_failed", error: errorMsg })}\n`);
+        enqueue(`\n\x02${JSON.stringify({ type: "execution_failed", error: errorMsg, awaitingApproval: true })}\n`);
         controller.close();
       }
     },

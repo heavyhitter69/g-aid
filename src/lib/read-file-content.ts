@@ -8,6 +8,8 @@ const BINARY_EXTENSIONS = new Set([
   "exe", "dll", "so", "dylib",
   "parquet", "feather", "h5", "hdf5", "nc",
   "grd", "bin", "wasm",
+  "tif", "tiff", "ers", "bil",
+  "npz", "npy",
 ]);
 
 /** Hard reject — avoids loading multi‑hundred‑MB files into memory */

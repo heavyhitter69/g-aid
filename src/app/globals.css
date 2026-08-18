@@ -618,6 +618,85 @@ html.light .curated-pill-inactive:hover {
   }
 }
 
+.gaid-tree-row {
+  height: 22px;
+  position: relative;
+}
+
+.gaid-tree-sticky {
+  position: sticky;
+}
+
+.gaid-tree-indent {
+  position: absolute;
+  inset: 0 auto 0 12px;
+  display: flex;
+  pointer-events: none;
+}
+
+.gaid-tree-indent-guide {
+  width: 8px;
+  height: 100%;
+  box-sizing: border-box;
+  border-left: 1px solid transparent;
+}
+
+.gaid-tree:hover .gaid-tree-indent-guide {
+  border-left-color: rgba(136, 136, 136, 0.28);
+}
+
+.gaid-stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin-left: 1px;
+  vertical-align: -0.12em;
+  background: #c8c8c8;
+  border-radius: 1px;
+  animation: gaid-caret-blink 1.05s steps(1) infinite;
+}
+
+@keyframes gaid-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gaid-stream-caret { animation: none; opacity: 0.85; }
+}
+
+.gaid-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 6px 2px;
+}
+
+.gaid-typing-dots i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #858585;
+  animation: gaid-typing-dot 1.05s ease-in-out infinite;
+}
+
+.gaid-typing-dots i:nth-child(2) { animation-delay: 0.16s; }
+.gaid-typing-dots i:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes gaid-typing-dot {
+  0%, 70%, 100% { opacity: 0.22; transform: translateY(0); }
+  35% { opacity: 1; transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gaid-typing-dots i {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 .gaid-boot-pulse {
   animation: gaid-boot-pulse 1.7s ease-in-out infinite;
 }

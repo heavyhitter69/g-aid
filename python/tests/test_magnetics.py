@@ -1,8 +1,12 @@
-import numpy as np
+import os
 
-from science.fft_filters import analytic_signal, reduction_to_pole, vertical_derivative
+import numpy as np
+import pandas as pd
+
+from science.fft_filters import analytic_signal, pseudo_gravity, reduction_to_pole, vertical_derivative
 from science.grid import Grid, minimum_curvature
-from science.magnetics import diurnal_correct
+from science.magnetics import classify_lines, diurnal_correct, microlevel_grid, tie_line_level
+from science.map_figure import write_potential_field_map
 
 
 def _dipole_grid(inclination=90.0):
@@ -56,3 +60,88 @@ def test_diurnal_formula():
     assert method == "mean_base"
     assert abs(ref - 49910.0) < 1e-9
     assert abs(corr[0] - (50000 - 49900 + 49910)) < 1e-9
+
+
+def _level_survey() -> pd.DataFrame:
+    rows = []
+    t = 0
+    offsets = {0: 0.0, 1: 8.0, 2: -6.0, 3: 3.0}
+    for i, x in enumerate([0.0, 20.0, 40.0, 60.0]):
+        for y in np.linspace(0, 100, 51):
+            rows.append(
+                {
+                    "timestamp": t,
+                    "x": x,
+                    "y": y,
+                    "line_id": f"T{i}",
+                    "magnetic_field": 100.0 + offsets[i],
+                }
+            )
+            t += 1
+    for j, y in enumerate([0.0, 100.0]):
+        for x in np.linspace(0, 60, 31):
+            rows.append(
+                {
+                    "timestamp": t,
+                    "x": x,
+                    "y": y,
+                    "line_id": f"K{j}",
+                    "magnetic_field": 100.0,
+                }
+            )
+            t += 1
+    return pd.DataFrame(rows)
+
+
+def test_classify_traverse_and_tie():
+    info = classify_lines(_level_survey())
+    assert set(info["traverse_ids"]) == {"T0", "T1", "T2", "T3"}
+    assert set(info["tie_ids"]) == {"K0", "K1"}
+    assert info["line_spacing_m"] is not None
+    assert abs(info["line_spacing_m"] - 20.0) < 2.0
+
+
+def test_tie_line_level_holds_ties_and_cuts_mistie():
+    df = _level_survey()
+    leveled, qc = tie_line_level(df, radius_m=8.0, hold="ties", degree=0, max_shift_nT=80.0)
+    assert qc["applied"] is True
+    assert qc["rms_after_nT"] < qc["rms_before_nT"] * 0.25
+    t1 = leveled.loc[leveled["line_id"] == "T1", "magnetic_field"].mean()
+    k0 = leveled.loc[leveled["line_id"] == "K0", "magnetic_field"].mean()
+    assert abs(k0 - 100.0) < 0.2
+    assert abs(t1 - 100.0) < 1.5
+
+
+def test_microlevel_grid_clips_corrugation():
+    xs = np.linspace(0, 200, 41)
+    ys = np.linspace(0, 200, 41)
+    xx, yy = np.meshgrid(xs, ys)
+    geology = 5.0 * np.sin(xx / 40.0)
+    corrugation = 4.0 * np.sin(xx / 8.0)
+    grid = Grid(
+        values=(geology + corrugation)[::-1],
+        x0=-2.5,
+        y0=-2.5,
+        dx=5.0,
+        dy=5.0,
+        crs_epsg=32630,
+        units="nT",
+        name="tmi",
+    )
+    out, info = microlevel_grid(grid, line_spacing_m=8.0, flight_azimuth_deg=0.0, max_amp_nT=6.0)
+    assert info["applied"] is True
+    assert info["rms_removed_nT"] > 0.5
+
+
+def test_pseudo_gravity_finite():
+    g = pseudo_gravity(_dipole_grid())
+    assert np.isfinite(g.masked()).mean() > 0.9
+
+
+def test_report_map_writes_png(tmp_path):
+    path = os.path.join(tmp_path, "map_tmi.png")
+    write_potential_field_map(_dipole_grid(), path, title="TMI residual", product="TMI residual", units="nT", survey="Unit test")
+    assert os.path.isfile(path)
+    assert os.path.getsize(path) > 8000
+    with open(path, "rb") as handle:
+        assert handle.read(8) == b"\x89PNG\r\n\x1a\n"

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:electron": "electron .",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "icons": "node scripts/generate-icons.mjs",
@@ -135,6 +135,14 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "ollama/Modelfile",
+        "to": "ai/Modelfile"
+      },
+      {
+        "from": "ollama/Modelfile.fast",
+        "to": "ai/Modelfile.fast"
       }
     ]
   }

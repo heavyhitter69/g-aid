@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/store/app-store";
 import { isTemporaryWorkspaceFile, TEMP_PLAN_ID, TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
+import { buildPendingChange } from "@/lib/pending-file-changes";
 
 export { TEMP_PLAN_ID, TEMP_TASKS_ID };
 
@@ -20,11 +21,14 @@ export function applyWorkspaceFileUpdates(updates: WorkspaceFileUpdate[]): void 
   if (!updates.length) return;
   const state = useAppStore.getState();
   const files = [...state.projectFiles];
+  const pending: ReturnType<typeof buildPendingChange>[] = [];
   for (const update of updates) {
     const temporary =
       Boolean(update.temporary) ||
       isTemporaryWorkspaceFile(update.id) ||
       isTemporaryWorkspaceFile(update.name || "");
+    const previousContent = state.fileContents[update.id] ?? "";
+    const existed = files.some((file) => file.id === update.id) || previousContent.length > 0;
     if (typeof update.content === "string") {
       state.setFileContent(update.id, update.content);
     }
@@ -40,6 +44,21 @@ export function applyWorkspaceFileUpdates(updates: WorkspaceFileUpdate[]): void 
       if (idx >= 0) files.splice(idx, 1);
       continue;
     }
+    if (update.type !== "folder") {
+      const nextContent = typeof update.content === "string" ? update.content : previousContent;
+      if (!existed || nextContent !== previousContent) {
+        pending.push(
+          buildPendingChange({
+            id: update.id,
+            name: update.name,
+            path: update.path,
+            previousContent,
+            content: nextContent,
+            existed,
+          })
+        );
+      }
+    }
     if (!files.some((file) => file.id === update.id)) {
       files.push({
         id: update.id,
@@ -52,4 +71,5 @@ export function applyWorkspaceFileUpdates(updates: WorkspaceFileUpdate[]): void 
   state.setProjectFiles(
     files.filter((file) => !isTemporaryWorkspaceFile(file.id) && !isTemporaryWorkspaceFile(file.name))
   );
+  if (pending.length) state.enqueuePendingFileChanges(pending);
 }

@@ -146,7 +146,9 @@ export class PipelineEngine {
           const result = await node.execute(artifactRegistry, globalParameters);
 
           // Bubble up events
-          result.events.forEach(onEvent);
+          result.events.forEach((event) =>
+            onEvent({ ...event, nodeId: event.nodeId || node.id })
+          );
 
           if (!result.success) {
             onEvent({

@@ -22,9 +22,16 @@ import { cn } from "@/lib/utils";
 import type { StreamPreamble, OpportunityChipViewModel, HypothesisEpistemicType, AgentId } from "@/types/scientific";
 import { AgentActivity } from "@/components/workspace/agent-activity";
 import { summariseFileForAgent } from "@/lib/auto-ingest";
-import { formatWorkspaceForAgent } from "@/lib/workspace-index";
+import { formatWorkspaceForAgent, wantsWorkspaceContext } from "@/lib/workspace-index";
 import { applyWorkspaceFileUpdates } from "@/lib/workspace-files";
+import { presentJobResultsFromEpilogue } from "@/lib/job-results";
+import { refreshWorkspaceIndex } from "@/lib/open-workspace";
+import { conversationTitleFromText, displayConversationTopic, isPlaceholderTopic } from "@/lib/conversation-title";
 import { isTemporaryWorkspaceFile, TEMP_PLAN_ID } from "@/lib/workspace-file-ids";
+import { ORCHESTRA_CHOICES, pickerLabel, resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
+import { upsertWorkStep, type WorkStep } from "@/lib/work-steps";
+import { WorkingLog } from "@/components/workspace/working-log";
+import { PendingChangesCard } from "@/components/workspace/pending-changes";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -203,7 +210,91 @@ function OpportunityChip({ opp, onDismiss, onActivate }: {
   );
 }
 
+function splitExecutionNarrative(text: string): { intro: string; outro: string } {
+  const markers = [
+    "Finished. Results are on the map.",
+    "Finished. Check G-AID Output for results.",
+    "Stopped. This run did not finish. Check G-AID Output only for whatever was written before the error.",
+  ];
+  for (const marker of markers) {
+    const idx = text.lastIndexOf(marker);
+    if (idx >= 0) {
+      return { intro: text.slice(0, idx).trim(), outro: text.slice(idx).trim() };
+    }
+  }
+  return { intro: text.trim(), outro: "" };
+}
+
+const THOUGHT_ECHO = /you are g-aid|never say you are|if asked who you are|system prompt|ground truth workspace|do not paste|implementation plan tab/i;
+
+function cleanDisplayedThought(text: string): string {
+  return text
+    .replace(/<\/?(?:think|思考)>/gi, "")
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      return trimmed && !THOUGHT_ECHO.test(trimmed);
+    })
+    .join("\n")
+    .trim();
+}
+
 // ─── Streaming markdown renderer ──────────────────────────────────────────────
+
+const DONE_REMARK_PLUGINS = [remarkGfm, remarkMath];
+const DONE_REHYPE_PLUGINS = [rehypeKatex];
+
+function TypingDots() {
+  return (
+    <span className="gaid-typing-dots" aria-label="Waiting for reply">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+function useSmoothReveal(target: string, active: boolean): string {
+  const [shown, setShown] = useState(() => (active ? "" : target));
+  const shownRef = useRef(active ? "" : target);
+  const targetRef = useRef(target);
+  const activeRef = useRef(active);
+  targetRef.current = target;
+  activeRef.current = active;
+
+  useEffect(() => {
+    let frame = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const goal = targetRef.current;
+      const current = shownRef.current;
+      const streaming = activeRef.current;
+      if (current === goal) {
+        if (streaming) frame = requestAnimationFrame(tick);
+        return;
+      }
+      if (current.length > goal.length || !goal.startsWith(current)) {
+        shownRef.current = goal;
+        setShown(goal);
+        if (streaming) frame = requestAnimationFrame(tick);
+        return;
+      }
+      const dt = Math.min(48, now - last);
+      last = now;
+      const behind = goal.length - current.length;
+      const charsPerMs = !streaming ? 0.55 : behind > 480 ? 0.42 : behind > 160 ? 0.2 : 0.09;
+      const add = Math.max(1, Math.ceil(dt * charsPerMs));
+      const next = goal.slice(0, current.length + add);
+      shownRef.current = next;
+      setShown(next);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [active]);
+
+  return shown;
+}
 
 function StreamingMessage({ content, preamble, isStreaming, isThinking, showConfidence }: {
   content: string;
@@ -212,30 +303,38 @@ function StreamingMessage({ content, preamble, isStreaming, isThinking, showConf
   isThinking?: boolean;
   showConfidence?: boolean;
 }) {
-  let formattedText = content.trim();
-  
-  // Strip outer markdown wrapper if the LLM mistakenly wrapped its entire response in a code block
-  if (formattedText.startsWith("```markdown")) {
-    formattedText = formattedText.substring(11).trimStart();
-    if (formattedText.endsWith("```")) {
-      formattedText = formattedText.substring(0, formattedText.length - 3).trimEnd();
-    }
-  } else if (formattedText.startsWith("```md")) {
-    formattedText = formattedText.substring(5).trimStart();
-    if (formattedText.endsWith("```")) {
-      formattedText = formattedText.substring(0, formattedText.length - 3).trimEnd();
+  let formattedText = isStreaming ? content : content.trim();
+  if (!isStreaming) {
+    if (formattedText.startsWith("```markdown")) {
+      formattedText = formattedText.substring(11).trimStart();
+      if (formattedText.endsWith("```")) {
+        formattedText = formattedText.substring(0, formattedText.length - 3).trimEnd();
+      }
+    } else if (formattedText.startsWith("```md")) {
+      formattedText = formattedText.substring(5).trimStart();
+      if (formattedText.endsWith("```")) {
+        formattedText = formattedText.substring(0, formattedText.length - 3).trimEnd();
+      }
     }
   }
+  const revealed = useSmoothReveal(formattedText, Boolean(isStreaming && formattedText));
   return (
     <div className="space-y-1">
       <div className="space-y-0.5">
         <div className="text-[13px] leading-relaxed text-[var(--ws-text)] break-words w-full max-w-full overflow-hidden prose prose-invert prose-p:my-1 prose-pre:bg-[#1e1e1e] prose-pre:border prose-pre:border-[#2b2b2b] prose-code:text-[#d4d4d4] prose-code:bg-[#1e1e1e] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-table:border-collapse prose-table:w-full prose-td:border prose-td:border-[#2b2b2b] prose-td:p-2 prose-th:border prose-th:border-[#2b2b2b] prose-th:p-2 prose-th:bg-[#181818] prose-th:text-left">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeKatex]}
-          >
-            {formattedText}
-          </ReactMarkdown>
+          {isStreaming ? (
+            <span className="whitespace-pre-wrap">
+              {revealed}
+              {revealed ? <span className="gaid-stream-caret" aria-hidden /> : null}
+            </span>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={DONE_REMARK_PLUGINS}
+              rehypePlugins={DONE_REHYPE_PLUGINS}
+            >
+              {revealed}
+            </ReactMarkdown>
+          )}
         </div>
       </div>
       {showConfidence && preamble && !isStreaming && formattedText && (
@@ -264,16 +363,77 @@ interface EnhancedMessage {
   thought?: string;
   awaitingApproval?: boolean;
   taskFolder?: string;
+  workSteps?: WorkStep[];
+  interrupted?: boolean;
+  interruptKind?: "network" | "empty" | "stalled" | "engine";
+}
+
+function InterruptCard({
+  requestId,
+  onRetry,
+  onDismiss,
+}: {
+  requestId: string;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  const shortId = requestId.replace(/^msg_/, "").slice(0, 12);
+  return (
+    <div className="w-full max-w-[440px] rounded-xl border border-[#3d3d3d] bg-[#252526] p-4 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#e2b340]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[13px] font-semibold text-white">Connection interrupted</h3>
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="rounded p-0.5 text-[#858585] hover:bg-white/5 hover:text-white"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-[#b4b4b4]">
+            Your connection was interrupted, so this reply paused. Wait until you have a stable connection, then try again to continue from where it left off.
+          </p>
+          <div className="mt-3.5 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              className="min-w-0 truncate text-[11px] text-[#8a8a8a] hover:text-[#ccc]"
+              onClick={() => void navigator.clipboard.writeText(requestId)}
+              title="Copy request id"
+            >
+              Copy request {shortId}…
+            </button>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#3c3c3c] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#4a4a4a]"
+            >
+              Try again
+              <span className="font-mono text-[10px] text-[#9a9a9a]">Ctrl ↵</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ThoughtDisclosure({ duration, thought, isThinking }: { duration: number; thought?: string; isThinking?: boolean }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(isThinking));
   const thoughtRef = useRef<HTMLDivElement>(null);
+  const revealedThought = useSmoothReveal(thought || "", Boolean(isThinking));
+
+  useEffect(() => {
+    if (isThinking) setOpen(true);
+  }, [isThinking]);
 
   useEffect(() => {
     if (!open || !thoughtRef.current) return;
     thoughtRef.current.scrollTop = thoughtRef.current.scrollHeight;
-  }, [thought, open, isThinking]);
+  }, [revealedThought, open, isThinking]);
 
   const formatTime = (secs: number) => {
     const safe = Math.max(1, secs || 0);
@@ -304,22 +464,22 @@ function ThoughtDisclosure({ duration, thought, isThinking }: { duration: number
           <ChevronRight className="w-3.5 h-3.5 shrink-0" />
         )}
       </button>
-      {open && (isThinking || thought) && (
+      {open && (
         <div
           ref={thoughtRef}
           className="mt-3 ml-2 text-[13px] text-[#a0a0a0] leading-relaxed border-l-2 border-[#333] pl-3 max-h-[240px] overflow-y-auto scrollbar-thin"
         >
-          {thought && thought.includes("[1/") ? (
+          {revealedThought.includes("[1/") ? (
             <ul className="list-disc space-y-1 pl-4">
-              {thought.split('\n').filter(Boolean).map((line, i) => {
+              {revealedThought.split('\n').filter(Boolean).map((line, i) => {
                 const cleanLine = line.replace(/^\[\d+\/\d+\]\s*/, '');
                 return <li key={i}>{cleanLine}</li>;
               })}
             </ul>
           ) : (
             <div className="whitespace-pre-wrap font-mono text-[12px] opacity-80">
-              {thought || ""}
-              {isThinking && <span className="inline-block w-[6px] h-[12px] ml-0.5 align-[-1px] bg-[#858585] animate-pulse" />}
+              {revealedThought}
+              {isThinking ? <span className="gaid-stream-caret" aria-hidden /> : null}
             </div>
           )}
         </div>
@@ -345,15 +505,16 @@ interface InputBoxProps {
   setSelectedMode: (v: string) => void;
   modelDropdownOpen: boolean;
   setModelDropdownOpen: (v: boolean) => void;
-  selectedModel: string;
-  setSelectedModel: (v: string) => void;
+  orchestraChoice: OrchestraChoice;
+  setOrchestraChoice: (v: OrchestraChoice) => void;
+  previewSpeed: "fast" | "thinking";
   dropUp?: boolean; // when true, dropdowns open upward (input is near bottom of panel)
 }
 
 function InputBox({
   inputVal, setInputVal, handleKeyDown, handleSend, handleStop, isGenerating,
   dropdownOpen, setDropdownOpen, currentModeObj, modes, selectedMode, setSelectedMode,
-  modelDropdownOpen, setModelDropdownOpen, selectedModel, setSelectedModel,
+  modelDropdownOpen, setModelDropdownOpen, orchestraChoice, setOrchestraChoice, previewSpeed,
   dropUp = false,
 }: InputBoxProps) {
   // Dropdown anchor: open upward when input is at bottom, downward when at top
@@ -406,21 +567,25 @@ function InputBox({
             <button
               onClick={() => { setModelDropdownOpen(!modelDropdownOpen); setDropdownOpen(false); }}
               className="flex items-center gap-1 text-[9px] text-[#858585] px-1 hover:text-[#cccccc] transition-colors"
+              title="Orchestra speed"
             >
-              <span className="truncate max-w-[90px]">{selectedModel}</span>
+              <span className="truncate max-w-[140px]">{pickerLabel(orchestraChoice, previewSpeed)}</span>
               <ChevronDown className="h-2.5 w-2.5" />
             </button>
             {modelDropdownOpen && (
-              <div className={`absolute left-0 ${anchor} bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-xl w-[160px] py-1 z-50 flex flex-col text-[10px]`}>
-                {["G-AID Orchestra"].map((model) => (
+              <div className={`absolute left-0 ${anchor} bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-xl w-[240px] py-1 z-50 flex flex-col text-[10px]`}>
+                {ORCHESTRA_CHOICES.map((choice) => (
                   <button
-                    key={model}
-                    onClick={() => { setSelectedModel(model); setModelDropdownOpen(false); }}
-                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#333333] text-left text-[#cccccc] transition-colors w-full"
+                    key={choice.id}
+                    onClick={() => { setOrchestraChoice(choice.id); setModelDropdownOpen(false); }}
+                    className="flex items-start gap-2 px-3 py-1.5 hover:bg-[#333333] text-left text-[#cccccc] transition-colors w-full"
                   >
-                    <span className="flex-1">{model}</span>
-                    {selectedModel === model && (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#e1e1e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <span className="flex-1">
+                      <span className="block font-medium">{choice.label}</span>
+                      <span className="block text-[9px] text-[#858585]">{choice.hint}</span>
+                    </span>
+                    {orchestraChoice === choice.id && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#e1e1e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-1 shrink-0">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     )}
@@ -465,52 +630,6 @@ function InputBox({
   );
 }
 
-// ─── Pending Changes Widget ──────────────────────────────────────────────────
-
-function PendingChangesWidget() {
-  const pendingFileUpdates = useAppStore(state => state.pendingFileUpdates);
-  const applyPendingFileUpdates = useAppStore(state => state.applyPendingFileUpdates);
-  const clearPendingFileUpdates = useAppStore(state => state.clearPendingFileUpdates);
-
-  if (!pendingFileUpdates || pendingFileUpdates.length === 0) return null;
-
-  return (
-    <div className="bg-[#252526] border border-[#3c3c3c] rounded-lg p-2.5 mb-2 shadow-lg animate-in fade-in slide-in-from-bottom-2">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <FileText className="h-3.5 w-3.5 text-[#cccccc]" />
-          <span className="text-[12px] font-semibold text-[#cccccc]">{pendingFileUpdates.length} Files Modified</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={clearPendingFileUpdates}
-            className="text-[11px] font-medium text-[#858585] hover:text-[#cccccc] transition-colors"
-          >
-            Reject all
-          </button>
-          <button 
-            onClick={applyPendingFileUpdates}
-            className="px-2.5 py-0.5 bg-[#007acc] hover:bg-[#1b8fe3] text-white text-[11px] font-medium rounded transition-colors"
-          >
-            Accept all
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-1">
-        {pendingFileUpdates.map((file, idx) => (
-          <div key={idx} className="flex items-center justify-between px-2 py-1 bg-[#1e1e1e] rounded border border-[#2b2b2b]">
-            <span className="text-[11px] text-[#cccccc] font-mono truncate max-w-[180px]">{file.id.split('/').pop() || file.id}</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[#4caf50]">+<span className="opacity-0">0</span></span>
-              <span className="text-[10px] text-[#f44336]">-<span className="opacity-0">0</span></span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function AIPanel() {
@@ -525,6 +644,8 @@ export function AIPanel() {
     addMessageToConversation,
     toggleChatPanel,
     agentSettings,
+    setAgentSettings,
+    pluginState,
     fileContents,
     projectFiles,
     isHistoryModalOpen,
@@ -564,11 +685,15 @@ export function AIPanel() {
 
   const [selectedMode, setSelectedMode] = useState("Agent");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("G-AID Orchestra");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const orchestraChoice = (agentSettings?.orchestraChoice || "auto") as OrchestraChoice;
+  const setOrchestraChoice = (choice: OrchestraChoice) => setAgentSettings({ orchestraChoice: choice });
+  const previewSpeed = resolveOrchestraSpeed(inputVal, { choice: orchestraChoice });
   const [showLimitWarning, setShowLimitWarning] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const abortReasonRef = useRef<"user" | "stall" | "retry" | null>(null);
+  const sendGenRef = useRef(0);
   const isAutoScrollEnabled = useRef(true);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -589,18 +714,24 @@ export function AIPanel() {
   const { pendingPrompt, setPendingPrompt, setChatPanelOpen } = useAppStore();
 
   const assignAiTopic = useCallback(async (convId: string, userMsg: string, reply: string) => {
+    const fallback = conversationTitleFromText(userMsg);
     try {
       const response = await fetch("/api/agent/title", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg, reply }),
+        signal: AbortSignal.timeout(15000),
       });
       const data = await response.json().catch(() => ({}));
       const title = typeof data?.title === "string" ? data.title.trim() : "";
-      updateConversationTopic(convId, title || "New conversation");
+      if (title && !isPlaceholderTopic(title)) {
+        updateConversationTopic(convId, title);
+        return;
+      }
     } catch {
-      updateConversationTopic(convId, "New conversation");
+      /* keep the first-message title */
     }
+    if (fallback) updateConversationTopic(convId, fallback);
   }, [updateConversationTopic]);
 
   const handleAddConversation = () => {
@@ -634,65 +765,114 @@ export function AIPanel() {
       agentStore.setOrchestratorThinking(false);
     }
     
-    useAppStore.getState().clearPendingFileUpdates();
+    useAppStore.getState().clearPendingFileChanges();
     
     const newMessages = conv.messages.slice(0, msgIndex);
     setConversationState(conv.id, { messages: newMessages });
   };
 
   const handleStop = useCallback(() => {
+    abortReasonRef.current = "user";
     abortRef.current?.abort();
   }, []);
 
-  const handleSend = useCallback(async (eOrPrompt?: React.MouseEvent | React.FormEvent | string) => {
-    // If it's an event, it will be an object. If it's a direct string, it's a string.
+  const handleSend = useCallback(async (
+    eOrPrompt?: React.MouseEvent | React.FormEvent | string,
+    opts?: { resumeAgentId?: string }
+  ) => {
     const isString = typeof eOrPrompt === "string";
     if (!isString && eOrPrompt && "preventDefault" in eOrPrompt) {
       eOrPrompt.preventDefault();
     }
-    const textToSend = isString ? eOrPrompt : inputVal;
 
-    if (!textToSend.trim() || isGenerating) return;
-    const userMsg = textToSend.trim();
     const convId = activeConversation.id;
+    const resumeAgentId = opts?.resumeAgentId;
+    const liveMessages = useAppStore.getState().conversations.find((c) => c.id === convId)?.messages || [];
+    let userMsg = (isString ? eOrPrompt : inputVal).trim();
+    let agentMsgId = `msg_${Date.now()}_agent`;
+    let accumulatedText = "";
+    let resumePartial = "";
 
-    if (!isString) setInputVal("");
+    if (resumeAgentId) {
+      const idx = liveMessages.findIndex((m) => m.id === resumeAgentId);
+      const prevUser = [...liveMessages.slice(0, idx)].reverse().find((m) => m.sender === "user");
+      const agentMsg = idx >= 0 ? liveMessages[idx] : undefined;
+      if (!prevUser?.text) return;
+      userMsg = prevUser.text.trim();
+      agentMsgId = resumeAgentId;
+      resumePartial = (agentMsg?.text || "").replace(/\n\n> ❌ \*\*(?:Connection Interrupted|Intelligence Engine)[\s\S]*$/, "").trim();
+      accumulatedText = resumePartial;
+    }
 
-    const shouldTitle = activeConversation.messages.length === 0;
+    if (!userMsg || (isGenerating && !resumeAgentId)) return;
+    if (!resumeAgentId && !isString) setInputVal("");
 
-    const userMsgId = `msg_${Date.now()}_user`;
-    
-    // Persist user message to store immediately
-    addMessageToConversation(convId, { 
-      id: userMsgId,
-      sender: "user", 
-      text: userMsg,
-      timestamp: new Date().toISOString()
-    });
+    const shouldTitle = !resumeAgentId && activeConversation.messages.length === 0;
+    if (shouldTitle) {
+      const instant = conversationTitleFromText(userMsg);
+      if (instant) updateConversationTopic(convId, instant);
+    }
+
+    if (!resumeAgentId) {
+      addMessageToConversation(convId, {
+        id: `msg_${Date.now()}_user`,
+        sender: "user",
+        text: userMsg,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     isAutoScrollEnabled.current = true;
     setIsGenerating(true);
     agentStore.setOrchestratorThinking(true);
     agentStore.clearStream();
+    abortReasonRef.current = null;
     abortRef.current?.abort();
     const abort = new AbortController();
     abortRef.current = abort;
+    const sendGen = sendGenRef.current + 1;
+    sendGenRef.current = sendGen;
 
-    const agentMsgId = `msg_${Date.now()}_agent`;
     let actualThinkingStart: number | undefined;
     let thinkingDurationRecorded: number | undefined;
-    let accumulatedText = "";
     let preamble: StreamPreamble | null = null;
+    let streamError: string | null = null;
 
-    addMessageToConversation(convId, {
-      id: agentMsgId,
-      sender: "agent",
-      text: "",
-      preamble: null,
-      isStreaming: true,
-      thinkingStartedAt: Date.now(),
-      timestamp: new Date().toISOString(),
+    if (resumeAgentId) {
+      updateMessageInConversation(convId, agentMsgId, {
+        isStreaming: true,
+        interrupted: false,
+        interruptKind: undefined,
+        text: accumulatedText,
+      });
+    } else {
+      addMessageToConversation(convId, {
+        id: agentMsgId,
+        sender: "agent",
+        text: "",
+        preamble: null,
+        isStreaming: true,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    let stallTimer: ReturnType<typeof setTimeout> | null = null;
+    const speed = resolveOrchestraSpeed(userMsg, {
+      choice: orchestraChoice,
+      planTurn: selectedMode === "Plan",
     });
+    const firstStallMs = speed === "thinking" ? 180_000 : 55_000;
+    const tokenStallMs = speed === "thinking" ? 120_000 : 45_000;
+    const hasModelText = (value: string) =>
+      Boolean(value.replace(/<\/?(?:think|思考)>/gi, "").trim());
+    const armStall = (ms: number) => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        abortReasonRef.current = "stall";
+        abort.abort();
+      }, ms);
+    };
+    armStall(hasModelText(accumulatedText) ? tokenStallMs : firstStallMs);
 
     try {
       // Build file content summaries for the orchestrator
@@ -703,15 +883,15 @@ export function AIPanel() {
         .join("\n\n");
 
       const workspaceCatalog = formatWorkspaceForAgent(workspaceIndex);
-      const lowerMsg = userMsg.toLowerCase().trim();
-      const isGreeting = /^(hi|hello|hey|howdy|greetings|good\s(morning|afternoon|evening)|what's up|sup|yo)\b/.test(lowerMsg);
-      const isConversational = isGreeting || lowerMsg === "help" || lowerMsg === "who are you";
+      const attachWorkspace = wantsWorkspaceContext(userMsg);
 
       const contextBlocks: string[] = [];
-      if (workspaceCatalog && !isConversational) {
-        contextBlocks.push(`--- Workspace ---\n${workspaceCatalog}`);
+      if (workspaceCatalog && attachWorkspace) {
+        contextBlocks.push(
+          `--- Workspace ---\nUse this catalog only if the user asked about these files. Do not start a processing plan unless they asked.\n${workspaceCatalog}`
+        );
       }
-      if (fileSummaries && !isConversational) {
+      if (fileSummaries && attachWorkspace) {
         contextBlocks.push(`--- File Context ---\n${fileSummaries}`);
       }
       const enrichedMessage = contextBlocks.length
@@ -720,11 +900,16 @@ export function AIPanel() {
 
       const history = activeConversation.messages
         .filter((m) => m.text && !m.isStreaming)
-        .slice(-8)
+        .slice(-6)
         .map((m) => ({
           sender: m.sender,
-          text: m.text.slice(0, 3500),
-        }));
+          text: m.text
+            .replace(/<think>[\s\S]*?<\/think>/gi, "")
+            .replace(/<思考>[\s\S]*?<\/思考>/gi, "")
+            .trim()
+            .slice(0, 800),
+        }))
+        .filter((m) => m.text);
 
       const response = await fetch("/api/agent/orchestrate", {
         method: "POST",
@@ -738,8 +923,10 @@ export function AIPanel() {
           workspaceRoot: workspaceRoot || "",
           workspaceIndex: workspaceIndex || null,
           history,
+          pluginState,
+          orchestraChoice,
           guestId: localStorage.getItem("gaid_guest_id") || undefined,
-          model: selectedModel,
+          ...(resumePartial ? { resumePartial } : {}),
         }),
         signal: abort.signal,
       });
@@ -825,6 +1012,9 @@ let activityId: string | null = null;
               const decoded = dec.decode(textSlice, { stream: true });
               accumulatedText += decoded;
               agentStore.appendStreamToken(decoded);
+              if (hasModelText(decoded) || hasModelText(accumulatedText)) {
+                armStall(tokenStallMs);
+              }
 
               if (actualThinkingStart === undefined) {
                 if (accumulatedText.includes("<think>") || accumulatedText.includes("<思考>")) {
@@ -869,6 +1059,11 @@ let activityId: string | null = null;
                  const clean = jsonStr.replace(/^\n/, "");
                  const epilogue = JSON.parse(clean);
                  epilogueSnapshot = epilogue;
+                 if (epilogue.type === "error" || epilogue.type === "stream_error") {
+                   streamError = typeof epilogue.message === "string" && epilogue.message
+                     ? epilogue.message
+                     : "The engine stopped unexpectedly.";
+                 }
                  planAwaitingApproval = Boolean(epilogue?.awaitingApproval);
                  planTaskFolder = epilogue?.taskFolder;
                  if (epilogue.hypothesisEvents?.length) {
@@ -918,21 +1113,27 @@ let activityId: string | null = null;
         if (remaining.trim()) accumulatedText += remaining;
       }
 
-      // Finalize message
-      const thinkingDuration = thinkingDurationRecorded ?? Math.round((Date.now() - (actualThinkingStart || Date.now())) / 1000);
       const awaitingApproval = planAwaitingApproval;
+      if (sendGenRef.current !== sendGen) return;
+      const visible = accumulatedText
+        .replace(/<\/?(?:think|思考)>/gi, "")
+        .trim();
+      const empty = !visible;
+      const failed = Boolean(streamError) || empty;
 
       updateMessageInConversation(convId, agentMsgId, {
         text: accumulatedText,
         preamble,
         isStreaming: false,
-        thinkingDuration,
+        interrupted: failed,
+        interruptKind: streamError ? "engine" : empty ? "empty" : undefined,
+        ...(thinkingDurationRecorded !== undefined ? { thinkingDuration: thinkingDurationRecorded } : {}),
         thought: thought || undefined,
         awaitingApproval,
         taskFolder: planTaskFolder
       });
 
-      if (shouldTitle) {
+      if (shouldTitle && !failed) {
         void assignAiTopic(convId, userMsg, accumulatedText);
       }
 
@@ -941,31 +1142,49 @@ let activityId: string | null = null;
       agentStore.setActiveAgent(null);
 
     } catch (err) {
+      if (sendGenRef.current !== sendGen) return;
       const aborted = err instanceof DOMException && err.name === "AbortError";
-      if (aborted) {
-        const thinkingDuration = thinkingDurationRecorded ?? Math.round((Date.now() - (actualThinkingStart || Date.now())) / 1000);
+      const reason = abortReasonRef.current;
+      if (aborted && reason === "user") {
         updateMessageInConversation(convId, agentMsgId, {
           text: accumulatedText,
           preamble,
           isStreaming: false,
-          thinkingDuration,
+          interrupted: false,
+          ...(thinkingDurationRecorded !== undefined ? { thinkingDuration: thinkingDurationRecorded } : {}),
         });
       } else {
-        const errorText = `\n\n> ❌ **Connection Interrupted:** ${err instanceof Error ? err.message : "Unknown network error"}. If your machine went to sleep, the stream may have dropped.`;
-        const finalMsgText = accumulatedText ? accumulatedText + errorText : errorText.trimStart();
-        updateMessageInConversation(convId, agentMsgId, { text: finalMsgText, isStreaming: false });
+        updateMessageInConversation(convId, agentMsgId, {
+          text: accumulatedText,
+          preamble,
+          isStreaming: false,
+          interrupted: true,
+          interruptKind: aborted && reason === "stall" ? "stalled" : "network",
+          ...(thinkingDurationRecorded !== undefined ? { thinkingDuration: thinkingDurationRecorded } : {}),
+        });
       }
     } finally {
+      if (stallTimer) clearTimeout(stallTimer);
       if (abortRef.current === abort) abortRef.current = null;
-      setConversationState(convId, { isGenerating: false });
-      agentStore.setOrchestratorThinking(false);
-      agentStore.setStreaming(false);
+      if (sendGenRef.current === sendGen) {
+        setConversationState(convId, { isGenerating: false });
+        agentStore.setOrchestratorThinking(false);
+        agentStore.setStreaming(false);
+      }
     }
   }, [
     inputVal, isGenerating, activeConversation.id, activeConversation.messages, 
     addMessageToConversation, updateMessageInConversation, setConversationState, agentStore, scientificState, projectFiles, 
-    fileContents, currentProject, workspaceRoot, workspaceIndex, selectedMode, updateConversationTopic, assignAiTopic
+    fileContents, currentProject, workspaceRoot, workspaceIndex, selectedMode, updateConversationTopic, assignAiTopic, pluginState, orchestraChoice
   ]);
+
+  const handleRetryInterrupted = useCallback((agentMsgId: string) => {
+    void handleSend(undefined, { resumeAgentId: agentMsgId });
+  }, [handleSend]);
+
+  const interruptedAgent = [...enhancedMessages]
+    .reverse()
+    .find((m) => m.sender === "agent" && m.interrupted && !m.isStreaming);
 
   useEffect(() => {
     if (pendingPrompt && !isGenerating) {
@@ -979,6 +1198,11 @@ let activityId: string | null = null;
 
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && e.ctrlKey && interruptedAgent?.id && !isGenerating) {
+      e.preventDefault();
+      handleRetryInterrupted(interruptedAgent.id);
+      return;
+    }
     if (agentSettings?.submitWithCtrlEnter) {
       if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); handleSend(); }
     } else {
@@ -990,6 +1214,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
     const dec = new TextDecoder();
     const approvalMsgId = `msg_${Date.now()}_approval`;
     const thinkingStart = Date.now();
+    setConversationState(sessionId, { isGenerating: true });
     
     addMessageToConversation(sessionId, {
       id: approvalMsgId,
@@ -999,7 +1224,13 @@ const handleApproveDiurnal = async (sessionId: string) => {
       isStreaming: true,
       timestamp: new Date().toISOString(),
       thinkingStartedAt: thinkingStart,
+      workSteps: [],
     });
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+    let workSteps: WorkStep[] = [];
+    let accumulated = "";
     
     try {
       const response = await fetch("/api/agent/approve-diurnal", {
@@ -1009,12 +1240,12 @@ const handleApproveDiurnal = async (sessionId: string) => {
           sessionId,
           decision: "approve"
         }),
+        signal: abort.signal,
       });
 
       if (!response.body) throw new Error("No response body");
       
       const reader = response.body.getReader();
-      let accumulated = "";
       let preamble: StreamPreamble | null = null;
       let rawBuf = new Uint8Array(0);
 
@@ -1046,6 +1277,23 @@ const handleApproveDiurnal = async (sessionId: string) => {
               if (parsed.projectFilesUpdates && Array.isArray(parsed.projectFilesUpdates)) {
                 applyWorkspaceFileUpdates(parsed.projectFilesUpdates);
               }
+              if (parsed.type === "execution_complete") {
+                presentJobResultsFromEpilogue(parsed);
+                void refreshWorkspaceIndex();
+              }
+              if (parsed.type === "work_step") {
+                if (parsed.done) {
+                  workSteps = workSteps.map((step) =>
+                    step.status === "running" ? { ...step, status: "done" } : step
+                  );
+                } else if (parsed.id && parsed.label) {
+                  workSteps = upsertWorkStep(workSteps, {
+                    id: String(parsed.id),
+                    label: String(parsed.label),
+                    status: parsed.status === "warning" ? "warning" : "running",
+                  });
+                }
+              }
             } catch {
               /* ignore malformed control frames */
             }
@@ -1063,17 +1311,41 @@ const handleApproveDiurnal = async (sessionId: string) => {
           }
         }
         rawBuf = rawBuf.slice(pos);
-        updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: true });
+        updateMessageInConversation(sessionId, approvalMsgId, {
+          text: accumulated,
+          preamble,
+          isStreaming: true,
+          workSteps,
+        });
       }
 
       if (rawBuf.length) {
         accumulated += dec.decode(rawBuf);
       }
-      updateMessageInConversation(sessionId, approvalMsgId, { text: accumulated, preamble, isStreaming: false });
+      workSteps = workSteps.map((step) =>
+        step.status === "running" ? { ...step, status: "done" } : step
+      );
+      updateMessageInConversation(sessionId, approvalMsgId, {
+        text: accumulated,
+        preamble,
+        isStreaming: false,
+        workSteps,
+      });
 
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      updateMessageInConversation(sessionId, approvalMsgId, { text: `Approval failed: ${errorMsg}`, isStreaming: false });
+      if (err instanceof DOMException && err.name === "AbortError") {
+        updateMessageInConversation(sessionId, approvalMsgId, {
+          text: accumulated || "Stopped.",
+          isStreaming: false,
+          workSteps,
+        });
+      } else {
+        const errorMsg = err instanceof Error ? err.message : "Unknown error";
+        updateMessageInConversation(sessionId, approvalMsgId, { text: `Approval failed: ${errorMsg}`, isStreaming: false, workSteps });
+      }
+    } finally {
+      if (abortRef.current === abort) abortRef.current = null;
+      setConversationState(sessionId, { isGenerating: false });
     }
   };
 
@@ -1114,9 +1386,20 @@ const handleApproveDiurnal = async (sessionId: string) => {
                 )}
               >
                 <MessageSquare className="h-3 w-3 shrink-0" />
-                <span className="truncate flex-1">{conv.topic}</span>
+                <span className="truncate flex-1">
+                  {displayConversationTopic(
+                    conv.topic,
+                    conv.messages.find((message) => message.sender === "user")?.text
+                  )}
+                </span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); hideConversation(conv.id); }}
+                  type="button"
+                  aria-label="Close chat tab"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideConversation(conv.id);
+                  }}
                   className="p-0.5 rounded hover:bg-[#333333] hover:text-white text-[#858585] shrink-0 transition-colors"
                 >
                   <X className="h-2.5 w-2.5" />
@@ -1164,36 +1447,49 @@ const handleApproveDiurnal = async (sessionId: string) => {
         </div>
       </div>
 
-      {/* Main layout: input floats top until first send, then moves to bottom */}
+      {/* Main layout: empty tab is centered; after the first send, input sits at the bottom */}
       <div className="flex-1 flex flex-col min-h-0 bg-[#1e1e1e]">
-
-        {/* Input box — shown at top ONLY before first message */}
-        {!hasSentMessage && (
-          <div className="p-3 border-b border-[#2b2b2b] shrink-0 bg-[#1e1e1e] animate-in fade-in duration-200">
-            <InputBox
-              inputVal={inputVal}
-              setInputVal={setInputVal}
-              handleKeyDown={handleKeyDown}
-              handleSend={handleSend}
-              handleStop={handleStop}
-              isGenerating={isGenerating}
-              dropdownOpen={dropdownOpen}
-              setDropdownOpen={setDropdownOpen}
-              currentModeObj={currentModeObj}
-              modes={modes}
-              selectedMode={selectedMode}
-              setSelectedMode={setSelectedMode}
-              modelDropdownOpen={modelDropdownOpen}
-              setModelDropdownOpen={setModelDropdownOpen}
-              selectedModel={selectedModel}
-              setSelectedModel={setSelectedModel}
-              dropUp={false}
-            />
+        {!hasSentMessage ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col items-center justify-center px-5">
+              <h1
+                title={currentProject || "G-AID"}
+                className="text-[28px] font-semibold text-white tracking-tight mb-6 max-w-full truncate px-2"
+              >
+                {currentProject || "G-AID"}
+              </h1>
+              <div className="w-full max-w-[520px]">
+                <PendingChangesCard />
+                <InputBox
+                  inputVal={inputVal}
+                  setInputVal={setInputVal}
+                  handleKeyDown={handleKeyDown}
+                  handleSend={handleSend}
+                  handleStop={handleStop}
+                  isGenerating={isGenerating}
+                  dropdownOpen={dropdownOpen}
+                  setDropdownOpen={setDropdownOpen}
+                  currentModeObj={currentModeObj}
+                  modes={modes}
+                  selectedMode={selectedMode}
+                  setSelectedMode={setSelectedMode}
+                  modelDropdownOpen={modelDropdownOpen}
+                  setModelDropdownOpen={setModelDropdownOpen}
+                  orchestraChoice={orchestraChoice}
+                  setOrchestraChoice={setOrchestraChoice}
+                  previewSpeed={previewSpeed}
+                  dropUp={false}
+                />
+              </div>
+            </div>
+            <p className="shrink-0 text-center text-[11px] text-[#6e6e6e] pb-3 px-4">
+              AI may make mistakes. Check results against the survey files.
+            </p>
           </div>
-        )}
-
-        {/* Messages */}
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-3">
+        ) : (
+          <>
+            <div className="relative flex-1 flex flex-col min-h-0">
+            <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-3">
 
           {/* Messages */}
           {enhancedMessages.map((msg) => (
@@ -1258,10 +1554,20 @@ const handleApproveDiurnal = async (sessionId: string) => {
                  }
                  
                  // Clean up any stray closing tags that were outside of matched blocks
-                 displayText = displayText.replace(/<\/(?:think|思考)>/g, "").trim();
+                 displayText = displayText.replace(/<\/(?:think|思考)>/g, "");
+                 displayThought = displayThought.replace(/<\/?(?:think|思考)>/gi, "");
+                 if (!msg.isStreaming) displayText = displayText.trim();
+                 displayThought = cleanDisplayedThought(displayThought);
 
-                 const stillThinking = Boolean(msg.isStreaming) && msg.thinkingDuration === undefined && !displayText;
-                 const showCompletedThought = !stillThinking && (Boolean(displayThought) || msg.thinkingDuration !== undefined);
+                 const rawText = msg.text || "";
+                 const thinkOpen = /<(?:think|思考)>/i.test(rawText);
+                 const thinkClosed = /<\/(?:think|思考)>/i.test(rawText);
+                 const stillThinking =
+                   Boolean(msg.isStreaming) &&
+                   !displayText.trim() &&
+                   (Boolean(displayThought) || (thinkOpen && !thinkClosed));
+                 const showCompletedThought = !stillThinking && Boolean(displayThought);
+                 const waitingForFirstToken = Boolean(msg.isStreaming) && !displayText && !displayThought && !stillThinking;
                  const hasProjectData = projectFiles.some((f) => Boolean(fileContents[f.id]?.trim()));
                  const showConfidence = !msg.isStreaming
                    && hasProjectData
@@ -1270,6 +1576,12 @@ const handleApproveDiurnal = async (sessionId: string) => {
                    && ((msg.preamble as StreamPreamble & { showConfidence?: boolean })?.showConfidence
                      || (msg.preamble?.rulesMatched?.length ?? 0) > 0
                      || (msg.preamble?.capabilityTrace?.length ?? 0) > 0);
+
+                 const isPlanRun = displayText.includes("Plan approved.");
+                 const { intro, outro } = isPlanRun
+                   ? splitExecutionNarrative(displayText)
+                   : { intro: displayText, outro: "" };
+                 const showWorking = isPlanRun || Boolean(msg.workSteps?.length);
 
                  return (
                  <>
@@ -1280,13 +1592,46 @@ const handleApproveDiurnal = async (sessionId: string) => {
                        isThinking={stillThinking}
                      />
                    ) : null}
-                   <StreamingMessage
-                     content={displayText}
-                     preamble={msg.preamble ?? null}
-                     isStreaming={msg.isStreaming ?? false}
-                     isThinking={Boolean(msg.isStreaming) && !displayText}
-                     showConfidence={showConfidence}
-                   />
+                   {waitingForFirstToken ? (
+                     <TypingDots />
+                   ) : isPlanRun ? (
+                     <>
+                       <StreamingMessage
+                         content={intro}
+                         preamble={msg.preamble ?? null}
+                         isStreaming={msg.isStreaming ?? false}
+                         isThinking={Boolean(msg.isStreaming) && !intro}
+                         showConfidence={false}
+                       />
+                       <WorkingLog
+                         steps={msg.workSteps || []}
+                         isWorking={Boolean(msg.isStreaming)}
+                       />
+                       {!msg.isStreaming && outro ? (
+                         <StreamingMessage
+                           content={outro}
+                           preamble={msg.preamble ?? null}
+                           isStreaming={false}
+                           showConfidence={showConfidence}
+                         />
+                       ) : null}
+                     </>
+                   ) : (
+                     <>
+                       {showWorking ? (
+                         <WorkingLog steps={msg.workSteps || []} isWorking={Boolean(msg.isStreaming)} />
+                       ) : null}
+                       {displayText || !msg.isStreaming ? (
+                         <StreamingMessage
+                           content={displayText}
+                           preamble={msg.preamble ?? null}
+                           isStreaming={msg.isStreaming ?? false}
+                           isThinking={Boolean(msg.isStreaming) && !displayText}
+                           showConfidence={showConfidence}
+                         />
+                       ) : null}
+                     </>
+                   )}
                    {/* Action Bar */}
                    {!msg.isStreaming && (
                      <div className="flex items-center gap-2 mt-2 text-[#858585] text-[10px] w-full max-w-full">
@@ -1340,41 +1685,48 @@ const handleApproveDiurnal = async (sessionId: string) => {
                })()}
             </div>
           ))}
-
-          {/* Generating indicator — only shown when no agent message bubble exists yet */}
-          {isGenerating && agentStore.isOrchestratorThinking && enhancedMessages.length === 0 && (
-            <div className="mr-auto max-w-[85%] py-1">
-              <ThoughtDisclosure duration={1} isThinking thought="" />
-            </div>
-          )}
         </div>
-
-        {/* Agent Activity Monitor has been removed to match new sleek IDE style */}
-
-        {/* Input box — shown at bottom AFTER first message is sent */}
-        {hasSentMessage && (
-          <div className="p-3 border-t border-[#2b2b2b] shrink-0 bg-[#1e1e1e] animate-in slide-in-from-bottom-4 fade-in duration-300">
-            <PendingChangesWidget />
-            <InputBox
-              inputVal={inputVal}
-              setInputVal={setInputVal}
-              handleKeyDown={handleKeyDown}
-              handleSend={handleSend}
-              handleStop={handleStop}
-              isGenerating={isGenerating}
-              dropdownOpen={dropdownOpen}
-              setDropdownOpen={setDropdownOpen}
-              currentModeObj={currentModeObj}
-              modes={modes}
-              selectedMode={selectedMode}
-              setSelectedMode={setSelectedMode}
-              modelDropdownOpen={modelDropdownOpen}
-              setModelDropdownOpen={setModelDropdownOpen}
-              selectedModel={selectedModel}
-              setSelectedModel={setSelectedModel}
-              dropUp={true}
-            />
+        {interruptedAgent?.id ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-3">
+            <div className="pointer-events-auto w-full flex justify-center">
+              <InterruptCard
+                requestId={interruptedAgent.id}
+                onRetry={() => handleRetryInterrupted(interruptedAgent.id!)}
+                onDismiss={() =>
+                  updateMessageInConversation(activeConversation.id, interruptedAgent.id!, {
+                    interrupted: false,
+                  })
+                }
+              />
+            </div>
           </div>
+        ) : null}
+            </div>
+
+        <div className="p-3 border-t border-[#2b2b2b] shrink-0 bg-[#1e1e1e] animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <PendingChangesCard />
+          <InputBox
+            inputVal={inputVal}
+            setInputVal={setInputVal}
+            handleKeyDown={handleKeyDown}
+            handleSend={handleSend}
+            handleStop={handleStop}
+            isGenerating={isGenerating}
+            dropdownOpen={dropdownOpen}
+            setDropdownOpen={setDropdownOpen}
+            currentModeObj={currentModeObj}
+            modes={modes}
+            selectedMode={selectedMode}
+            setSelectedMode={setSelectedMode}
+            modelDropdownOpen={modelDropdownOpen}
+            setModelDropdownOpen={setModelDropdownOpen}
+            orchestraChoice={orchestraChoice}
+            setOrchestraChoice={setOrchestraChoice}
+            previewSpeed={previewSpeed}
+            dropUp={true}
+          />
+        </div>
+          </>
         )}
       </div>
     </aside>

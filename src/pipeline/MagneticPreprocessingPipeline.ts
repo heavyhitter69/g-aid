@@ -31,11 +31,13 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     this.registerNode(new PythonNode("igrf_corrector", SCIENCE, ["diurnal_corrector"]));
     this.registerNode(new PythonNode("heading_lag_corrector", SCIENCE, ["igrf_corrector"]));
     this.registerNode(new PythonNode("tie_line_leveler", SCIENCE, ["heading_lag_corrector"]));
-    this.registerNode(new PythonNode("mag_gridder", SCIENCE, ["tie_line_leveler"]));
+    this.registerNode(new PythonNode("microleveller", SCIENCE, ["tie_line_leveler"]));
+    this.registerNode(new PythonNode("mag_gridder", SCIENCE, ["microleveller"]));
     this.registerNode(new PythonNode("rtp_filter", SCIENCE, ["mag_gridder"]));
     this.registerNode(new PythonNode("fft_derivatives", SCIENCE, ["rtp_filter"]));
     this.registerNode(new PythonNode("lineament_extractor", SCIENCE, ["fft_derivatives"]));
-    this.registerNode(new PythonNode("gis_export", SCIENCE, ["mag_gridder"]));
+    this.registerNode(new PythonNode("euler_deconvolution", SCIENCE, ["fft_derivatives"]));
+    this.registerNode(new PythonNode("gis_export", SCIENCE, ["fft_derivatives"]));
   }
 }
 
@@ -61,5 +63,26 @@ export class SeismicPipeline extends PipelineEngine {
   constructor() {
     super();
     this.registerNode(new PythonNode("seismic_process", SCIENCE, []));
+  }
+}
+
+export class GprPipeline extends PipelineEngine {
+  constructor() {
+    super();
+    this.registerNode(new PythonNode("gpr_process", SCIENCE, []));
+  }
+}
+
+export class RadiometricPipeline extends PipelineEngine {
+  constructor() {
+    super();
+    this.registerNode(new PythonNode("radiometric_correct", SCIENCE, []));
+  }
+}
+
+export class WellLogPipeline extends PipelineEngine {
+  constructor() {
+    super();
+    this.registerNode(new PythonNode("las_ingest", SCIENCE, []));
   }
 }

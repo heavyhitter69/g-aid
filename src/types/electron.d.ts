@@ -24,18 +24,39 @@ declare global {
     getAuthBaseUrl: () => Promise<string>;
     getPendingAuthUrl: () => Promise<string | null>;
     openAuxWindow: (pathname: string) => Promise<void>;
-    pickFolder: () => Promise<string | null>;
+    openNewWindow: () => Promise<void>;
+    pickFolder: (options?: { title?: string }) => Promise<string | null>;
     indexWorkspace: (root: string) => Promise<GaidWorkspaceIndex>;
     readWorkspaceFile: (
       root: string,
       relativePath: string
-    ) => Promise<{ text: string; size: number; truncated: boolean }>;
+    ) => Promise<{
+      text: string;
+      size: number;
+      truncated: boolean;
+      binary?: boolean;
+      media?: string;
+      kind?: string;
+      companion?: string;
+    }>;
     createWorkspaceFile: (
       root: string,
       relativePath: string,
       content?: string
     ) => Promise<string>;
+    saveWorkspaceFile: (
+      root: string,
+      relativePath: string,
+      content?: string
+    ) => Promise<string>;
     createWorkspaceFolder: (root: string, relativePath: string) => Promise<string>;
+    deleteWorkspacePath: (root: string, relativePath: string) => Promise<string>;
+    moveWorkspacePath: (root: string, fromRel: string, destFolderRel?: string) => Promise<string>;
+    copyWorkspacePath: (root: string, fromRel: string, destFolderRel?: string) => Promise<string>;
+    renameWorkspacePath: (root: string, fromRel: string, newName: string) => Promise<string>;
+    cloneGitRepo: (url: string, destParent: string) => Promise<string>;
+    showItemInFolder: (root: string, relativePath?: string) => Promise<void>;
+    openPath: (root: string, relativePath?: string) => Promise<void>;
     dismissBootCover: () => void;
     onAuthCallback: (callback: GaidAuthCallback) => () => void;
   }
