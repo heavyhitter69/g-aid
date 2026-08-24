@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const lightBuild = process.env.GAID_LIGHT_BUILD === "1";
+
 const nextConfig: NextConfig = {
   devIndicators: false,
   ...(process.env.NODE_ENV === "production" ? { output: "standalone" } : {}),
@@ -12,6 +14,16 @@ const nextConfig: NextConfig = {
       "resources/**",
     ],
   },
+  ...(lightBuild
+    ? {
+        typescript: { ignoreBuildErrors: true },
+        experimental: { cpus: 1, workerThreads: false },
+        webpack: (config) => {
+          config.parallelism = 1;
+          return config;
+        },
+      }
+    : {}),
 };
 
 export default nextConfig;

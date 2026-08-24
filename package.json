@@ -2,6 +2,9 @@
   "name": "geophysics-demo2.0",
   "version": "0.1.0",
   "private": true,
+  "author": {
+    "name": "Genie Platforms"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
@@ -59,6 +62,7 @@
     "appId": "com.geophysics.gaid",
     "productName": "G-AID",
     "executableName": "G-AID",
+    "copyright": "Copyright © Genie Platforms",
     "compression": "store",
     "icon": "build/icon.ico",
     "directories": {
@@ -67,16 +71,19 @@
     },
     "files": [
       "**/*",
-      ".env",
-      ".env.local",
+      "!.tmp/**/*",
+      "!**/.tmp/**/*",
       "!src/**/*.ts",
       "!src/**/*.tsx",
       "!.next/cache/**/*",
       "!.next/dev/**/*",
+      "!.next/standalone/**/*",
+      "!.next/diagnostics/**/*",
       "!dist_desktop/**/*",
       "!resources/**/*",
       "!python/.venv/**/*",
       "!python/dist/**/*",
+      "!python/tests/**/*",
       "!python/**/__pycache__/**/*"
     ],
     "extraMetadata": {

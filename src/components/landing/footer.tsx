@@ -223,7 +223,7 @@ export function Footer() {
             className="flex items-center gap-3 text-[11px] font-mono transition-colors duration-200"
             style={{ color: "var(--text-muted)" }}
           >
-            <span>© 2026 G-AID. All rights reserved.</span>
+            <span>© 2026 Genie Platforms. All rights reserved.</span>
           </div>
 
           {/* Theme switcher */}
