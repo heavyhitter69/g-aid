@@ -5,11 +5,12 @@
 
 import type { NextRequest } from "next/server";
 import { getPendingPlan } from "./implementation-plan";
-import { buildPlanningPrompt, upsertAgentPlan } from "./agent-plan";
+import { buildPlanningPrompt, syncPendingFromEditor, upsertAgentPlan } from "./agent-plan";
 import { patchStreamEpilogue } from "./stream-epilogue";
 import { streamPlanDecision } from "../execute-plan";
 import {
   detectAnalysisIntent,
+  isGeneralKnowledgeQuestion,
   isProceedPhrase,
   splitUserAndContext,
   type WorkspaceIndex,
@@ -17,6 +18,7 @@ import {
 import { streamOrchestra } from "@/lib/ollama-orchestra";
 import type { PluginState } from "@/lib/plugins";
 import { resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
+import { validatePlan } from "@/lib/plan-spec";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { message, sessionId, workspaceRoot, workspaceIndex, projectName, history, pluginState, orchestraChoice, resumePartial } = body as {
+  const { message, sessionId, workspaceRoot, workspaceIndex, projectName, history, pluginState, orchestraChoice, resumePartial, implementationPlanContent } = body as {
     message?: string;
     sessionId?: string;
     workspaceRoot?: string;
@@ -137,23 +139,39 @@ export async function POST(request: NextRequest): Promise<Response> {
     pluginState?: Partial<PluginState>;
     orchestraChoice?: OrchestraChoice | string;
     resumePartial?: string;
+    implementationPlanContent?: string;
   };
   if (!message || !sessionId) {
     return Response.json({ error: "message and sessionId are required" }, { status: 400 });
   }
 
   const { userText } = splitUserAndContext(message);
-  const pending = getPendingPlan(sessionId);
+  const editorMarkdown = typeof implementationPlanContent === "string" ? implementationPlanContent : undefined;
+  let pending = getPendingPlan(sessionId);
   const intent = detectAnalysisIntent(userText);
   const root = typeof workspaceRoot === "string" ? workspaceRoot.trim() : "";
 
   if (pending && isProceedPhrase(userText)) {
+    pending = syncPendingFromEditor(sessionId, editorMarkdown) || pending;
+    const check = validatePlan(pending);
+    if (!check.ok) {
+      return streamAgentResponse(
+        `I can't start yet. ${check.blockers.map((issue) => issue.message).join(" ")} Edit the plan or tell me what to change.`,
+        {
+          type: "synthesis_complete",
+          awaitingApproval: true,
+          taskFolder: pending.taskFolder,
+          implementationPlanContent: pending.plan,
+          planRev: pending.rev,
+        }
+      );
+    }
     return new Response(streamPlanDecision(sessionId, "approve"), {
       headers: { "Content-Type": "application/octet-stream" },
     });
   }
 
-  const planTurn = Boolean(intent || pending);
+  const planTurn = Boolean(intent || pending) && !isGeneralKnowledgeQuestion(userText);
   const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn });
   if (planTurn && !root) {
     return streamAgentResponse(
@@ -170,6 +188,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         workspaceRoot: root,
         workspaceIndex: workspaceIndex ?? null,
         projectName: projectName || "",
+        editorMarkdown,
       });
       const prompt = buildPlanningPrompt({
         userText,
@@ -184,6 +203,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           awaitingApproval: true,
           taskFolder: plan.taskFolder,
           implementationPlanContent: plan.plan,
+          planRev: plan.rev,
         },
         undefined,
         undefined,

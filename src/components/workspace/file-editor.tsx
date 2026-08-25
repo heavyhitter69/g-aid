@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { TextEditor } from "@/components/workspace/text-editor";
 import { SpreadsheetView } from "@/components/workspace/spreadsheet-view";
 import { MarkdownViewer } from "@/components/workspace/markdown-viewer";
+import { TEMP_PLAN_ID, TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
+import { validateEditorMarkdown } from "@/lib/plan-spec";
 
 const DEMO_MOCK_FILES = [
   "line4_ert.dat",
@@ -43,6 +45,7 @@ export function FileEditorView() {
   const [isFetchingContent, setIsFetchingContent] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [reviewText, setReviewText] = useState("");
+  const [planPreview, setPlanPreview] = useState(false);
   const [mapOverlay, setMapOverlay] = useState<{ x: number; y: number }[]>([]);
   const [mapLines, setMapLines] = useState<{ x: number; y: number }[][]>([]);
 
@@ -329,7 +332,12 @@ export function FileEditorView() {
   }
 
   if (isMd) {
-    const isPlan = activeFile === "Implementation Plan" || activeFile === "Implementation Plan.md" || activeFile === "tasks.md";
+    const isImplementationPlan = activeFile === "Implementation Plan" || activeFile === TEMP_PLAN_ID;
+    const isTasks = activeFile === TEMP_TASKS_ID;
+    const isPlanChrome = isImplementationPlan || isTasks;
+    const planText = fileContents[activeFile] || "";
+    const editorCheck = isImplementationPlan ? validateEditorMarkdown(planText) : { ok: true, blockers: [] as { message: string }[] };
+    const proceedBlocked = isImplementationPlan && !editorCheck.ok;
     return (
       <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden">
         {/* Top toolbar */}
@@ -337,8 +345,20 @@ export function FileEditorView() {
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-[#858585]" />
             <span className="text-[#cccccc] text-[13px] font-medium">{activeFile}</span>
+            {isImplementationPlan && (
+              <span className="text-[11px] text-[#858585]">Edits here are what G-AID will run</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {isImplementationPlan && (
+              <button
+                onClick={() => setPlanPreview(!planPreview)}
+                className="px-2.5 py-1.5 text-[12px] text-[#cccccc] border border-[#3c3c3c] rounded-md hover:bg-[#2d2d2d] transition-colors"
+                title={planPreview ? "Edit the plan" : "Preview markdown"}
+              >
+                {planPreview ? "Edit" : "Preview"}
+              </button>
+            )}
             <button className="p-1.5 text-[#858585] hover:text-[#cccccc] hover:bg-[#2d2d2d] rounded transition-colors" title="Copy">
               <Copy className="h-4 w-4" />
             </button>
@@ -346,7 +366,7 @@ export function FileEditorView() {
               <Download className="h-4 w-4" />
             </button>
              
-            {isPlan && (
+            {isPlanChrome && (
               <div className="flex items-center gap-2 ml-3 relative">
                 <button 
                   onClick={() => setIsReviewOpen(!isReviewOpen)}
@@ -354,14 +374,19 @@ export function FileEditorView() {
                 >
                   Review <ChevronDown className="h-3 w-3 text-[#858585]" />
                 </button>
-                <button 
-                  onClick={() => {
-                    useAppStore.getState().setPendingPrompt("I approve the implementation plan, please proceed.");
-                  }}
-                  className="bg-[#007acc] hover:bg-[#1b8fe3] text-white px-4 py-1.5 rounded-md text-[13px] font-bold transition-colors shadow-sm"
-                >
-                  Proceed
-                </button>
+                {isImplementationPlan && (
+                  <button 
+                    onClick={() => {
+                      if (proceedBlocked) return;
+                      useAppStore.getState().setPendingPrompt("I approve the implementation plan, please proceed.");
+                    }}
+                    disabled={proceedBlocked}
+                    title={proceedBlocked ? editorCheck.blockers.map((issue) => issue.message).join(" ") : "Run this plan"}
+                    className="bg-[#007acc] hover:bg-[#1b8fe3] text-white px-4 py-1.5 rounded-md text-[13px] font-bold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Proceed
+                  </button>
+                )}
 
                 {/* Review Popover */}
                 {isReviewOpen && (
@@ -403,8 +428,25 @@ export function FileEditorView() {
             )}
           </div>
         </div>
+        {proceedBlocked && (
+          <div className="px-4 py-2 text-[12px] text-[#f0c674] bg-[#2a2618] border-b border-[#3c3c3c]">
+            {editorCheck.blockers.map((issue) => issue.message).join(" ")}
+          </div>
+        )}
         <div className="flex-1 overflow-auto">
-          <MarkdownViewer content={fileContents[activeFile] || ""} />
+          {isImplementationPlan && !planPreview ? (
+            <TextEditor
+              filePath={activeFile}
+              content={planText}
+              projectName={currentProject}
+              onChange={(value) => {
+                setFileDirty(activeFile, true);
+                setFileContent(activeFile, value);
+              }}
+            />
+          ) : (
+            <MarkdownViewer content={planText} />
+          )}
         </div>
       </div>
     );

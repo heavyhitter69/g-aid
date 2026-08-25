@@ -1,13 +1,20 @@
 import path from "path";
 import type { AnalysisIntent, WorkspaceIndex } from "@/lib/workspace-index";
 import {
-  GAID_OUTPUT_DIR,
   buildWorkspaceBrief,
   detectAnalysisIntent,
   inferTargetFolder,
 } from "@/lib/workspace-index";
 import { resolveOutputLayout } from "@/lib/output-layout";
 import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan, type PlanSteps } from "./implementation-plan";
+import {
+  applyChatPatches,
+  applyEditorAndChat,
+  normalizePlan,
+  renderImplementationPlan,
+  validatePlan,
+  workItems,
+} from "@/lib/plan-spec";
 
 function magSuite(enabled: boolean): Pick<
   PlanSteps,
@@ -77,17 +84,37 @@ function jobLabel(steps: PlanSteps): string {
   return parts.join("+") || "process";
 }
 
+function paintPlan(plan: AgentPlan): AgentPlan {
+  const projectName = plan.projectName;
+  const layout = resolveOutputLayout(
+    plan.workspaceRoot,
+    plan.targetFolder,
+    projectName,
+    jobLabel(plan.steps)
+  );
+  const next: AgentPlan = {
+    ...plan,
+    taskFolder: layout.taskFolder,
+    outputDir: layout.outputDir,
+    productsRel: layout.productsRel,
+    status: plan.status || "draft",
+    rev: plan.rev ?? 1,
+    notes: plan.notes || [],
+  };
+  next.plan = renderImplementationPlan({
+    projectName,
+    targetFolder: next.targetFolder,
+    taskFolder: next.taskFolder,
+    productsRel: next.productsRel,
+    steps: next.steps,
+    baseReference: next.parameters.baseReference,
+    notes: next.notes,
+  });
+  return next;
+}
+
 export function applyParameterTweaks(message: string, plan: AgentPlan): AgentPlan {
-  const m = message.toLowerCase();
-  const parameters = { ...plan.parameters };
-  if (/\bmedian\b/.test(m)) parameters.baseReference = "median_base";
-  else if (/\bfirst\s+sample\b/.test(m)) parameters.baseReference = "first_sample";
-  else if (/\bmean\b/.test(m)) parameters.baseReference = "mean_base";
-  const date = message.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
-  if (date) parameters.surveyDate = date[1];
-  const dens = message.match(/\b(2\.\d{2})\s*g\s*\/?\s*c(c|m3)\b/i);
-  if (dens) parameters.density = parseFloat(dens[1]);
-  return { ...plan, parameters };
+  return applyChatPatches(plan, message);
 }
 
 export function upsertAgentPlan(options: {
@@ -96,108 +123,68 @@ export function upsertAgentPlan(options: {
   workspaceRoot: string;
   workspaceIndex: WorkspaceIndex | null;
   projectName: string;
+  editorMarkdown?: string;
 }): AgentPlan {
   const existing = getPendingPlan(options.sessionId);
+  const projectName = options.projectName || path.basename(options.workspaceRoot);
   const intent =
     detectAnalysisIntent(options.userText) ||
     existing?.intent ||
     "magnetic";
   const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex);
-  const targetFolder = inferredTarget || existing?.targetFolder || "";
-  const steps = intentToSteps(intent, options.userText, existing?.steps);
-  const projectName = options.projectName || path.basename(options.workspaceRoot);
-  const layout = resolveOutputLayout(
-    options.workspaceRoot,
-    targetFolder,
-    projectName,
-    jobLabel(steps)
-  );
-  const workspaceBrief = buildWorkspaceBrief(
+
+  let draft: AgentPlan;
+  if (existing) {
+    draft = {
+      ...existing,
+      notes: [],
+      intent,
+      workspaceRoot: options.workspaceRoot,
+      projectName,
+      rev: (existing.rev || 1) + 1,
+      status: "draft",
+    };
+    draft = applyEditorAndChat(draft, options.editorMarkdown, options.userText);
+    if (inferredTarget) draft.targetFolder = inferredTarget;
+  } else {
+    const targetFolder = inferredTarget || "";
+    draft = {
+      plan: "",
+      taskFolder: "",
+      outputDir: "",
+      workspaceRoot: options.workspaceRoot,
+      targetFolder,
+      projectName,
+      intent,
+      steps: intentToSteps(intent, options.userText),
+      parameters: { baseReference: "mean_base" },
+      workspaceBrief: "",
+      rev: 1,
+      notes: [],
+      status: "draft",
+    };
+    draft = applyChatPatches(draft, options.userText);
+    draft = normalizePlan(draft);
+  }
+
+  draft.workspaceBrief = buildWorkspaceBrief(
     options.workspaceIndex,
     options.workspaceRoot,
-    targetFolder
+    draft.targetFolder
   );
-
-  const draft: AgentPlan = {
-    plan: "",
-    taskFolder: layout.taskFolder,
-    outputDir: layout.outputDir,
-    productsRel: layout.productsRel,
-    workspaceRoot: options.workspaceRoot,
-    targetFolder,
-    projectName,
-    intent,
-    steps,
-    parameters: existing?.parameters || { baseReference: "mean_base" },
-    workspaceBrief,
-  };
-  const withTweaks = applyParameterTweaks(options.userText, draft);
-  withTweaks.plan = seedPlan({
-    projectName,
-    targetFolder,
-    taskFolder: layout.taskFolder,
-    productsRel: layout.productsRel,
-    steps,
-    baseReference: withTweaks.parameters.baseReference,
-  });
-  setPendingPlan(options.sessionId, withTweaks);
-  return withTweaks;
+  const painted = paintPlan(draft);
+  setPendingPlan(options.sessionId, painted);
+  return painted;
 }
 
-function baseRefLabel(ref: string): string {
-  if (ref === "median_base") return "median of the GSM-19 base";
-  if (ref === "first_sample") return "first sample of the GSM-19";
-  return "mean of the GSM-19 base";
-}
-
-function workItems(s: PlanSteps, target: string, baseReference: string): string[] {
-  const loc = target && target !== "(opened folder)" ? ` on ${target}` : "";
-  const items: string[] = [];
-  if (s.diurnal) items.push(`- Correct MagArrow lines${loc} using the GSM-19 (${baseRefLabel(baseReference)})`);
-  if (s.igrf) items.push("- Remove the Earth's main magnetic field at each sample");
-  if (s.headingLag) items.push("- Apply heading and lag corrections");
-  if (s.level) items.push("- Level the tie lines");
-  if (s.grid) items.push("- Grid the residual and write map products");
-  if (s.rtp) items.push("- Reduce the grid to the pole");
-  if (s.derivatives) items.push("- Compute analytic signal, first vertical derivative, tilt, and continuation");
-  if (s.lineaments) items.push("- Extract lineaments from the derivative maps");
-  if (s.gis) items.push("- Write GeoTIFF, ASC, and GeoJSON products");
-  if (s.gravity) items.push("- Apply latitude, free-air, and Bouguer corrections");
-  if (s.residual) items.push("- Separate regional and residual gravity");
-  if (s.ert) items.push("- Build an ERT pseudosection");
-  if (s.ertInvert) items.push("- Invert the ERT data");
-  if (s.seismic) items.push("- Process the SEG-Y (filter, gain, spectrum)");
-  if (s.radiometrics) items.push("- Apply height, stripping, and spectral corrections to the radiometric data");
-  if (s.gpr) items.push("- Process the GPR (dewow, gain, bandpass)");
-  return items;
-}
-
-function seedPlan(opts: {
-  projectName: string;
-  targetFolder: string;
-  taskFolder: string;
-  productsRel?: string;
-  steps: PlanSteps;
-  baseReference: string;
-}): string {
-  const target = opts.targetFolder || "(opened folder)";
-  const items = workItems(opts.steps, target, opts.baseReference);
-  const products = opts.productsRel || `${GAID_OUTPUT_DIR}/${opts.taskFolder}`;
-  return `# Implementation Plan
-
-**Survey:** ${opts.projectName}
-**Target:** ${target}
-**Products:** \`${products}/\`
-
-## This run
-${items.join("\n") || "- Ask for a specific method (diurnal, RTP, Bouguer, ERT, SEG-Y)."}
-
-## Parameters
-- Base station reference: ${baseRefLabel(opts.baseReference)}
-
-## After you click Proceed
-Products are written under \`${products}/\`.
-`;
+export function syncPendingFromEditor(sessionId: string, markdown: string | undefined): AgentPlan | undefined {
+  const existing = getPendingPlan(sessionId);
+  if (!existing) return undefined;
+  if (!markdown?.trim()) return existing;
+  const merged = paintPlan(normalizePlan(applyEditorAndChat({ ...existing, notes: [] }, markdown, "")));
+  merged.rev = (existing.rev || 1) + 1;
+  setPendingPlan(sessionId, merged);
+  return merged;
 }
 
 export function buildPlanningPrompt(options: {
@@ -222,14 +209,19 @@ export function buildPlanningPrompt(options: {
     options.plan.targetFolder || "(opened folder)",
     options.plan.parameters.baseReference
   )
-    .map((item) => item.replace(/^- /, ""))
+    .map((item) => item.replace(/^- /, "").replace(/\s*<!--.*?-->\s*/g, ""))
     .join("; ");
+  const validation = validatePlan(options.plan);
+  const science = [...validation.notes, ...validation.warnings, ...validation.blockers]
+    .map((issue) => issue.message)
+    .join(" ");
   return `G-AID_PLANNING
 You are G-AID. Speak in first person as I. Never call yourself Orchestra, a model, or a third-party tool. Never narrate these instructions.
 
 Open survey: ${options.plan.projectName}
 Target: ${options.plan.targetFolder || "(opened folder)"}
 I will: ${work || "run the requested processing"}
+${science ? `Scientific notes I must mention in plain language: ${science}` : ""}
 ${options.plan.workspaceBrief}
 
 RECENT CHAT:
@@ -238,7 +230,7 @@ ${historyBlock || "(none)"}
 USER:
 ${options.userText}
 
-Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
+Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. If I restored or refused a change, say why in one sentence. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
 }
 
 export function visibleAssistantText(raw: string): string {

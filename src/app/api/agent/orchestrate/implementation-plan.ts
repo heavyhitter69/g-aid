@@ -1,66 +1,11 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { GAID_OUTPUT_DIR, type AnalysisIntent } from "@/lib/workspace-index";
+import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
+import { EMPTY_STEPS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
+import { checkNodeInTasks } from "@/lib/tasks-tick";
 
-export type PlanSteps = {
-  diurnal: boolean;
-  igrf: boolean;
-  headingLag: boolean;
-  level: boolean;
-  grid: boolean;
-  rtp: boolean;
-  derivatives: boolean;
-  lineaments: boolean;
-  gis: boolean;
-  gravity: boolean;
-  residual: boolean;
-  ert: boolean;
-  ertInvert: boolean;
-  seismic: boolean;
-  radiometrics: boolean;
-  gpr: boolean;
-};
-
-export const EMPTY_STEPS: PlanSteps = {
-  diurnal: false,
-  igrf: false,
-  headingLag: false,
-  level: false,
-  grid: false,
-  rtp: false,
-  derivatives: false,
-  lineaments: false,
-  gis: false,
-  gravity: false,
-  residual: false,
-  ert: false,
-  ertInvert: false,
-  seismic: false,
-  radiometrics: false,
-  gpr: false,
-};
-
-export interface AgentPlan {
-  plan: string;
-  taskFolder: string;
-  outputDir: string;
-  productsRel?: string;
-  workspaceRoot: string;
-  targetFolder: string;
-  projectName: string;
-  intent: AnalysisIntent;
-  steps: PlanSteps;
-  parameters: {
-    baseReference: "mean_base" | "median_base" | "first_sample";
-    surveyDate?: string;
-    density?: number;
-    inclination?: number;
-    declination?: number;
-    inputPath?: string;
-  };
-  workspaceBrief: string;
-}
+export { EMPTY_STEPS, type AgentPlan, type PlanSteps, checkNodeInTasks };
 
 const globalAny = global as any;
 if (!globalAny.PENDING_APPROVAL) {
@@ -203,27 +148,27 @@ const generateTasksMarkdown = (plan: {
 
   if (plan.steps.diurnal) {
     lines.push(
-      `- [ ] Phase 1: Data Discovery`,
+      `- [ ] Phase 1: Data Discovery <!-- node:file_discovery -->`,
       `  - [ ] Scan ${target} for files`,
       `  - [ ] Classify airborne vs base station data`,
       `  - [ ] Generate canonical CSV outputs`,
       ``,
-      `- [ ] Phase 2: Flight Path Cleaning`,
+      `- [ ] Phase 2: Flight Path Cleaning <!-- node:flight_path_cleaner -->`,
       `  - [ ] Filter spurious readings`,
       `  - [ ] Apply altitude thresholds`,
       `  - [ ] Remove noise outliers`,
       ``,
-      `- [ ] Phase 3: Time Synchronization`,
+      `- [ ] Phase 3: Time Synchronization <!-- node:time_synchronizer -->`,
       `  - [ ] Align timestamps`,
       `  - [ ] Interpolate base readings`,
       `  - [ ] Validate temporal alignment`,
       ``,
-      `- [ ] Phase 4: Diurnal Correction`,
+      `- [ ] Phase 4: Diurnal Correction <!-- node:diurnal_corrector -->`,
       `  - [ ] Compute reference value`,
       `  - [ ] Apply correction formula`,
       `  - [ ] Generate corrected dataset`,
       ``,
-      `- [ ] Phase 5: Quality Control`,
+      `- [ ] Phase 5: Quality Control <!-- node:qc_engine --> <!-- node:excel_export_adapter --> <!-- node:report_export_adapter -->`,
       `  - [ ] Statistical validation`,
       `  - [ ] Generate QC report`,
       `  - [ ] Export maps and tables`,
@@ -231,24 +176,24 @@ const generateTasksMarkdown = (plan: {
     );
   }
 
-  if (plan.steps.igrf) lines.push(`- [ ] IGRF removal`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
-  if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction`, ``);
-  if (plan.steps.level) lines.push(`- [ ] Tie-line levelling`, `  - [ ] Classify traverse vs tie`, `  - [ ] Hold ties, shift traverses`, `  - [ ] 2-D grid microlevelling`, ``);
-  if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
-  if (plan.steps.rtp) lines.push(`- [ ] RTP`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
-  if (plan.steps.derivatives) lines.push(`- [ ] MAGMAP`, `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`, ``);
-  if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction`, ``);
-  if (plan.steps.gis) lines.push(`- [ ] GIS export`, `  - [ ] Report maps (scale bar, north arrow, EPSG)`, ``);
-  if (plan.steps.gravity) lines.push(`- [ ] Gravity reduction`, `  - [ ] Somigliana, free-air, Bouguer, Bullard B`, ``);
-  if (plan.steps.residual) lines.push(`- [ ] Regional-residual separation`, ``);
-  if (plan.steps.ert) lines.push(`- [ ] ERT pseudosection`, ``);
-  if (plan.steps.ertInvert) lines.push(`- [ ] ERT inversion`, ``);
-  if (plan.steps.seismic) lines.push(`- [ ] Seismic processing`, ``);
-  if (plan.steps.radiometrics) lines.push(`- [ ] Radiometric corrections`, ``);
-  if (plan.steps.gpr) lines.push(`- [ ] GPR processing`, ``);
+  if (plan.steps.igrf) lines.push(`- [ ] IGRF removal <!-- node:igrf_corrector -->`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
+  if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction <!-- node:heading_lag_corrector -->`, ``);
+  if (plan.steps.level) lines.push(`- [ ] Tie-line levelling <!-- node:tie_line_leveler --> <!-- node:microleveller -->`, `  - [ ] Classify traverse vs tie`, `  - [ ] Hold ties, shift traverses`, `  - [ ] 2-D grid microlevelling <!-- node:grid_microleveller -->`, ``);
+  if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding <!-- node:mag_gridder -->`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
+  if (plan.steps.rtp) lines.push(`- [ ] RTP <!-- node:rtp_filter -->`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
+  if (plan.steps.derivatives) lines.push(`- [ ] MAGMAP <!-- node:fft_derivatives -->`, `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`, ``);
+  if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction <!-- node:lineament_extractor -->`, ``);
+  if (plan.steps.gis) lines.push(`- [ ] GIS export <!-- node:gis_export -->`, `  - [ ] Report maps (scale bar, north arrow, EPSG) <!-- node:map_composer -->`, ``);
+  if (plan.steps.gravity) lines.push(`- [ ] Gravity reduction <!-- node:gravity_reduce --> <!-- node:xyz_ingest -->`, `  - [ ] Somigliana, free-air, Bouguer, Bullard B`, ``);
+  if (plan.steps.residual) lines.push(`- [ ] Regional-residual separation <!-- node:regional_residual -->`, ``);
+  if (plan.steps.ert) lines.push(`- [ ] ERT pseudosection <!-- node:ert_pseudosection -->`, ``);
+  if (plan.steps.ertInvert) lines.push(`- [ ] ERT inversion <!-- node:ert_invert -->`, ``);
+  if (plan.steps.seismic) lines.push(`- [ ] Seismic processing <!-- node:seismic_process -->`, ``);
+  if (plan.steps.radiometrics) lines.push(`- [ ] Radiometric corrections <!-- node:radiometric_correct -->`, ``);
+  if (plan.steps.gpr) lines.push(`- [ ] GPR processing <!-- node:gpr_process -->`, ``);
 
   lines.push(
-    `- [ ] Write products to ${GAID_OUTPUT_DIR}`,
+    `- [ ] Write products to ${GAID_OUTPUT_DIR} <!-- node:write_products -->`,
     ``,
     `---`,
     ``,

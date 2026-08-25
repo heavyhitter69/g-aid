@@ -926,6 +926,7 @@ export function AIPanel() {
           pluginState,
           orchestraChoice,
           guestId: localStorage.getItem("gaid_guest_id") || undefined,
+          implementationPlanContent: useAppStore.getState().fileContents[TEMP_PLAN_ID],
           ...(resumePartial ? { resumePartial } : {}),
         }),
         signal: abort.signal,
@@ -1238,7 +1239,8 @@ const handleApproveDiurnal = async (sessionId: string) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
-          decision: "approve"
+          decision: "approve",
+          implementationPlanContent: useAppStore.getState().fileContents[TEMP_PLAN_ID],
         }),
         signal: abort.signal,
       });

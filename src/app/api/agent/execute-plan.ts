@@ -1,11 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
 import { workStepFromEvent } from "@/lib/work-steps";
+import { checkNodeInTasks } from "@/lib/tasks-tick";
 import {
   generateTasksMarkdown,
-  checkPhaseInTasks,
   getPendingPlan,
   clearPendingPlan,
   setPendingPlan,
@@ -101,36 +100,23 @@ function tasksUpdate(content: string, open = false): ProjectFileUpdate {
   };
 }
 
-const NODE_PHASE: Record<string, string> = {
-  file_discovery: "Phase 1: Data Discovery",
-  flight_path_cleaner: "Phase 2: Flight Path Cleaning",
-  time_synchronizer: "Phase 3: Time Synchronization",
-  diurnal_corrector: "Phase 4: Diurnal Correction",
-  qc_engine: "Phase 5: Quality Control",
-  excel_export_adapter: "Phase 5: Quality Control",
-  report_export_adapter: "Phase 5: Quality Control",
-  igrf_corrector: "IGRF removal",
-  heading_lag_corrector: "Heading and lag correction",
-  tie_line_leveler: "Tie-line levelling",
-  mag_gridder: "Minimum-curvature gridding",
-  grid_microleveller: "2-D microlevelling",
-  rtp_filter: "RTP",
-  fft_derivatives: "MAGMAP",
-  map_composer: "Report maps",
-  lineament_extractor: "Lineament extraction",
-  gis_export: "GIS export",
-  microleveller: "Microlevelling",
-  euler_deconvolution: "Euler deconvolution",
-  gravity_reduce: "Gravity reduction",
-  regional_residual: "Regional-residual separation",
-  ert_pseudosection: "ERT pseudosection",
-  ert_invert: "ERT inversion",
-  seismic_process: "Seismic processing",
-  radiometric_correct: "Radiometric corrections",
-  gpr_process: "GPR processing",
-  xyz_ingest: "Gravity reduction",
-  las_ingest: "Write products to",
-};
+function tickFromEvent(
+  content: string,
+  event: { type?: string; nodeId?: string; message?: string; payload?: { skipped?: boolean; artifacts?: { path?: string }[] } }
+): string | null {
+  if (event.type !== "NODE_COMPLETED" || !event.nodeId) return null;
+  const artifacts = event.payload?.artifacts || [];
+  const skipped =
+    Boolean(event.payload?.skipped) ||
+    (/skipped:/i.test(event.message || "") && artifacts.length === 0);
+  if (skipped) return checkNodeInTasks(content, event.nodeId, "skipped");
+  const hasFiles = artifacts.some((artifact) => {
+    const filePath = artifact?.path;
+    return typeof filePath === "string" && filePath.length > 0 && fs.existsSync(filePath);
+  });
+  if (!hasFiles && artifacts.length === 0) return null;
+  return checkNodeInTasks(content, event.nodeId, "complete");
+}
 
 async function runDiurnalPipeline(
   pending: AgentPlan,
@@ -161,19 +147,18 @@ async function runDiurnalPipeline(
     if (event.type === "NODE_PROGRESS") {
       const step = workStepFromEvent(event.nodeId, event.message || "");
       if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
-      const phase = event.nodeId ? NODE_PHASE[event.nodeId] : undefined;
-      if (phase && !checked.has(phase)) {
-        checked.add(phase);
-        tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
-        onTasks(tasksContent.current);
-      }
     } else if (event.type === "NODE_COMPLETED" && event.nodeId) {
-      enqueue(`\x02${JSON.stringify({ type: "work_step", id: event.nodeId, done: true })}\n`);
-      const phase = NODE_PHASE[event.nodeId];
-      if (phase && !checked.has(phase)) {
-        checked.add(phase);
-        tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
-        onTasks(tasksContent.current);
+      const skipped = Boolean(event.payload?.skipped) || /skipped:/i.test(event.message || "");
+      if (!skipped) {
+        enqueue(`\x02${JSON.stringify({ type: "work_step", id: event.nodeId, done: true })}\n`);
+      }
+      if (!checked.has(event.nodeId)) {
+        const next = tickFromEvent(tasksContent.current, event);
+        if (next) {
+          checked.add(event.nodeId);
+          tasksContent.current = next;
+          onTasks(tasksContent.current);
+        }
       }
     } else if (event.type === "QC_WARNING") {
       enqueue(`\x02${JSON.stringify({
@@ -226,6 +211,15 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           .relative(pending.workspaceRoot, path.join(pending.outputDir, pending.taskFolder))
           .replace(/\\/g, "/");
         fs.mkdirSync(path.join(pending.outputDir, pending.taskFolder), { recursive: true });
+        try {
+          fs.writeFileSync(
+            path.join(pending.outputDir, pending.taskFolder, "plan.json"),
+            `${JSON.stringify({ ...pending, status: "approved" }, null, 2)}\n`
+          );
+        } catch {
+          /* checklist still runs */
+        }
+        pending.status = "executing";
         setPendingPlan(sessionId, pending);
 
         const tasksContent = { current: generateTasksMarkdown(pending) };
@@ -275,7 +269,6 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
             else if (pending.steps.seismic) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".sgy", ".segy"]);
             else if (pending.steps.gpr) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".dzt"]);
             else if (pending.steps.radiometrics) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".csv"]);
-            else pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".las"]);
           }
           const extraParams = {
             projectName: pending.projectName,
@@ -292,9 +285,14 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
               if (event.type === "NODE_PROGRESS") {
                 const step = workStepFromEvent(event.nodeId, event.message || "");
                 if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
-                const phase = event.nodeId ? NODE_PHASE[event.nodeId] : undefined;
-                if (phase) {
-                  tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
+              } else if (event.type === "NODE_COMPLETED" && event.nodeId) {
+                const skipped = Boolean(event.payload?.skipped) || /skipped:/i.test(event.message || "");
+                if (!skipped) {
+                  enqueue(`\x02${JSON.stringify({ type: "work_step", id: event.nodeId, done: true })}\n`);
+                }
+                const next = tickFromEvent(tasksContent.current, event);
+                if (next) {
+                  tasksContent.current = next;
                   onTasks(tasksContent.current);
                 }
               } else if (event.type === "QC_WARNING") {
@@ -318,30 +316,6 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           if (pending.steps.radiometrics) await runExtra(new RadiometricPipeline());
         }
 
-        const lasPath = findWorkspaceFile(pending.workspaceRoot, [".las"]);
-        if (lasPath) {
-          const { WellLogPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
-          const lasPipe = new WellLogPipeline();
-          const lasOk = await lasPipe.runPipeline([], async (event) => {
-            if (event.type === "NODE_PROGRESS") {
-              const step = workStepFromEvent(event.nodeId, event.message || "");
-              if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
-            } else if (event.type === "PIPELINE_FAILED") {
-              ranOk = false;
-              enqueue(`- ❌ **Pipeline Error**: ${event.message}\n`);
-            }
-          }, {
-            projectName: pending.projectName,
-            targetFolder: pending.targetFolder || "",
-            taskFolder: pending.taskFolder,
-            baseDir: pending.workspaceRoot,
-            outDir: pending.outputDir,
-            inputPath: lasPath,
-            steps: pending.steps,
-          });
-          if (!lasOk) ranOk = false;
-        }
-
         const latest = collectTaskFiles(pending.workspaceRoot, pending.outputDir, pending.taskFolder);
         const seen = new Set(projectFilesUpdates.map((f) => f.path));
         for (const file of latest) {
@@ -362,7 +336,7 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           return;
         }
 
-        tasksContent.current = checkPhaseInTasks(tasksContent.current, `Write products to ${GAID_OUTPUT_DIR}`);
+        tasksContent.current = checkNodeInTasks(tasksContent.current, "write_products", "complete");
         onTasks(tasksContent.current);
 
         enqueue(`\n\nFinished. Results are on the map.`);

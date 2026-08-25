@@ -150,7 +150,12 @@ export function wantsWorkspaceContext(message: string): boolean {
 
 export function isProceedPhrase(message: string): boolean {
   const t = message.trim().toLowerCase().replace(/[.!]+$/, "");
-  return /^(yes[, ]+)?(proceed|go ahead|looks good|sounds good|approved|approve it|do it|run it|execute|lgtm|ok proceed|okay proceed)$/.test(t);
+  if (/^(yes[, ]+)?(proceed|go ahead|looks good|sounds good|approved|approve it|do it|run it|execute|lgtm|ok proceed|okay proceed)$/.test(t)) {
+    return true;
+  }
+  if (/^i approve the implementation plan/.test(t)) return true;
+  if (/\bapprov/.test(t) && /\bplease proceed$/.test(t)) return true;
+  return false;
 }
 
 export function isDiurnalRunRequest(message: string): boolean {

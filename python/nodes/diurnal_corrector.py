@@ -6,9 +6,12 @@ import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.node_runner import run_node
+from science.artifacts import skipped, step_enabled
 
 def compute_correction(payload: dict) -> dict:
     node_id = payload.get("node_id", "diurnal_corrector")
+    if not step_enabled(payload, "diurnal", default=True):
+        return skipped(node_id, "not in plan")
     project_name = payload.get("parameters", {}).get("projectName", "")
     task_folder = payload.get("parameters", {}).get("taskFolder", "")
     out_dir = payload.get("parameters", {}).get("outDir", "")
