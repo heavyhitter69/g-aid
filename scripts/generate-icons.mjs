@@ -31,6 +31,16 @@ const iconPngPath = path.join(buildDir, "icon.png");
 fs.writeFileSync(iconPngPath, PNG.sync.write(iconPng));
 fs.writeFileSync(path.join(buildDir, "icon.ico"), await pngToIco(iconPngPath));
 
+const linuxIcons = path.join(buildDir, "icons");
+fs.mkdirSync(linuxIcons, { recursive: true });
+for (const size of [16, 32, 48, 64, 128, 256, 512, 1024]) {
+  const sized = scalePng(iconPng, size, size);
+  fs.writeFileSync(path.join(linuxIcons, `${size}x${size}.png`), PNG.sync.write(sized));
+}
+
+const publicIcon = path.join(root, "public", "app-icon.png");
+fs.writeFileSync(publicIcon, PNG.sync.write(scalePng(iconPng, 256, 256)));
+
 const small = makeWizardSmall(trimmed, 110);
 writeBmp24(path.join(buildDir, "wizard-small.bmp"), pngToBmp(small, 55, 55));
 writeBmp24(path.join(buildDir, "wizard-small-200.bmp"), pngToBmp(small, 110, 110));
@@ -38,7 +48,7 @@ writeBmp24(path.join(buildDir, "wizard-small-200.bmp"), pngToBmp(small, 110, 110
 writeBmp24(path.join(buildDir, "wizard-big.bmp"), pngToBmp(makeFinishImage(trimmed, 164, 314), 164, 314));
 writeBmp24(path.join(buildDir, "wizard-big-200.bmp"), pngToBmp(makeFinishImage(trimmed, 328, 628), 328, 628));
 
-console.log("Generated rounded icon.ico and Cursor-style wizard bitmaps");
+console.log("Generated icon.ico, Linux PNG set, splash, and Cursor-style wizard bitmaps");
 
 function makeCanvas(width, height, fill = [11, 11, 11, 255]) {
   const png = new PNG({ width, height });
@@ -114,6 +124,23 @@ function sample(png, x, y) {
     lerp(lerp(p00[2], p10[2], tx), lerp(p01[2], p11[2], tx), ty),
     lerp(lerp(p00[3], p10[3], tx), lerp(p01[3], p11[3], tx), ty),
   ];
+}
+
+function scalePng(png, width, height) {
+  const out = new PNG({ width, height });
+  for (let y = 0; y < height; y++) {
+    const sy = ((y + 0.5) * png.height) / height - 0.5;
+    for (let x = 0; x < width; x++) {
+      const sx = ((x + 0.5) * png.width) / width - 0.5;
+      const [r, g, b, a] = sample(png, sx, sy);
+      const i = (width * y + x) << 2;
+      out.data[i] = Math.round(r);
+      out.data[i + 1] = Math.round(g);
+      out.data[i + 2] = Math.round(b);
+      out.data[i + 3] = Math.round(a);
+    }
+  }
+  return out;
 }
 
 function sdRoundBox(px, py, cx, cy, halfW, halfH, radius) {

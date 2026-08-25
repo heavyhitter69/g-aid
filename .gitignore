@@ -17,8 +17,12 @@
 /.next/
 /out/
 
-# production
-/build
+# production (keep Linux/Windows icon assets for electron-builder)
+/build/*
+!/build/icon.png
+!/build/icon.ico
+!/build/icons/
+!/build/icons/**
 
 # electron desktop build output
 /dist_desktop/
