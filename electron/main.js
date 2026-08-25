@@ -14,6 +14,17 @@ const hostname = "localhost";
 app.setName("G-AID");
 app.setAppUserModelId("com.geophysics.gaid");
 
+if (process.platform === "linux") {
+  try {
+    const helper = path.join(path.dirname(process.execPath), "chrome-sandbox");
+    const st = fs.statSync(helper);
+    const suidRoot = st.uid === 0 && (st.mode & 0o4000);
+    if (!suidRoot) app.commandLine.appendSwitch("no-sandbox");
+  } catch {
+    app.commandLine.appendSwitch("no-sandbox");
+  }
+}
+
 if (dev) {
   app.setAsDefaultProtocolClient(
     PROTOCOL,
@@ -229,8 +240,23 @@ function sendAuthUrl(url) {
   }
 }
 
+function bundledBinary(dir, name) {
+  const ext = process.platform === "win32" ? ".exe" : "";
+  return path.join(dir, `${name}${ext}`);
+}
+
+function ensureExecutable(filePath) {
+  if (process.platform === "win32") return;
+  try {
+    fs.chmodSync(filePath, 0o755);
+  } catch {
+    /* ignore chmod failures on read-only images */
+  }
+}
+
 function spawnHidden(exePath, args, extraEnv = {}) {
   log("spawn", exePath, args.join(" "));
+  ensureExecutable(exePath);
   const child = spawn(exePath, args, {
     detached: false,
     windowsHide: true,
@@ -251,7 +277,7 @@ function startPythonBackend() {
   }
   if (pythonProcess && !pythonProcess.killed) return;
 
-  const enginePath = path.join(process.resourcesPath, "g-aid-engine", "g-aid-engine.exe");
+  const enginePath = bundledBinary(path.join(process.resourcesPath, "g-aid-engine"), "g-aid-engine");
   if (!fs.existsSync(enginePath)) {
     log("Python engine missing:", enginePath);
     return;
@@ -267,7 +293,7 @@ function startOllamaDaemon() {
   if (ollamaProcess && !ollamaProcess.killed) return;
 
   const ollamaDir = path.join(process.resourcesPath, "ai");
-  const ollamaPath = path.join(ollamaDir, "ollama.exe");
+  const ollamaPath = bundledBinary(ollamaDir, "ollama");
   const modelsPath = path.join(ollamaDir, "models");
   if (!fs.existsSync(ollamaPath)) {
     log("Ollama missing:", ollamaPath);
@@ -313,7 +339,7 @@ function ollamaEnv() {
 
 function ensureFastOrchestra() {
   const ollamaDir = path.join(process.resourcesPath, "ai");
-  const ollamaPath = path.join(ollamaDir, "ollama.exe");
+  const ollamaPath = bundledBinary(ollamaDir, "ollama");
   const modelfile = orchestraFastModelfilePath();
   if (!fs.existsSync(ollamaPath) || !modelfile) {
     log("Orchestra Fast model or Modelfile missing");
@@ -329,7 +355,7 @@ function ensureOrchestraModel() {
     return;
   }
   const ollamaDir = path.join(process.resourcesPath, "ai");
-  const ollamaPath = path.join(ollamaDir, "ollama.exe");
+  const ollamaPath = bundledBinary(ollamaDir, "ollama");
   if (!fs.existsSync(ollamaPath)) return;
   spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], {
     OLLAMA_MODELS: path.join(ollamaDir, "models"),
@@ -355,10 +381,31 @@ function listenOnPort(server, port) {
 }
 
 function iconPath() {
-  const packaged = path.join(process.resourcesPath, "app", "build", "icon.ico");
-  const asarSibling = path.join(__dirname, "..", "build", "icon.ico");
-  if (fs.existsSync(asarSibling)) return asarSibling;
-  if (fs.existsSync(packaged)) return packaged;
+  const names =
+    process.platform === "win32"
+      ? ["icon.ico", "icon.png", "icons/512x512.png"]
+      : process.platform === "darwin"
+        ? ["icon.icns", "icons/512x512.png", "icon.png"]
+        : ["icons/512x512.png", "icons/256x256.png", "icon.png"];
+  const dirs = [
+    path.join(__dirname, "..", "build"),
+    path.join(app.getAppPath(), "build"),
+    path.join(process.resourcesPath, "app", "build"),
+    path.join(process.resourcesPath, "build"),
+  ];
+  for (const dir of dirs) {
+    for (const name of names) {
+      const file = path.join(dir, name);
+      if (fs.existsSync(file)) return file;
+    }
+  }
+  const fallbacks = [
+    path.join(__dirname, "..", "public", "app-icon.png"),
+    path.join(app.getAppPath(), "public", "app-icon.png"),
+  ];
+  for (const file of fallbacks) {
+    if (fs.existsSync(file)) return file;
+  }
   return undefined;
 }
 

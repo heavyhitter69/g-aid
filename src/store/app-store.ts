@@ -672,7 +672,7 @@ export const useAppStore = create<AppState>()(
         fileTimeline: (state.fileTimeline || []).slice(0, 80),
         isChatPanelOpen: state.isChatPanelOpen,
       }),
-      version: 3,
+      version: 4,
       migrate: (persistedState: any, version: number) => {
         if (version === 0) {
           return { ...initialState, theme: persistedState?.theme || "dark" };
@@ -690,6 +690,13 @@ export const useAppStore = create<AppState>()(
           next = {
             ...next,
             pluginState: next.pluginState || { enabled: defaultPluginEnabled(), secrets: {} },
+          };
+        }
+        if (version < 4) {
+          next = {
+            ...next,
+            onboardingComplete: false,
+            onboardingStep: next.onboardingStep === "complete" ? "welcome" : next.onboardingStep || "welcome",
           };
         }
         return next;

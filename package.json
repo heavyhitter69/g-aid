@@ -2,8 +2,10 @@
   "name": "geophysics-demo2.0",
   "version": "0.1.0",
   "private": true,
+  "description": "G-AID geophysics workspace",
   "author": {
-    "name": "Genie Platforms"
+    "name": "Genie Platforms",
+    "email": "sarkodieemil@gmail.com"
   },
   "main": "electron/main.js",
   "scripts": {
@@ -17,7 +19,7 @@
     "dist:inno": "node scripts/compile-inno.mjs",
     "dist:win": "npm run icons && npm run build && electron-builder --win dir && npm run dist:inno",
     "dist:mac": "npm run icons && npm run build && electron-builder --mac",
-    "dist:linux": "npm run icons && npm run build && electron-builder --linux"
+    "dist:linux": "npm run icons && npm run build && electron-builder --linux && node scripts/write-linux-launcher.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -64,13 +66,17 @@
     "executableName": "G-AID",
     "copyright": "Copyright © Genie Platforms",
     "compression": "store",
-    "icon": "build/icon.ico",
+    "icon": "build/icon.png",
     "directories": {
       "output": "dist_desktop",
       "buildResources": "build"
     },
     "files": [
       "**/*",
+      "build/icon.png",
+      "build/icon.ico",
+      "build/icon.icns",
+      "build/icons/**/*",
       "!.tmp/**/*",
       "!**/.tmp/**/*",
       "!src/**/*.ts",
@@ -90,6 +96,7 @@
       "main": "electron/main.js"
     },
     "asar": false,
+    "afterPack": "./scripts/after-pack.cjs",
     "protocols": [
       {
         "name": "G-AID",
@@ -115,13 +122,27 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.education"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "category": "Science",
+      "icon": "build/icons",
+      "executableName": "g-aid",
+      "desktop": {
+        "entry": {
+          "Name": "G-AID",
+          "Comment": "Geophysics AI desktop workspace",
+          "Categories": "Science;Education;",
+          "Icon": "g-aid",
+          "StartupWMClass": "g-aid"
+        }
+      }
     },
     "publish": {
       "provider": "github",

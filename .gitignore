@@ -17,8 +17,16 @@
 /.next/
 /out/
 
-# production
-/build
+# generated icons / wizard bitmaps (keep installer scripts tracked)
+/build/*
+!/build/*.iss
+!/build/*.nsh
+!/build/*.txt
+!/build/icon.png
+!/build/icon.ico
+!/build/icon.icns
+!/build/icons/
+!/build/icons/**
 
 # electron desktop build output
 /dist_desktop/

@@ -29,7 +29,6 @@ function SignInBody() {
     isAuthenticated,
     setCurrentProject,
     setProjectFiles,
-    completeOnboarding,
   } = useAppStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +44,7 @@ function SignInBody() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const dest = desktop || onboardingComplete ? "/workspace" : "/onboarding";
+      const dest = onboardingComplete ? "/workspace" : "/onboarding";
       router.replace(openedFile ? `/workspace?open=${encodeURIComponent(openedFile)}` : dest);
     } else if (existingUser?.email) {
       setEmail(existingUser.email);
@@ -53,12 +52,11 @@ function SignInBody() {
   }, [existingUser, isAuthenticated, router, onboardingComplete, desktop, openedFile]);
 
   const goAfterAuth = () => {
-    if (desktop) {
-      completeOnboarding();
-      router.replace(openedFile ? `/workspace?open=${encodeURIComponent(openedFile)}` : "/workspace");
+    if (openedFile) {
+      router.replace(`/workspace?open=${encodeURIComponent(openedFile)}`);
       return;
     }
-    router.push(onboardingComplete ? "/workspace" : "/onboarding");
+    router.replace(onboardingComplete ? "/workspace" : "/onboarding");
   };
 
   const openBrowserAuth = async (mode: "login" | "signup") => {

@@ -21,15 +21,31 @@ if (!fs.existsSync(sourcePng)) {
 const src = PNG.sync.read(fs.readFileSync(sourcePng));
 const trimmed = trimPadding(src);
 
-const iconPng = makeSquircle(trimmed, 512, {
+const iconMaster = makeSquircle(trimmed, 1024, {
   margin: 0,
   radius: 0.22,
   outside: "transparent",
   logoInset: 0.16,
 });
+const sizedPng = { 1024: iconMaster };
+function pngOf(size) {
+  if (!sizedPng[size]) sizedPng[size] = resizePng(iconMaster, size);
+  return sizedPng[size];
+}
+
+const iconPng = pngOf(512);
 const iconPngPath = path.join(buildDir, "icon.png");
 fs.writeFileSync(iconPngPath, PNG.sync.write(iconPng));
 fs.writeFileSync(path.join(buildDir, "icon.ico"), await pngToIco(iconPngPath));
+fs.writeFileSync(path.join(root, "public", "app-icon.png"), PNG.sync.write(iconPng));
+
+const iconsDir = path.join(buildDir, "icons");
+fs.mkdirSync(iconsDir, { recursive: true });
+for (const size of [16, 32, 48, 64, 128, 256, 512, 1024]) {
+  fs.writeFileSync(path.join(iconsDir, `${size}x${size}.png`), PNG.sync.write(pngOf(size)));
+}
+
+writeIcns(path.join(buildDir, "icon.icns"), pngOf);
 
 const small = makeWizardSmall(trimmed, 110);
 writeBmp24(path.join(buildDir, "wizard-small.bmp"), pngToBmp(small, 55, 55));
@@ -38,7 +54,49 @@ writeBmp24(path.join(buildDir, "wizard-small-200.bmp"), pngToBmp(small, 110, 110
 writeBmp24(path.join(buildDir, "wizard-big.bmp"), pngToBmp(makeFinishImage(trimmed, 164, 314), 164, 314));
 writeBmp24(path.join(buildDir, "wizard-big-200.bmp"), pngToBmp(makeFinishImage(trimmed, 328, 628), 328, 628));
 
-console.log("Generated rounded icon.ico and Cursor-style wizard bitmaps");
+console.log("Generated Windows .ico, macOS .icns, Linux PNG set, and installer wizard bitmaps");
+
+function icnsChunk(type, pngBuf) {
+  const header = Buffer.alloc(8);
+  header.write(type, 0, 4, "ascii");
+  header.writeUInt32BE(8 + pngBuf.length, 4);
+  return Buffer.concat([header, pngBuf]);
+}
+
+function writeIcns(dest, pngForSize) {
+  const chunks = [
+    icnsChunk("ic07", PNG.sync.write(pngForSize(128))),
+    icnsChunk("ic08", PNG.sync.write(pngForSize(256))),
+    icnsChunk("ic09", PNG.sync.write(pngForSize(512))),
+    icnsChunk("ic10", PNG.sync.write(pngForSize(1024))),
+    icnsChunk("ic11", PNG.sync.write(pngForSize(32))),
+    icnsChunk("ic12", PNG.sync.write(pngForSize(64))),
+    icnsChunk("ic13", PNG.sync.write(pngForSize(256))),
+    icnsChunk("ic14", PNG.sync.write(pngForSize(512))),
+  ];
+  const body = Buffer.concat(chunks);
+  const header = Buffer.alloc(8);
+  header.write("icns", 0, 4, "ascii");
+  header.writeUInt32BE(8 + body.length, 4);
+  fs.writeFileSync(dest, Buffer.concat([header, body]));
+}
+
+function resizePng(src, size) {
+  const dest = new PNG({ width: size, height: size });
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const sx = ((x + 0.5) * src.width) / size - 0.5;
+      const sy = ((y + 0.5) * src.height) / size - 0.5;
+      const [r, g, b, a] = sample(src, sx, sy);
+      const i = (size * y + x) << 2;
+      dest.data[i] = Math.round(r);
+      dest.data[i + 1] = Math.round(g);
+      dest.data[i + 2] = Math.round(b);
+      dest.data[i + 3] = Math.round(a);
+    }
+  }
+  return dest;
+}
 
 function makeCanvas(width, height, fill = [11, 11, 11, 255]) {
   const png = new PNG({ width, height });

@@ -16,8 +16,8 @@ export function DesktopSessionProvider({ children }: { children: React.ReactNode
   const [hydrated, setHydrated] = useState(false);
   const setAuthenticated = useAppStore((s) => s.setAuthenticated);
   const setUser = useAppStore((s) => s.setUser);
-  const completeOnboarding = useAppStore((s) => s.completeOnboarding);
   const isAuthenticated = useAppStore((s) => s.isAuthenticated);
+  const onboardingComplete = useAppStore((s) => s.onboardingComplete);
 
   useEffect(() => {
     const persist = useAppStore.persist;
@@ -82,32 +82,36 @@ export function DesktopSessionProvider({ children }: { children: React.ReactNode
 
       setUser(profileFromUser(data.user));
       setAuthenticated(true);
-      completeOnboarding();
-      router.replace("/workspace");
+      const done = useAppStore.getState().onboardingComplete;
+      router.replace(done ? "/workspace" : "/onboarding");
     };
 
     window.gaidDesktop.getPendingAuthUrl().then(applyAuthUrl);
     return window.gaidDesktop.onAuthCallback(applyAuthUrl);
-  }, [completeOnboarding, router, setAuthenticated, setUser]);
+  }, [router, setAuthenticated, setUser]);
 
   useEffect(() => {
     if (!hydrated || !isDesktop()) return;
 
     window.gaidDesktop?.dismissBootCover?.();
 
-    if (isAuthenticated && MARKETING_OR_AUTH.has(pathname)) {
-      router.replace("/workspace");
+    const openedFile = new URLSearchParams(window.location.search).has("open");
+
+    if (isAuthenticated) {
+      if (!onboardingComplete && !openedFile && pathname !== "/onboarding") {
+        router.replace("/onboarding");
+        return;
+      }
+      if (onboardingComplete && MARKETING_OR_AUTH.has(pathname)) {
+        router.replace("/workspace");
+      }
       return;
     }
 
-    if (!isAuthenticated && pathname === "/") {
+    if (pathname === "/" || pathname === "/workspace" || pathname === "/onboarding") {
       router.replace("/signin");
     }
-
-    if (!isAuthenticated && pathname === "/workspace") {
-      router.replace("/signin");
-    }
-  }, [hydrated, isAuthenticated, pathname, router]);
+  }, [hydrated, isAuthenticated, onboardingComplete, pathname, router]);
 
   return (
     <>
