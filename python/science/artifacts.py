@@ -30,6 +30,15 @@ def sha256_json(payload: Any) -> str:
     return sha256_bytes(encoded)
 
 
+def assert_gaid_output_path(path: str) -> str:
+    """Refuse writes that are not under a G-AID Output directory."""
+    abs_path = os.path.abspath(path)
+    parts = abs_path.replace("\\", "/").lower().split("/")
+    if "g-aid output" not in parts:
+        raise ValueError(f"Refusing to write outside G-AID Output: {abs_path}")
+    return abs_path
+
+
 def task_dir(payload: dict) -> str:
     params = payload.get("parameters") or {}
     out_dir = params.get("outDir") or ""
@@ -37,6 +46,7 @@ def task_dir(payload: dict) -> str:
     if not out_dir:
         raise ValueError("parameters.outDir is required")
     path = os.path.abspath(os.path.join(out_dir, task_folder))
+    assert_gaid_output_path(path)
     os.makedirs(path, exist_ok=True)
     return path
 

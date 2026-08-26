@@ -8,13 +8,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.node_runner import run_node
 from formats import (
     magarrow_survey_date,
-    parse_geosoft_xyz,
     parse_gsm19,
     parse_header_date,
     parse_las,
     parse_magarrow,
 )
-from science.artifacts import make_artifact, write_json
+from science.artifacts import make_artifact, write_json, assert_gaid_output_path
 
 
 def _survey_date(params: dict, header_text: str, fallback: datetime | None = None):
@@ -57,6 +56,7 @@ def discover_files(payload: dict) -> dict:
     events = []
     artifacts = []
     out_dir = os.path.abspath(os.path.join(out_dir, task_folder))
+    assert_gaid_output_path(out_dir)
     os.makedirs(out_dir, exist_ok=True)
 
     candidates = []
@@ -98,11 +98,15 @@ def discover_files(payload: dict) -> dict:
                 any(k in head_l for k in ("wenner", "dipole", "electrode", "res2dinv"))
                 or (head.strip()[:1].isalpha())
             ):
-                kind = "ert-dat"
+                events.append(_progress(node_id, f"Skipped {f}: not MagArrow or GSM-19."))
+                continue
             elif lower.endswith(".xyz") or (head_l.startswith("/") and "x" in head_l):
-                kind = "geosoft-xyz"
+                events.append(_progress(node_id, f"Skipped {f}: not MagArrow or GSM-19."))
+                continue
             else:
                 kind = "other"
+            if kind == "other":
+                continue
             candidates.append({"path": filepath, "name": f, "rel": rel, "head": head, "kind": kind})
 
     base_dfs = []
@@ -139,20 +143,6 @@ def discover_files(payload: dict) -> dict:
             manifest.append({"path": item["rel"], "kind": "gsm19-base", "date": str(date.date()), "n": len(df)})
         except Exception as exc:
             events.append(_qc("warning", f"Failed to inspect or parse {item['name']}: {exc}", node_id))
-
-    for item in candidates:
-        if item["kind"] == "ert-dat":
-            manifest.append({"path": item["rel"], "kind": "ert-dat"})
-            events.append(_progress(node_id, f"Classified {item['name']} as possible ERT .dat."))
-        elif item["kind"] == "geosoft-xyz":
-            try:
-                xyz = parse_geosoft_xyz(item["path"])
-                xyz_path = os.path.join(out_dir, "xyz_canonical.csv")
-                xyz.to_csv(xyz_path, index=False)
-                manifest.append({"path": item["rel"], "kind": "geosoft-xyz", "n": len(xyz)})
-                events.append(_progress(node_id, f"Read {item['name']} as Geosoft XYZ ({len(xyz)} samples)."))
-            except Exception as exc:
-                events.append(_qc("warning", f"XYZ parse of {item['name']} failed: {exc}", node_id))
 
     manifest_path = os.path.join(out_dir, "survey_manifest.json")
     write_json(manifest_path, {"directory": abs_dir, "files": manifest, "created_at": datetime.now(timezone.utc).isoformat()})

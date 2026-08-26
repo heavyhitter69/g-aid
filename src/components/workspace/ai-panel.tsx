@@ -1260,6 +1260,7 @@ const handleApproveDiurnal = async (sessionId: string) => {
           sessionId,
           decision: "approve",
           implementationPlanContent: useAppStore.getState().fileContents[TEMP_PLAN_ID],
+          workspaceRoot: workspaceRoot || "",
         }),
         signal: abort.signal,
       });

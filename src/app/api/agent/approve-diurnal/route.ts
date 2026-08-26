@@ -12,7 +12,7 @@ const encoder = new TextEncoder();
 function streamMessage(text: string, epilogue: Record<string, unknown>): Response {
   const stream = new ReadableStream({
     start(controller) {
-      controller.enqueue(encoder.encode(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0.9 })}\n`));
+      controller.enqueue(encoder.encode(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`));
       controller.enqueue(encoder.encode(text));
       controller.enqueue(encoder.encode(`\n\x02${JSON.stringify(epilogue)}\n`));
       controller.close();
@@ -27,6 +27,7 @@ interface ApproveRequest {
   comment?: string;
   implementationPlanContent?: string;
   planRev?: number;
+  workspaceRoot?: string;
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -37,13 +38,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { sessionId, decision, implementationPlanContent } = body;
+  const { sessionId, decision, implementationPlanContent, workspaceRoot } = body;
   if (!sessionId || !decision) {
     return Response.json({ error: "sessionId and decision are required" }, { status: 400 });
   }
 
+  const root = typeof workspaceRoot === "string" ? workspaceRoot.trim() : "";
   if (decision === "approve") {
-    const pending = syncPendingFromEditor(sessionId, implementationPlanContent) || getPendingPlan(sessionId);
+    const pending = syncPendingFromEditor(sessionId, implementationPlanContent) || getPendingPlan(sessionId, root);
     if (pending) {
       const check = validatePlan(pending);
       if (!check.ok) {
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
   }
 
-  return new Response(streamPlanDecision(sessionId, decision), {
+  return new Response(streamPlanDecision(sessionId, decision, root), {
     headers: {
       "Content-Type": "application/octet-stream",
       "Transfer-Encoding": "chunked",

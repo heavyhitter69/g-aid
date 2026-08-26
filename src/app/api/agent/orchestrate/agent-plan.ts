@@ -3,7 +3,6 @@ import {
   buildWorkspaceBrief,
   detectAnalysisIntent,
   isAbsoluteDiskPath,
-  type AnalysisIntent,
   type WorkspaceIndex,
 } from "@/lib/workspace-index";
 import {
@@ -15,8 +14,8 @@ import {
   unmatchedNeedles,
   type WorkspaceSearchHit,
 } from "@/lib/workspace-search";
-import { resolveOutputLayout } from "@/lib/output-layout";
-import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan, type PlanSteps } from "./implementation-plan";
+import { generateRunId, resolveRunLayout } from "@/lib/run-layout";
+import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan } from "./implementation-plan";
 import {
   applyChatPatches,
   applyEditorAndChat,
@@ -25,91 +24,27 @@ import {
   validatePlan,
   workItems,
 } from "@/lib/plan-spec";
+import { collectPlanInputs, inferIntentFromFiles, intentToSteps } from "@/lib/plan-intent";
 
-function magSuite(enabled: boolean): Pick<
-  PlanSteps,
-  "igrf" | "headingLag" | "level" | "grid" | "derivatives" | "lineaments" | "gis"
-> {
-  return {
-    igrf: enabled,
-    headingLag: enabled,
-    level: enabled,
-    grid: enabled,
-    derivatives: enabled,
-    lineaments: enabled,
-    gis: enabled,
-  };
-}
-
-function intentToSteps(intent: AnalysisIntent | null, message: string, previous?: PlanSteps): PlanSteps {
-  const m = message.toLowerCase();
-  const onlyDiurnal =
-    /\b(only|just)\s+diurnal\b|\bdiurnal\s+only\b/.test(m) ||
-    (intent === "diurnal" && !/\brtp\b|\bigrf\b|\bgrid\b|\bfull\s+(mag|magnetic)\b/.test(m));
-  const next: PlanSteps = { ...(previous ?? EMPTY_STEPS) };
-
-  if (intent === "gravity" || /\bbouguer\b|\bfree[\s-]?air\b/.test(m)) {
-    next.gravity = true;
-    next.residual = true;
-    next.gis = true;
-  }
-  if (intent === "resistivity" || /\bert\b|\bpseudosection\b/.test(m)) {
-    next.ert = true;
-    next.ertInvert = !/\bpseudosection only\b/.test(m);
-  }
-  if (intent === "seismic") next.seismic = true;
-  if (intent === "radiometrics") next.radiometrics = true;
-  if (intent === "gpr") next.gpr = true;
-
-  const mag =
-    intent === "diurnal" ||
-    intent === "rtp" ||
-    intent === "magnetic" ||
-    /\bdiurnal\b|\brtp\b|\bigrf\b|\bmagnetic\b/.test(m);
-
-  if (mag) {
-    next.diurnal = true;
-    if (!onlyDiurnal) {
-      Object.assign(next, magSuite(true));
-      next.rtp = intent === "rtp" || intent === "magnetic" || /\brtp\b/.test(m) || previous?.rtp || false;
-      if (intent === "magnetic" || intent === "rtp") next.rtp = true;
-      if (intent === "diurnal" && !/\brtp\b/.test(m)) {
-        next.rtp = previous?.rtp || false;
-      }
-    }
-  }
-  return next;
-}
-
-function jobLabel(steps: PlanSteps): string {
-  const parts: string[] = [];
-  if (steps.diurnal) parts.push("diurnal");
-  if (steps.igrf) parts.push("IGRF");
-  if (steps.rtp) parts.push("RTP");
-  if (steps.gravity) parts.push("gravity");
-  if (steps.ert) parts.push("ERT");
-  if (steps.seismic) parts.push("seismic");
-  if (steps.gpr) parts.push("GPR");
-  if (steps.radiometrics) parts.push("rad");
-  return parts.join("+") || "process";
-}
+export { intentToSteps };
 
 function paintPlan(plan: AgentPlan): AgentPlan {
   const projectName = plan.projectName;
-  const layout = resolveOutputLayout(
-    plan.workspaceRoot,
-    plan.targetFolder,
-    projectName,
-    jobLabel(plan.steps)
-  );
+  const runId = plan.runId || generateRunId();
+  const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
+  const notes = [...(plan.notes || [])];
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic checklist.");
+  }
   const next: AgentPlan = {
     ...plan,
+    runId,
     taskFolder: layout.taskFolder,
     outputDir: layout.outputDir,
     productsRel: layout.productsRel,
     status: plan.status || "draft",
     rev: plan.rev ?? 1,
-    notes: plan.notes || [],
+    notes,
   };
   next.plan = renderImplementationPlan({
     projectName,
@@ -150,15 +85,15 @@ export function upsertAgentPlan(options: {
   searchHits?: WorkspaceSearchHit[];
   searchMisses?: string[];
 }): AgentPlan {
-  const existing = getPendingPlan(options.sessionId);
+  const existing = getPendingPlan(options.sessionId, options.workspaceRoot);
   const projectName = options.projectName || path.basename(options.workspaceRoot);
-  const intent =
-    detectAnalysisIntent(options.userText) ||
-    existing?.intent ||
-    "magnetic";
   const hits = options.searchHits ?? searchWorkspaceIndex(options.workspaceIndex, options.userText);
   const misses = options.searchMisses ?? unmatchedNeedles(extractSearchNeedles(options.userText).named, hits);
   const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex, hits);
+  const targetFolder = inferredTarget || existing?.targetFolder || "";
+  const detected = detectAnalysisIntent(options.userText);
+  const intent = detected
+    || (existing && !detected ? existing.intent : inferIntentFromFiles(null, options.workspaceIndex, targetFolder, options.userText));
 
   let draft: AgentPlan;
   if (existing) {
@@ -171,10 +106,12 @@ export function upsertAgentPlan(options: {
       rev: (existing.rev || 1) + 1,
       status: "draft",
     };
+    if (detected && detected !== "diurnal" && detected !== "rtp" && detected !== "magnetic") {
+      draft.steps = intentToSteps(intent, options.userText);
+    }
     draft = applyEditorAndChat(draft, options.editorMarkdown, options.userText);
     if (inferredTarget) draft.targetFolder = inferredTarget;
   } else {
-    const targetFolder = inferredTarget || "";
     draft = {
       plan: "",
       taskFolder: "",
@@ -202,6 +139,7 @@ export function upsertAgentPlan(options: {
     ];
   }
 
+  draft.inputs = collectPlanInputs(options.workspaceIndex, draft.targetFolder);
   draft.workspaceBrief = buildWorkspaceBrief(
     options.workspaceIndex,
     options.workspaceRoot,

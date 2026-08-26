@@ -129,6 +129,17 @@ test("validatePlan blocks missing mag files for diurnal", () => {
   assert.equal(check.blockers.some((issue) => issue.code === "no_mag_files"), true);
 });
 
+test("validatePlan blocks incomplete mag files for diurnal", () => {
+  const check = validatePlan(
+    plan({
+      workspaceBrief: "MagArrow airborne: 4\nGSM-19 base station: 0",
+      steps: { ...EMPTY_STEPS, diurnal: true },
+    })
+  );
+  assert.equal(check.ok, false);
+  assert.equal(check.blockers.some((issue) => issue.code === "incomplete_mag"), true);
+});
+
 test("editor+chat: markdown no-RTP then chat skip levelling", () => {
   const markdown = renderImplementationPlan({
     projectName: "TEMA",

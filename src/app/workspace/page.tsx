@@ -6,12 +6,10 @@ import { Sidebar } from "@/components/workspace/sidebar";
 import { Topbar } from "@/components/workspace/topbar";
 import { StatusBar } from "@/components/workspace/status-bar";
 import { AIPanel } from "@/components/workspace/ai-panel";
-import { UploadModal } from "@/components/workspace/upload-modal";
 import { ConversationHistoryModal } from "@/components/workspace/conversation-history-modal";
 import { DashboardView } from "@/components/workspace/dashboard-view";
 import { WorkflowBuilder } from "@/components/workflows/workflow-builder";
 import { VisualizationStudio } from "@/components/workspace/visualization-studio";
-import { AICenter } from "@/components/workspace/ai-center";
 import { PluginStoreView } from "@/components/workspace/plugin-store";
 import { FileEditorView } from "@/components/workspace/file-editor";
 import { PendingChangesReview } from "@/components/workspace/pending-changes";
@@ -87,7 +85,6 @@ export default function WorkspacePage() {
     recentProjects
   } = useAppStore();
   const ingestDataset = useScientificState((s) => s.ingestDataset);
-  const [uploadOpen, setUploadOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [saveAsName, setSaveAsName] = useState("");
   const [fileSearch, setFileSearch] = useState("");
@@ -273,7 +270,14 @@ export default function WorkspacePage() {
       case "visualization":
         return <VisualizationStudio />;
       case "ai-center":
-        return <AICenter />;
+        return (
+          <section className="h-full flex flex-col items-center justify-center gap-2 p-8 text-[#858585]">
+            <h2 className="text-lg font-semibold text-[#cccccc]">Not in this workflow</h2>
+            <p className="text-sm max-w-md text-center">
+              The interpretation centre is not part of the magnetic survey path. Open G-AID Output after Proceed to view real products.
+            </p>
+          </section>
+        );
       case "datasets":
         return (
           <section className="p-6 bg-[#1e1e1e] h-full text-[#cccccc]">
@@ -605,7 +609,6 @@ export default function WorkspacePage() {
       </div>
       
       <StatusBar />
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
 
       {/* Hidden Native File Selector */}
       <input 

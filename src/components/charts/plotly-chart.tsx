@@ -2,29 +2,25 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { seededUnit } from "@/lib/utils";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 interface PlotlyChartProps {
   type: "heatmap" | "contour" | "histogram" | "waveform" | "scatter3d";
   className?: string;
+  /** Real grid values. Without this the chart stays empty — no seeded demo data. */
+  z?: number[][];
+  x?: number[];
+  y?: number[];
+  title?: string;
 }
 
-function generateResistivityData() {
-  const z: number[][] = [];
-  for (let i = 0; i < 40; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < 60; j++) {
-      const anomaly = Math.exp(-((i - 20) ** 2 + (j - 35) ** 2) / 80) * 200;
-      row.push(30 + seededUnit("ert", i, j) * 20 + anomaly);
-    }
-    z.push(row);
-  }
-  return z;
-}
+export function PlotlyChart({ type, className, z, x, y, title }: PlotlyChartProps) {
+  const hasData =
+    (Array.isArray(z) && z.length > 0) ||
+    (Array.isArray(x) && x.length > 0) ||
+    (Array.isArray(y) && y.length > 0);
 
-export function PlotlyChart({ type, className }: PlotlyChartProps) {
   const { data, layout } = useMemo(() => {
     const darkLayout = {
       paper_bgcolor: "transparent",
@@ -35,84 +31,61 @@ export function PlotlyChart({ type, className }: PlotlyChartProps) {
       yaxis: { gridcolor: "rgba(255,255,255,0.05)", zerolinecolor: "rgba(255,255,255,0.1)" },
     };
 
-    if (type === "heatmap") {
+    if (!hasData) {
       return {
-        data: [{
-          z: generateResistivityData(),
-          type: "heatmap" as const,
-          colorscale: "Viridis",
-          colorbar: { title: "ρ (Ω·m)", titlefont: { color: "#a1a1aa" }, tickfont: { color: "#71717a" } },
-        }],
-        layout: { ...darkLayout, title: { text: "ERT Resistivity Section", font: { color: "#e2e8f0", size: 12 } } },
+        data: [],
+        layout: {
+          ...darkLayout,
+          title: { text: title || "No survey grid loaded", font: { color: "#e2e8f0", size: 12 } },
+          annotations: [
+            {
+              text: "Open a completed magnetic run to plot real values.",
+              showarrow: false,
+              font: { color: "#71717a", size: 11 },
+              xref: "paper",
+              yref: "paper",
+              x: 0.5,
+              y: 0.5,
+            },
+          ],
+        },
       };
     }
 
-    if (type === "contour") {
-      const z = generateResistivityData();
+    if (type === "heatmap" || type === "contour") {
       return {
-        data: [{ z, type: "contour" as const, colorscale: "Viridis", contours: { coloring: "heatmap" as const } }],
-        layout: { ...darkLayout, title: { text: "Apparent Resistivity Contours", font: { color: "#e2e8f0", size: 12 } } },
+        data: [{
+          z: z || [],
+          type: type === "contour" ? ("contour" as const) : ("heatmap" as const),
+          colorscale: "Viridis",
+        }],
+        layout: { ...darkLayout, title: { text: title || "Grid", font: { color: "#e2e8f0", size: 12 } } },
       };
     }
 
     if (type === "histogram") {
       return {
         data: [{
-          x: Array.from({ length: 500 }, (_, i) =>
-            20 + seededUnit("hist", i) * 80 + (seededUnit("hist-outlier", i) > 0.9 ? 150 : 0)
-          ),
+          x: x || (z || []).flat(),
           type: "histogram" as const,
           marker: { color: "rgba(255,255,255,0.4)" },
           nbinsx: 40,
         }],
-        layout: { ...darkLayout, title: { text: "Resistivity Distribution", font: { color: "#e2e8f0", size: 12 } } },
+        layout: { ...darkLayout, title: { text: title || "Distribution", font: { color: "#e2e8f0", size: 12 } } },
       };
     }
 
-    if (type === "waveform") {
-      const t = Array.from({ length: 200 }, (_, i) => i * 0.004);
-      return {
-        data: [{
-          x: t,
-          y: t.map((ti, i) =>
-            Math.sin(2 * Math.PI * 25 * ti) * Math.exp(-ti * 3) + (seededUnit("wave", i) - 0.5) * 0.1
-          ),
-          type: "scatter" as const,
-          mode: "lines" as const,
-          line: { color: "#ffffff", width: 1 },
-        }],
-        layout: { ...darkLayout, title: { text: "Induced Polarization Decay", font: { color: "#e2e8f0", size: 12 } }, xaxis: { ...darkLayout.xaxis, title: "Time (s)" }, yaxis: { ...darkLayout.yaxis, title: "mV/V" } },
-      };
-    }
-
-    // scatter3d
-    const n = 200;
     return {
       data: [{
-        x: Array.from({ length: n }, (_, i) => seededUnit("3d-x", i) * 100),
-        y: Array.from({ length: n }, (_, i) => seededUnit("3d-y", i) * 100),
-        z: Array.from({ length: n }, (_, i) => -5 - seededUnit("3d-z", i) * 30),
-        mode: "markers" as const,
-        type: "scatter3d" as const,
-        marker: {
-          size: 3,
-          color: Array.from({ length: n }, (_, i) => seededUnit("3d-c", i) * 100),
-          colorscale: "Plasma",
-          opacity: 0.8,
-        },
+        x: x || [],
+        y: y || [],
+        type: "scatter" as const,
+        mode: "lines" as const,
+        line: { color: "#ffffff", width: 1 },
       }],
-      layout: {
-        ...darkLayout,
-        title: { text: "3D Subsurface Model Preview", font: { color: "#e2e8f0", size: 12 } },
-        scene: {
-          bgcolor: "transparent",
-          xaxis: { title: "E (m)", gridcolor: "rgba(255,255,255,0.05)" },
-          yaxis: { title: "N (m)", gridcolor: "rgba(255,255,255,0.05)" },
-          zaxis: { title: "Depth (m)", gridcolor: "rgba(255,255,255,0.05)" },
-        },
-      },
+      layout: { ...darkLayout, title: { text: title || "Series", font: { color: "#e2e8f0", size: 12 } } },
     };
-  }, [type]);
+  }, [hasData, type, title, z, x, y]);
 
   return (
     <figure className={className}>

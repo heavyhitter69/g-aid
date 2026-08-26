@@ -130,7 +130,7 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   if (rtp && diurnal) return "magnetic";
   if (rtp) return "rtp";
   if (diurnal) return "diurnal";
-  if (wantsWork && /\b(mag|magnetic|survey|airborne|tmi|igrf)\b/.test(m)) return "magnetic";
+  if (wantsWork && /\b(mag|magnetic|airborne|tmi|igrf|magarrow|gsm-?19)\b/.test(m)) return "magnetic";
   return null;
 }
 
@@ -161,6 +161,16 @@ export function isProceedPhrase(message: string): boolean {
   if (/^i approve the implementation plan/.test(t)) return true;
   if (/\bapprov/.test(t) && /\bplease proceed$/.test(t)) return true;
   return false;
+}
+
+export function isProcessingRequest(message: string): boolean {
+  if (!message.trim() || isGeneralKnowledgeQuestion(message)) return false;
+  if (detectAnalysisIntent(message)) return true;
+  const t = message.toLowerCase();
+  if (/\bday\s*\d+\b/.test(t) && /\b(do|run|perform|apply|start|process|correct|execute|analyse|analyze|plan|grid)\b/.test(t)) {
+    return true;
+  }
+  return /\b(process|correct|grid|analyse|analyze)\b/.test(t) && /\b(day\s*\d+|survey|folder|magarrow|gsm-?19)\b/.test(t);
 }
 
 export function isDiurnalRunRequest(message: string): boolean {

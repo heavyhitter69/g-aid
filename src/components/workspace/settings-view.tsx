@@ -381,9 +381,9 @@ export function SettingsView() {
                     <User className="h-6 w-6 text-[#555555]" />
                   </div>
                   <div>
-                    <p className="text-[14px] font-semibold text-[#cccccc] mb-1">You&apos;re browsing the demo</p>
+                    <p className="text-[14px] font-semibold text-[#cccccc] mb-1">You&apos;re not signed in</p>
                     <p className="text-[12px] text-[#858585] max-w-[280px] leading-relaxed mx-auto">
-                      Create a free account to save your workspace preferences, discipline, and agent settings across sessions.
+                      Create a free account to save workspace preferences across sessions. This is not a demo survey.
                     </p>
                   </div>
                   <div className="flex flex-col gap-3 w-full max-w-[240px]">

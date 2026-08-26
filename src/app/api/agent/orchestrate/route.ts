@@ -12,6 +12,7 @@ import {
   detectAnalysisIntent,
   isGeneralKnowledgeQuestion,
   isProceedPhrase,
+  isProcessingRequest,
   splitUserAndContext,
   type WorkspaceIndex,
 } from "@/lib/workspace-index";
@@ -36,8 +37,8 @@ function streamAgentResponse(
         encoder.encode(
           `\x00${JSON.stringify({
             agentId: "orchestrator-agent",
-            confidence: 0.9,
-            showConfidence: true,
+            confidence: 0,
+            showConfidence: false,
             capabilityTrace: ["G-AID"],
             ...preamble,
           })}\n`
@@ -166,12 +167,12 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
       );
     }
-    return new Response(streamPlanDecision(sessionId, "approve"), {
+    return new Response(streamPlanDecision(sessionId, "approve", root), {
       headers: { "Content-Type": "application/octet-stream" },
     });
   }
 
-  const planTurn = Boolean(intent || pending) && !isGeneralKnowledgeQuestion(userText);
+  const planTurn = Boolean(intent || pending || isProcessingRequest(userText)) && !isGeneralKnowledgeQuestion(userText);
   const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn });
   if (planTurn && !root) {
     return streamAgentResponse(

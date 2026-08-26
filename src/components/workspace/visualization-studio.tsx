@@ -5,6 +5,7 @@ import { Layers, Loader2 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { GridMapView, extractLineStrings, extractLonLat, parseEsriAscii } from "@/components/workspace/grid-map-view";
 import { folderOf, layerLabel, rasterLayersFromPaths } from "@/lib/job-results";
+import { companionAsciiPath } from "@/lib/survey-file-kinds";
 import { epsgZone, looksLonLat, utmZoneFromLon, wgs84ToUtm } from "@/lib/wgs84-utm";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +65,21 @@ export function VisualizationStudio() {
       .readWorkspaceFile(workspaceRoot, activeLayerId)
       .then((result) => {
         if (cancelled) return;
-        setFileContent(activeLayerId, result?.text || "");
+        const text = result?.text || "";
+        if (text) {
+          setFileContent(activeLayerId, text);
+          return;
+        }
+        const companion = companionAsciiPath(activeLayerId);
+        if (companion && companion !== activeLayerId) {
+          return window.gaidDesktop
+            ?.readWorkspaceFile(workspaceRoot, companion)
+            .then((ascii) => {
+              if (cancelled) return;
+              setFileContent(activeLayerId, ascii?.text || "");
+            });
+        }
+        setFileContent(activeLayerId, "");
       })
       .catch(() => {
         if (!cancelled) setFileContent(activeLayerId, "");

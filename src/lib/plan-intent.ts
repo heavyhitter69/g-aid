@@ -1,0 +1,91 @@
+import { detectAnalysisIntent, filesInTarget, type AnalysisIntent, type WorkspaceIndex } from "./workspace-index.ts";
+import { EMPTY_STEPS, type PlanSteps } from "./plan-spec.ts";
+
+function magSuite(enabled: boolean): Pick<
+  PlanSteps,
+  "igrf" | "headingLag" | "level" | "grid" | "derivatives" | "lineaments" | "gis"
+> {
+  return {
+    igrf: enabled,
+    headingLag: enabled,
+    level: enabled,
+    grid: enabled,
+    derivatives: enabled,
+    lineaments: enabled,
+    gis: enabled,
+  };
+}
+
+export function intentToSteps(
+  intent: AnalysisIntent | "none" | null,
+  message: string,
+  previous?: PlanSteps
+): PlanSteps {
+  const m = message.toLowerCase();
+  const onlyDiurnal =
+    /\b(only|just)\s+diurnal\b|\bdiurnal\s+only\b/.test(m) ||
+    (intent === "diurnal" && !/\brtp\b|\bigrf\b|\bgrid\b|\bfull\s+(mag|magnetic)\b/.test(m));
+  const next: PlanSteps = { ...(previous ?? EMPTY_STEPS) };
+
+  if (intent === "gravity" || /\bbouguer\b|\bfree[\s-]?air\b/.test(m)) {
+    next.gravity = true;
+    next.residual = true;
+  }
+  if (intent === "resistivity" || /\bert\b|\bpseudosection\b/.test(m)) {
+    next.ert = true;
+    next.ertInvert = !/\bpseudosection only\b/.test(m);
+  }
+  if (intent === "seismic") next.seismic = true;
+  if (intent === "radiometrics") next.radiometrics = true;
+  if (intent === "gpr") next.gpr = true;
+
+  const mag =
+    intent === "diurnal" ||
+    intent === "rtp" ||
+    intent === "magnetic" ||
+    /\bdiurnal\b|\brtp\b|\bigrf\b|\bmagnetic\b/.test(m);
+
+  if (mag) {
+    next.diurnal = true;
+    if (!onlyDiurnal) {
+      Object.assign(next, magSuite(true));
+      next.rtp = intent === "rtp" || intent === "magnetic" || /\brtp\b/.test(m) || previous?.rtp || false;
+      if (intent === "magnetic" || intent === "rtp") next.rtp = true;
+      if (intent === "diurnal" && !/\brtp\b/.test(m)) {
+        next.rtp = previous?.rtp || false;
+      }
+    }
+  }
+  return next;
+}
+
+export function inferIntentFromFiles(
+  detected: AnalysisIntent | null,
+  index: WorkspaceIndex | null,
+  targetFolder: string,
+  message: string
+): AnalysisIntent | "none" {
+  if (detected) return detected;
+  const m = message.toLowerCase();
+  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr)\b/.test(m)) {
+    return detectAnalysisIntent(message) || "none";
+  }
+  const scoped = filesInTarget(index, targetFolder);
+  const air = scoped.filter((file) => file.kind === "magarrow").length;
+  const base = scoped.filter((file) => file.kind === "gsm19-base").length;
+  const wantsWork =
+    /\b(do|run|perform|apply|start|process|correct|execute|analyse|analyze|plan|grid)\b/.test(m) ||
+    /\bday\s*\d+\b/.test(m);
+  if (wantsWork && air > 0 && base > 0) return "magnetic";
+  return "none";
+}
+
+export function collectPlanInputs(index: WorkspaceIndex | null, targetFolder: string) {
+  return filesInTarget(index, targetFolder)
+    .filter((file) => file.kind === "magarrow" || file.kind === "gsm19-base")
+    .map((file) => ({
+      path: file.relativePath,
+      kind: file.kind,
+      size: file.size,
+    }));
+}

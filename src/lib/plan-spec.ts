@@ -45,6 +45,15 @@ export const EMPTY_STEPS: PlanSteps = {
   gpr: false,
 };
 
+export type PlanIntent = AnalysisIntent | "none";
+
+export interface PlanInput {
+  path: string;
+  kind?: string;
+  size?: number;
+  checksum?: string;
+}
+
 export interface AgentPlan {
   plan: string;
   taskFolder: string;
@@ -53,7 +62,7 @@ export interface AgentPlan {
   workspaceRoot: string;
   targetFolder: string;
   projectName: string;
-  intent: AnalysisIntent;
+  intent: PlanIntent;
   steps: PlanSteps;
   parameters: {
     baseReference: "mean_base" | "median_base" | "first_sample";
@@ -67,6 +76,12 @@ export interface AgentPlan {
   rev?: number;
   notes?: string[];
   status?: PlanStatus;
+  runId?: string;
+  parentRunId?: string;
+  planHash?: string;
+  approvedAt?: string;
+  inputs?: PlanInput[];
+  lineage?: { products?: string[] };
 }
 
 export interface PlanIssue {
@@ -115,16 +130,59 @@ export const STEP_KEYS = [
 
 type StepKey = (typeof STEP_KEYS)[number];
 
+/** Nodes actually registered on MagneticPreprocessingPipeline. Keep in sync with that class. */
+export const REGISTERED_MAG_NODE_IDS = [
+  "file_discovery",
+  "flight_path_cleaner",
+  "time_synchronizer",
+  "diurnal_corrector",
+  "qc_engine",
+  "excel_export_adapter",
+  "report_export_adapter",
+  "igrf_corrector",
+  "heading_lag_corrector",
+  "tie_line_leveler",
+  "microleveller",
+  "mag_gridder",
+  "rtp_filter",
+  "fft_derivatives",
+  "lineament_extractor",
+  "euler_deconvolution",
+  "gis_export",
+] as const;
+
+export const MAGNETIC_STEP_KEYS = [
+  "diurnal",
+  "igrf",
+  "headingLag",
+  "level",
+  "grid",
+  "rtp",
+  "derivatives",
+  "lineaments",
+  "gis",
+] as const satisfies readonly StepKey[];
+
+export const UNSUPPORTED_STEP_KEYS = [
+  "gravity",
+  "residual",
+  "ert",
+  "ertInvert",
+  "seismic",
+  "radiometrics",
+  "gpr",
+] as const satisfies readonly StepKey[];
+
 export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   diurnal: ["file_discovery", "flight_path_cleaner", "time_synchronizer", "diurnal_corrector", "qc_engine"],
   igrf: ["igrf_corrector"],
   headingLag: ["heading_lag_corrector"],
-  level: ["tie_line_leveler", "microleveller", "grid_microleveller"],
+  level: ["tie_line_leveler", "microleveller"],
   grid: ["mag_gridder"],
   rtp: ["rtp_filter"],
-  derivatives: ["fft_derivatives"],
+  derivatives: ["fft_derivatives", "euler_deconvolution"],
   lineaments: ["lineament_extractor"],
-  gis: ["gis_export", "map_composer", "excel_export_adapter", "report_export_adapter"],
+  gis: ["gis_export", "excel_export_adapter", "report_export_adapter"],
   gravity: ["xyz_ingest", "gravity_reduce"],
   residual: ["regional_residual"],
   ert: ["ert_pseudosection"],
@@ -133,6 +191,29 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   radiometrics: ["radiometric_correct"],
   gpr: ["gpr_process"],
 };
+
+export function magneticStepsEnabled(steps: PlanSteps): boolean {
+  return MAGNETIC_STEP_KEYS.some((key) => steps[key]);
+}
+
+export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
+  return UNSUPPORTED_STEP_KEYS.some((key) => steps[key]);
+}
+
+export function registeredNodesForSteps(steps: PlanSteps): string[] {
+  const registered = new Set<string>(REGISTERED_MAG_NODE_IDS);
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const key of MAGNETIC_STEP_KEYS) {
+    if (!steps[key]) continue;
+    for (const id of STEP_NODE_IDS[key]) {
+      if (!registered.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  return ids;
+}
 
 const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "diurnal", re: /\b(diurnal|magarrow|gsm-?19)\b/i },
@@ -243,7 +324,7 @@ export function renderImplementationPlan(opts: {
 **Products:** \`${products}/\`
 
 ## This run
-${items.join("\n") || "- Ask for a specific method (diurnal, RTP, Bouguer, ERT, SEG-Y)."}
+${items.join("\n") || "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP). Other methods are not in this release."}
 
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
@@ -252,7 +333,7 @@ ${items.join("\n") || "- Ask for a specific method (diurnal, RTP, Bouguer, ERT, 
 ${notes.length ? notes.map((note) => `- ${note}`).join("\n") : "- None flagged before Proceed."}
 
 ## After you click Proceed
-Products are written under \`${products}/\`. Edits in this file are what G-AID will run.
+Products, the frozen plan, tasks, and logs are written under \`${products}/\`. A rerun always creates a new run folder. Edits in this file are what G-AID will run.
 `;
 }
 
@@ -558,20 +639,36 @@ export function validatePlan(plan: AgentPlan): PlanValidation {
 
   const magarrow = countFromBrief(plan.workspaceBrief || "", "MagArrow airborne");
   const gsm = countFromBrief(plan.workspaceBrief || "", "GSM-19 base station");
-  if (plan.steps.diurnal && magarrow === 0 && gsm === 0) {
+  const magMissing = magarrow == null || magarrow === 0;
+  const gsmMissing = gsm == null || gsm === 0;
+  if (plan.steps.diurnal && magMissing && gsmMissing) {
     blockers.push({
       level: "blocker",
       code: "no_mag_files",
       message: "I don't see MagArrow or GSM-19 files in the target folder. Open the parent survey, or pick a different DAY.",
     });
-  } else if (plan.steps.diurnal && (magarrow === 0 || gsm === 0)) {
+  } else if (plan.steps.diurnal && (magMissing || gsmMissing)) {
+    blockers.push({
+      level: "blocker",
+      code: "incomplete_mag",
+      message: magMissing
+        ? "Diurnal correction needs MagArrow rover files as well as the GSM-19 base. I will not run it with only a base station."
+        : "Diurnal correction needs GSM-19 base-station files as well as MagArrow rover data. I will not run it with only the rover.",
+    });
+  }
+
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps)) {
+    blockers.push({
+      level: "blocker",
+      code: "unsupported_method",
+      message:
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics after you click Proceed. Gravity, ERT, seismic, GPR, and radiometrics are not available yet.",
+    });
+  } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({
       level: "warning",
-      code: "incomplete_mag",
-      message:
-        magarrow === 0
-          ? "No MagArrow airborne files in the target folder."
-          : "No GSM-19 base-station files in the target folder.",
+      code: "unsupported_method",
+      message: "Extra non-magnetic methods in this plan will not run. Only the magnetic checklist is executed.",
     });
   }
 

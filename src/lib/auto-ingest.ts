@@ -127,12 +127,7 @@ function detectModality(headers: string[], ext: string): DataModality | null {
     if (ext === "las") return "well-log";
     if (ext === "sgy" || ext === "segy") return "seismic";
     if (ext === "grd") return "gravity";
-    // If we found spatial columns but no modality keywords, default to magnetic
-    // (most common survey type for generic CSV with lat/lon/value)
-    const hasSpatial = normalised.some((c) =>
-      Object.keys(SPATIAL_KEYWORDS).some((k) => c.includes(k))
-    );
-    if (hasSpatial && normalised.length >= 3) return "magnetic";
+    // Spatial columns without a magnetic (or other) keyword are unknown — not magnetic by default.
     return null;
   }
 

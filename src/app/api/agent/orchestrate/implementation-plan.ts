@@ -1,8 +1,8 @@
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
-import { EMPTY_STEPS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
+import { EMPTY_STEPS, MAGNETIC_STEP_KEYS, REGISTERED_MAG_NODE_IDS, STEP_NODE_IDS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
+import { pendingPlansPath } from "@/lib/run-layout";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
 
 export { EMPTY_STEPS, type AgentPlan, type PlanSteps, checkNodeInTasks };
@@ -12,29 +12,34 @@ if (!globalAny.PENDING_APPROVAL) {
   globalAny.PENDING_APPROVAL = {};
 }
 const PENDING_APPROVAL: Record<string, AgentPlan> = globalAny.PENDING_APPROVAL;
-const PLAN_STORE = path.join(os.tmpdir(), "g-aid-pending-plans.json");
 
-function loadPlansFromDisk(): Record<string, AgentPlan> {
+function loadPlansFromDisk(workspaceRoot?: string): Record<string, AgentPlan> {
+  if (!workspaceRoot) return {};
   try {
-    if (!fs.existsSync(PLAN_STORE)) return {};
-    const parsed = JSON.parse(fs.readFileSync(PLAN_STORE, "utf8")) as Record<string, AgentPlan>;
+    const store = pendingPlansPath(workspaceRoot);
+    if (!fs.existsSync(store)) return {};
+    const parsed = JSON.parse(fs.readFileSync(store, "utf8")) as Record<string, AgentPlan>;
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
 }
 
-function savePlansToDisk(plans: Record<string, AgentPlan>): void {
+function savePlansToDisk(workspaceRoot: string, plans: Record<string, AgentPlan>): void {
   try {
-    fs.writeFileSync(PLAN_STORE, JSON.stringify(plans));
+    const store = pendingPlansPath(workspaceRoot);
+    fs.mkdirSync(path.dirname(store), { recursive: true });
+    fs.writeFileSync(store, `${JSON.stringify(plans, null, 2)}\n`);
   } catch {
-    /* testers can still retry in the same Node process */
+    /* in-memory pending plan still works in this process */
   }
 }
 
-export function getPendingPlan(sessionId: string): AgentPlan | undefined {
+export function getPendingPlan(sessionId: string, workspaceRoot?: string): AgentPlan | undefined {
   if (PENDING_APPROVAL[sessionId]) return PENDING_APPROVAL[sessionId];
-  const disk = loadPlansFromDisk();
+  const root = workspaceRoot || Object.values(PENDING_APPROVAL).find((plan) => plan.workspaceRoot)?.workspaceRoot;
+  if (!root) return undefined;
+  const disk = loadPlansFromDisk(root);
   if (disk[sessionId]) {
     PENDING_APPROVAL[sessionId] = disk[sessionId];
     return disk[sessionId];
@@ -44,14 +49,18 @@ export function getPendingPlan(sessionId: string): AgentPlan | undefined {
 
 export function setPendingPlan(sessionId: string, plan: AgentPlan): void {
   PENDING_APPROVAL[sessionId] = plan;
-  savePlansToDisk({ ...loadPlansFromDisk(), ...PENDING_APPROVAL, [sessionId]: plan });
+  if (!plan.workspaceRoot) return;
+  savePlansToDisk(plan.workspaceRoot, { ...loadPlansFromDisk(plan.workspaceRoot), [sessionId]: plan });
 }
 
 export function clearPendingPlan(sessionId: string): void {
+  const existing = PENDING_APPROVAL[sessionId];
   delete PENDING_APPROVAL[sessionId];
-  const disk = loadPlansFromDisk();
+  const root = existing?.workspaceRoot;
+  if (!root) return;
+  const disk = loadPlansFromDisk(root);
   delete disk[sessionId];
-  savePlansToDisk(disk);
+  savePlansToDisk(root, disk);
 }
 
 const generateImplementationPlan = (
@@ -130,17 +139,26 @@ const generateTasksMarkdown = (plan: {
   targetFolder?: string;
   steps: PlanSteps;
   parameters?: { baseReference?: string };
+  runId?: string;
 }): string => {
   const target = plan.targetFolder || plan.projectName;
+  const registered = new Set<string>(REGISTERED_MAG_NODE_IDS);
+  const nodeTag = (ids: string[]): string =>
+    ids
+      .filter((id) => registered.has(id))
+      .map((id) => `<!-- node:${id} -->`)
+      .join(" ");
+
   const lines = [
     `# Tasks`,
     ``,
     `**Project:** ${plan.projectName}`,
     `**Target:** ${target}`,
-    `**Products:** \`${plan.productsRel || `${GAID_OUTPUT_DIR}/${plan.taskFolder}`}/\``,
+    `**Products:** \`${plan.productsRel || `${GAID_OUTPUT_DIR}/runs/${plan.taskFolder}`}/\``,
+    plan.runId ? `**Run:** \`${plan.runId}\`` : "",
     plan.parameters?.baseReference ? `**Base reference:** \`${plan.parameters.baseReference}\`` : "",
     ``,
-    `This file is the working checklist. Items are checked off as G-AID finishes each step.`,
+    `This file is the working checklist. Items are checked off as G-AID finishes each registered step.`,
     ``,
     `## Tasks`,
     ``,
@@ -148,27 +166,27 @@ const generateTasksMarkdown = (plan: {
 
   if (plan.steps.diurnal) {
     lines.push(
-      `- [ ] Phase 1: Data Discovery <!-- node:file_discovery -->`,
-      `  - [ ] Scan ${target} for files`,
+      `- [ ] Phase 1: Data Discovery ${nodeTag(STEP_NODE_IDS.diurnal.slice(0, 1))}`,
+      `  - [ ] Scan ${target} for MagArrow and GSM-19 files`,
       `  - [ ] Classify airborne vs base station data`,
       `  - [ ] Generate canonical CSV outputs`,
       ``,
-      `- [ ] Phase 2: Flight Path Cleaning <!-- node:flight_path_cleaner -->`,
+      `- [ ] Phase 2: Flight Path Cleaning ${nodeTag(["flight_path_cleaner"])}`,
       `  - [ ] Filter spurious readings`,
       `  - [ ] Apply altitude thresholds`,
       `  - [ ] Remove noise outliers`,
       ``,
-      `- [ ] Phase 3: Time Synchronization <!-- node:time_synchronizer -->`,
+      `- [ ] Phase 3: Time Synchronization ${nodeTag(["time_synchronizer"])}`,
       `  - [ ] Align timestamps`,
       `  - [ ] Interpolate base readings`,
       `  - [ ] Validate temporal alignment`,
       ``,
-      `- [ ] Phase 4: Diurnal Correction <!-- node:diurnal_corrector -->`,
+      `- [ ] Phase 4: Diurnal Correction ${nodeTag(["diurnal_corrector"])}`,
       `  - [ ] Compute reference value`,
       `  - [ ] Apply correction formula`,
       `  - [ ] Generate corrected dataset`,
       ``,
-      `- [ ] Phase 5: Quality Control <!-- node:qc_engine --> <!-- node:excel_export_adapter --> <!-- node:report_export_adapter -->`,
+      `- [ ] Phase 5: Quality Control ${nodeTag(["qc_engine", "excel_export_adapter", "report_export_adapter"])}`,
       `  - [ ] Statistical validation`,
       `  - [ ] Generate QC report`,
       `  - [ ] Export maps and tables`,
@@ -176,24 +194,36 @@ const generateTasksMarkdown = (plan: {
     );
   }
 
-  if (plan.steps.igrf) lines.push(`- [ ] IGRF removal <!-- node:igrf_corrector -->`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
-  if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction <!-- node:heading_lag_corrector -->`, ``);
-  if (plan.steps.level) lines.push(`- [ ] Tie-line levelling <!-- node:tie_line_leveler --> <!-- node:microleveller -->`, `  - [ ] Classify traverse vs tie`, `  - [ ] Hold ties, shift traverses`, `  - [ ] 2-D grid microlevelling <!-- node:grid_microleveller -->`, ``);
-  if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding <!-- node:mag_gridder -->`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
-  if (plan.steps.rtp) lines.push(`- [ ] RTP <!-- node:rtp_filter -->`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
-  if (plan.steps.derivatives) lines.push(`- [ ] MAGMAP <!-- node:fft_derivatives -->`, `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`, ``);
-  if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction <!-- node:lineament_extractor -->`, ``);
-  if (plan.steps.gis) lines.push(`- [ ] GIS export <!-- node:gis_export -->`, `  - [ ] Report maps (scale bar, north arrow, EPSG) <!-- node:map_composer -->`, ``);
-  if (plan.steps.gravity) lines.push(`- [ ] Gravity reduction <!-- node:gravity_reduce --> <!-- node:xyz_ingest -->`, `  - [ ] Somigliana, free-air, Bouguer, Bullard B`, ``);
-  if (plan.steps.residual) lines.push(`- [ ] Regional-residual separation <!-- node:regional_residual -->`, ``);
-  if (plan.steps.ert) lines.push(`- [ ] ERT pseudosection <!-- node:ert_pseudosection -->`, ``);
-  if (plan.steps.ertInvert) lines.push(`- [ ] ERT inversion <!-- node:ert_invert -->`, ``);
-  if (plan.steps.seismic) lines.push(`- [ ] Seismic processing <!-- node:seismic_process -->`, ``);
-  if (plan.steps.radiometrics) lines.push(`- [ ] Radiometric corrections <!-- node:radiometric_correct -->`, ``);
-  if (plan.steps.gpr) lines.push(`- [ ] GPR processing <!-- node:gpr_process -->`, ``);
+  if (plan.steps.igrf) lines.push(`- [ ] IGRF removal ${nodeTag(STEP_NODE_IDS.igrf)}`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
+  if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction ${nodeTag(STEP_NODE_IDS.headingLag)}`, ``);
+  if (plan.steps.level) {
+    lines.push(
+      `- [ ] Tie-line levelling ${nodeTag(STEP_NODE_IDS.level)}`,
+      `  - [ ] Classify traverse vs tie`,
+      `  - [ ] Hold ties, shift traverses`,
+      ``
+    );
+  }
+  if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding ${nodeTag(STEP_NODE_IDS.grid)}`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
+  if (plan.steps.rtp) lines.push(`- [ ] RTP ${nodeTag(STEP_NODE_IDS.rtp)}`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
+  if (plan.steps.derivatives) {
+    lines.push(
+      `- [ ] MAGMAP ${nodeTag(["fft_derivatives"])}`,
+      `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`,
+      `- [ ] Euler deconvolution ${nodeTag(["euler_deconvolution"])}`,
+      ``
+    );
+  }
+  if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction ${nodeTag(STEP_NODE_IDS.lineaments)}`, ``);
+  if (plan.steps.gis) lines.push(`- [ ] GIS export ${nodeTag(["gis_export"])}`, ``);
+
+  const magAsked = MAGNETIC_STEP_KEYS.some((key) => plan.steps[key]);
+  if (!magAsked) {
+    lines.push(`- [ ] No registered magnetic nodes to execute`, ``);
+  }
 
   lines.push(
-    `- [ ] Write products to ${GAID_OUTPUT_DIR} <!-- node:write_products -->`,
+    `- [ ] Write products to ${GAID_OUTPUT_DIR}/runs <!-- node:write_products -->`,
     ``,
     `---`,
     ``,

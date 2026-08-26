@@ -28,15 +28,16 @@ export function buildPendingChange(input: {
   };
 }
 
-async function writeToDisk(rel: string, content: string): Promise<void> {
+async function writeToDisk(rel: string, content: string): Promise<string | void> {
   const root = useAppStore.getState().workspaceRoot;
   if (!root || !window.gaidDesktop) return;
   if (window.gaidDesktop.saveWorkspaceFile) {
-    await window.gaidDesktop.saveWorkspaceFile(root, rel, content);
-    return;
+    const written = await window.gaidDesktop.saveWorkspaceFile(root, rel, content);
+    return written;
   }
   try {
     await window.gaidDesktop.createWorkspaceFile(root, rel, content);
+    return rel;
   } catch {
     /* file already exists; keep in-memory content */
   }
@@ -58,9 +59,15 @@ export async function keepPendingFile(id: string): Promise<void> {
     return;
   }
   if (change.kind === "created" && change.content) {
-    await writeToDisk(change.id, change.content);
+    const written = await writeToDisk(change.id, change.content);
+    if (written && written !== change.id) {
+      useAppStore.getState().setFileContent(written, change.content);
+    }
   } else if (change.kind === "edited") {
-    await writeToDisk(change.id, change.content);
+    const written = await writeToDisk(change.id, change.content);
+    if (written && written !== change.id) {
+      useAppStore.getState().setFileContent(written, change.content);
+    }
   }
   useAppStore.getState().removePendingFileChange(id);
   closeReviewIfEmpty();

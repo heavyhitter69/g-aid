@@ -449,6 +449,19 @@ function writeWorkspaceFile(root, relativePath, content = "") {
   return path.relative(resolvedRoot, full).replace(/\\/g, "/");
 }
 
+function isGaidOutputRel(relativePath) {
+  return String(relativePath || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((part) => part.toLowerCase() === "g-aid output");
+}
+
+function copyToOutputRel(relativePath) {
+  const cleaned = sanitizeRelative(relativePath);
+  if (isGaidOutputRel(cleaned)) return cleaned;
+  return ["G-AID Output", "edits", ...cleaned.split("/")].join("/");
+}
+
 function saveWorkspaceFile(root, relativePath, content = "") {
   if (typeof root !== "string" || typeof relativePath !== "string") {
     throw new Error("root and relativePath are required");
@@ -462,6 +475,9 @@ function saveWorkspaceFile(root, relativePath, content = "") {
   const full = path.resolve(resolvedRoot, relativePath);
   if (!isInsideRoot(resolvedRoot, full)) {
     throw new Error("Path is outside the open workspace");
+  }
+  if (fs.existsSync(full) && !isGaidOutputRel(relativePath)) {
+    return saveWorkspaceFile(root, copyToOutputRel(relativePath), content);
   }
   fs.mkdirSync(path.dirname(full), { recursive: true });
   fs.writeFileSync(full, content, "utf8");
