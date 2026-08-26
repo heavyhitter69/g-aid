@@ -85,6 +85,7 @@ export interface CatalogRecord {
   crs?: string;
   units?: string;
   bbox?: CatalogBBox;
+  cellSizeM?: number;
   timeRange?: CatalogTimeRange;
   recordCount?: number;
   parseErrors?: string[];

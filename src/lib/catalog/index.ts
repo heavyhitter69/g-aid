@@ -21,6 +21,7 @@ export {
   inspectGravityText,
   isGravityAdapterId,
 } from "./gravity-contract.ts";
+export { inspectDemText, demReadyForSupport, DEM_ASCII_FORMAT } from "./dem-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";
 export {

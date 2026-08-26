@@ -184,8 +184,9 @@ def gravity_bouguer(payload: dict) -> dict:
         "apply_bullard_b": apply_bb,
         "mean_bouguer_mgal": float(np.nanmean(work["bouguer_mgal"])),
         "formula": formula,
-        "terrain": "not applied in this pack",
+        "terrain": "not applied — simple Bouguer only. Complete Bouguer requires grav.terrain with a documented DEM.",
         "assumed_density": False,
+        "convention": "simple Bouguer (infinite slab). This is not complete Bouguer.",
     }
     qc_path = write_json(os.path.join(out, "gravity_bouguer_qc.json"), qc)
     write_lineage(out, node_id, formula, {"density": density, "applyBullardB": apply_bb}, [src], [path, qc_path])
@@ -194,7 +195,163 @@ def gravity_bouguer(payload: dict) -> dict:
             make_artifact("artifact-grav-bouguer", "processed_dataset", "csv", path, node_id, [src], qc),
             make_artifact("artifact-grav-bouguer-qc", "qc_report", "json", qc_path, node_id, [src]),
         ],
-        "events": [{"type": "NODE_PROGRESS", "message": f"Simple Bouguer at {density} g/cm³. Terrain not applied."}],
+        "events": [{"type": "NODE_PROGRESS", "message": f"Simple Bouguer at {density} g/cm³. Terrain not applied — this is not complete Bouguer."}],
+    }
+
+
+def _bound_dem(params: dict) -> list[dict]:
+    items = params.get("catalogInputs") or params.get("catalog_inputs") or []
+    out = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        adapter = str(item.get("adapterId") or item.get("kind") or "").lower()
+        if adapter == "dem-ascii":
+            out.append(item)
+    return out
+
+
+def gravity_terrain(payload: dict) -> dict:
+    """Near-zone complete Bouguer: simple Bouguer + Nagy prism TC. Far-zone is not applied."""
+    from formats.dem import parse_dem_ascii
+    from science.gravity import terrain_correction_prisms
+
+    node_id = "gravity_terrain"
+    out = _out(payload)
+    params = _params(payload)
+    density = params.get("density")
+    if density is None:
+        raise ValueError("Complete Bouguer needs parameters.density in g/cm³. I will not assume 2.67.")
+    density = float(density)
+    if density < 1.2 or density > 3.5:
+        raise ValueError(f"Density {density} g/cm³ is outside 1.2–3.5.")
+    dems = _bound_dem(params)
+    if not dems:
+        raise ValueError(
+            "Complete Bouguer needs a bound dem-ascii catalog record. I will not download or invent a DEM."
+        )
+    if len(dems) > 1:
+        # Prefer DEM whose CRS matches stations when several are bound.
+        dems = dems[:1]
+    dem_item = dems[0]
+    dem_rel = str(dem_item.get("path") or "")
+    dem_path = dem_item.get("absPath") or dem_item.get("abs_path") or dem_rel
+    if dem_path and not os.path.isabs(str(dem_path)):
+        dem_path = os.path.abspath(os.path.join(str(params.get("baseDir") or ""), str(dem_path)))
+    dem = parse_dem_ascii(str(dem_path))
+    src = _find(out, "gravity_bouguer.csv")
+    df = pd.read_csv(src)
+    station_epsg = int(df["crs_epsg"].iloc[0]) if "crs_epsg" in df.columns else 0
+    if int(dem["epsg"]) != station_epsg:
+        raise ValueError(
+            f"DEM EPSG:{dem['epsg']} does not match station EPSG:{station_epsg}. I will not reproject silently."
+        )
+    station_datum = params.get("elevationDatum") or (df["elevation_datum"].iloc[0] if "elevation_datum" in df.columns else "")
+    if str(station_datum).strip() and str(station_datum).strip() != dem["elevation_datum"]:
+        raise ValueError(
+            f"DEM vertical datum {dem['elevation_datum']} does not match station datum {station_datum}."
+        )
+    use_extent = bool(params.get("useDemExtent") or params.get("use_dem_extent") or False)
+    radius = params.get("terrainRadiusM") or params.get("terrain_radius_m")
+    if use_extent:
+        span = max(dem["xmax"] - dem["xmin"], dem["ymax"] - dem["ymin"])
+        radius = float(span)
+    elif radius is None:
+        raise ValueError("Complete Bouguer needs parameters.terrainRadiusM in metres, or useDemExtent=true.")
+    radius = float(radius)
+    if radius <= 0:
+        raise ValueError("terrainRadiusM must be positive.")
+    result = terrain_correction_prisms(
+        df["x"].to_numpy(dtype=float),
+        df["y"].to_numpy(dtype=float),
+        df["elevation_m"].to_numpy(dtype=float),
+        dem["grid"],
+        density_gcc=density,
+        max_radius_m=radius,
+    )
+    tc = result["terrain_correction_mgal"]
+    coverage = result["coverage_fraction"]
+    mean_cov = float(np.nanmean(coverage)) if np.isfinite(coverage).any() else 0.0
+    if mean_cov < 0.95 or np.isnan(tc).any():
+        raise ValueError(
+            f"DEM coverage is insufficient for near-zone terrain correction "
+            f"(mean coverage {mean_cov:.3f}, required ≥ 0.95 inside radius {radius} m)."
+        )
+    work = df.copy()
+    work["terrain_correction_mgal"] = tc
+    work["terrain_coverage"] = coverage
+    work["complete_bouguer_mgal"] = work["bouguer_mgal"].to_numpy(dtype=float) + tc
+    path = os.path.join(out, "gravity_complete.csv")
+    work.to_csv(path, index=False)
+    formula = (
+        "Δg_CBA(near-zone) = Δg_FA − 2πGρh [+ Bullard B if requested] + TC_Nagy(R). "
+        "TC is |gz| of DEM−slab prisms (Nagy 1966). Far-zone/Hayford–Bowie is not applied."
+    )
+    qc = {
+        "density_gcc": density,
+        "terrain_radius_m": radius,
+        "use_dem_extent": use_extent,
+        "mean_terrain_correction_mgal": float(np.nanmean(tc)),
+        "mean_complete_bouguer_mgal": float(np.nanmean(work["complete_bouguer_mgal"])),
+        "mean_coverage_fraction": mean_cov,
+        "min_coverage_fraction": float(np.nanmin(coverage)),
+        "dem_catalog_id": dem_item.get("catalogId") or dem_item.get("catalog_id"),
+        "dem_checksum": dem_item.get("checksum"),
+        "dem_path": dem_rel or str(dem_path),
+        "dem_epsg": dem["epsg"],
+        "dem_elevation_datum": dem["elevation_datum"],
+        "dem_units": "m",
+        "dem_cellsize_m": dem["cellsize"],
+        "dem_extent": {
+            "xmin": dem["xmin"],
+            "xmax": dem["xmax"],
+            "ymin": dem["ymin"],
+            "ymax": dem["ymax"],
+        },
+        "method": result["method"],
+        "numerical_approximation": "Vectorized Nagy 1966 eight-term prism kernel per DEM cell inside R.",
+        "near_zone": True,
+        "far_zone": False,
+        "hayford_bowie": False,
+        "convention": "G-AID near-zone complete Bouguer. Not a global/complete-to-infinity Bouguer.",
+        "assumed_density": False,
+        "formula": formula,
+        "limitations": [
+            "Far-zone terrain is not computed.",
+            "DEM cells outside R are ignored.",
+            "No isostatic correction.",
+            "No Earth curvature on the prism kernel itself (Bullard B is a separate optional term on the slab).",
+        ],
+    }
+    qc_path = write_json(os.path.join(out, "gravity_terrain_qc.json"), qc)
+    write_lineage(
+        out,
+        node_id,
+        formula,
+        {
+            "density": density,
+            "terrainRadiusM": radius,
+            "useDemExtent": use_extent,
+            "demCatalogId": qc["dem_catalog_id"],
+            "demChecksum": qc["dem_checksum"],
+        },
+        [src, str(dem_path)],
+        [path, qc_path],
+    )
+    return {
+        "artifacts": [
+            make_artifact("artifact-grav-complete", "processed_dataset", "csv", path, node_id, [src], qc),
+            make_artifact("artifact-grav-terrain-qc", "qc_report", "json", qc_path, node_id, [src]),
+        ],
+        "events": [
+            {
+                "type": "NODE_PROGRESS",
+                "message": (
+                    f"Near-zone complete Bouguer at {density} g/cm³, R={radius:.0f} m, "
+                    f"mean TC {qc['mean_terrain_correction_mgal']:.3f} mGal. Far-zone not applied."
+                ),
+            }
+        ],
     }
 
 
@@ -206,9 +363,15 @@ def grav_gridder(payload: dict) -> dict:
     node_id = "grav_gridder"
     out = _out(payload)
     params = _params(payload)
-    src = _find(out, "gravity_bouguer.csv", "gravity_freeair.csv")
+    src = _find(out, "gravity_complete.csv", "gravity_bouguer.csv", "gravity_freeair.csv")
     df = pd.read_csv(src)
-    col = "bouguer_mgal" if "bouguer_mgal" in df.columns else "free_air_mgal"
+    col = (
+        "complete_bouguer_mgal"
+        if "complete_bouguer_mgal" in df.columns
+        else "bouguer_mgal"
+        if "bouguer_mgal" in df.columns
+        else "free_air_mgal"
+    )
     epsg = int(df["crs_epsg"].iloc[0])
     dx = params.get("cellSizeM")
     grid = minimum_curvature(
@@ -222,7 +385,7 @@ def grav_gridder(payload: dict) -> dict:
         name=col.replace("_mgal", ""),
     )
     crs = CRS(epsg, f"EPSG:{epsg}", "projected" if epsg != 4326 else "geographic")
-    stem = "bouguer_grid" if col == "bouguer_mgal" else "free_air_grid"
+    stem = "complete_bouguer_grid" if col == "complete_bouguer_mgal" else "bouguer_grid" if col == "bouguer_mgal" else "free_air_grid"
     paths = export_grid_bundle(grid, out, stem, crs)
     np.savez(os.path.join(out, f"{stem}.npz"), values=grid.masked(), x0=grid.x0, y0=grid.y0, dx=grid.dx, dy=grid.dy, crs=epsg)
     qc = {"crs_epsg": epsg, "dx": grid.dx, "nx": grid.nx, "ny": grid.ny, "source_column": col, "units": "mGal"}
@@ -245,7 +408,13 @@ def regional_residual(payload: dict) -> dict:
     node_id = "regional_residual"
     out = _out(payload)
     params = _params(payload)
-    stem = "bouguer_grid" if os.path.isfile(os.path.join(out, "bouguer_grid.npz")) else "free_air_grid"
+    stem = (
+        "complete_bouguer_grid"
+        if os.path.isfile(os.path.join(out, "complete_bouguer_grid.npz"))
+        else "bouguer_grid"
+        if os.path.isfile(os.path.join(out, "bouguer_grid.npz"))
+        else "free_air_grid"
+    )
     npz = os.path.join(out, f"{stem}.npz")
     if not os.path.isfile(npz):
         raise FileNotFoundError("Regional-residual needs grav_gridder output.")
@@ -282,9 +451,17 @@ def grav_gis_export(payload: dict) -> dict:
 
     node_id = "grav_gis_export"
     out = _out(payload)
-    src = _find(out, "gravity_bouguer.csv", "gravity_freeair.csv", "gravity_canonical.csv")
+    src = _find(out, "gravity_complete.csv", "gravity_bouguer.csv", "gravity_freeair.csv", "gravity_canonical.csv")
     df = pd.read_csv(src)
-    col = "bouguer_mgal" if "bouguer_mgal" in df.columns else "free_air_mgal" if "free_air_mgal" in df.columns else "g_obs_mgal"
+    col = (
+        "complete_bouguer_mgal"
+        if "complete_bouguer_mgal" in df.columns
+        else "bouguer_mgal"
+        if "bouguer_mgal" in df.columns
+        else "free_air_mgal"
+        if "free_air_mgal" in df.columns
+        else "g_obs_mgal"
+    )
     epsg = int(df["crs_epsg"].iloc[0]) if "crs_epsg" in df.columns else 0
     if not epsg:
         raise ValueError("GIS export needs a documented CRS. I will not write GeoJSON as 4326 by default.")
@@ -304,6 +481,7 @@ def grav_interpret(payload: dict) -> dict:
         "gravity_ingest_qc.json",
         "gravity_freeair_qc.json",
         "gravity_bouguer_qc.json",
+        "gravity_terrain_qc.json",
         "gravity_grid_qc.json",
         "gravity_residual_qc.json",
     ]
@@ -313,11 +491,16 @@ def grav_interpret(payload: dict) -> dict:
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as handle:
                 qcs[name] = json.load(handle)
+    terrain_qc = qcs.get("gravity_terrain_qc.json") or {}
+    complete = bool(terrain_qc)
+    bouguer_kind = "near-zone complete Bouguer" if complete else "simple Bouguer (infinite slab, no terrain)"
     report = {
         "observations": [
             "Gravity stations were ingested under the G-AID named-column contract.",
             f"Free-air QC present: {'gravity_freeair_qc.json' in qcs}",
-            f"Bouguer QC present: {'gravity_bouguer_qc.json' in qcs}",
+            f"Simple Bouguer QC present: {'gravity_bouguer_qc.json' in qcs}",
+            f"Terrain/complete Bouguer QC present: {complete}",
+            f"Anomaly reported in this run: {bouguer_kind}.",
         ],
         "assumptions": [
             qcs.get("gravity_bouguer_qc.json", {}).get("density_gcc")
@@ -326,9 +509,16 @@ def grav_interpret(payload: dict) -> dict:
             qcs.get("gravity_freeair_qc.json", {}).get("elevation_datum")
             and f"Elevation datum {qcs['gravity_freeair_qc.json']['elevation_datum']} was used as documented."
             or "Elevation datum was required and recorded when free-air ran.",
+            complete
+            and (
+                f"Near-zone Nagy terrain correction used DEM {terrain_qc.get('dem_catalog_id')} "
+                f"(checksum {terrain_qc.get('dem_checksum')}) inside R={terrain_qc.get('terrain_radius_m')} m."
+            )
+            or "Terrain correction was not applied. Simple Bouguer is not complete Bouguer.",
         ],
         "uncertainty": [
             "Simple Bouguer omits terrain. Incomplete terrain correction can exceed many geological signals.",
+            "This complete Bouguer, when present, is near-zone only. Far-zone/Hayford–Bowie is not computed.",
             "Polynomial residual order is a modelling choice.",
             "Gridding interpolates between stations.",
         ],
@@ -341,6 +531,7 @@ def grav_interpret(payload: dict) -> dict:
             "Mineralisation is not established.",
             "Density bodies are not established.",
             "Drill targets are not established.",
+            "A global/complete-to-infinity Bouguer anomaly is not established without far-zone terrain.",
         ],
         "qc": qcs,
         "interpretation_limit": "A gravity anomaly is an observation. Overlay and colour scale do not prove geological causation.",

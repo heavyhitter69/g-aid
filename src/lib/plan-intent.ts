@@ -33,7 +33,11 @@ export function intentToSteps(
     next.gravity = true;
     next.residual = true;
   }
-  if (intent === "resistivity" || /\bert\b|\bpseudosection\b/.test(m)) {
+  if (/\bcomplete\s+bouguer\b|\bterrain\s+correct/.test(m)) {
+    next.gravity = true;
+    next.completeBouguer = true;
+  }
+  if (intent === "resistivity" || /\bert\b|\bpseudosection\b|\bresistivity\b/.test(m)) {
     next.ert = true;
     next.ertInvert = !/\bpseudosection only\b/.test(m);
   }
@@ -102,6 +106,8 @@ export function collectPlanInputs(
       elevationDatum: record.elevationDatum,
       units: record.units,
       crs: record.crs,
+      bbox: record.bbox,
+      cellSizeM: record.cellSizeM,
     }));
   }
   void index;

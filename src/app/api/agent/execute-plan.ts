@@ -3,7 +3,7 @@ import path from "path";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
 import { workStepFromEvent } from "@/lib/work-steps";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
-import { gravityStepsEnabled, magneticStepsEnabled, validatePlan } from "@/lib/plan-spec";
+import { ertStepsEnabled, gravityStepsEnabled, magneticStepsEnabled, validatePlan } from "@/lib/plan-spec";
 import {
   allocateApprovedRun,
   appendRunLog,
@@ -171,6 +171,8 @@ async function runDiurnalPipeline(
     gravityUnits: pending.parameters.gravityUnits,
     crsEpsg: pending.parameters.crsEpsg,
     applyBullardB: pending.parameters.applyBullardB,
+    terrainRadiusM: pending.parameters.terrainRadiusM,
+    useDemExtent: pending.parameters.useDemExtent,
     gravityMapping: pending.parameters.gravityMapping,
     columnMapping: pending.parameters.gravityMapping,
     columnMappingReviewed: pending.parameters.columnMappingReviewed,
@@ -343,13 +345,14 @@ export function streamPlanDecision(
         let ranOk = true;
         const mag = magneticStepsEnabled(frozen.steps);
         const grav = gravityStepsEnabled(frozen.steps);
+        const ert = ertStepsEnabled(frozen.steps);
 
-        if (!mag && !grav) {
+        if (!mag && !grav && !ert) {
           ranOk = false;
-          enqueue("- ❌ **No registered steps to execute.** ERT, seismic, GPR, and radiometrics are not in this release.\n");
+          enqueue("- ❌ **No registered steps to execute.** Seismic, GPR, and radiometrics are not in this release.\n");
         } else if (!(frozen.inputs || []).length) {
           ranOk = false;
-          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow/GSM-19 and/or gravity-contract catalog IDs first.\n");
+          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow/GSM-19, gravity-contract, dem-ascii, and/or ERT-contract catalog IDs first.\n");
         } else {
           const created = await runDiurnalPipeline(frozen, enqueue, onTasks, tasksContent);
           projectFilesUpdates.push(...created.files);

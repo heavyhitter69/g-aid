@@ -46,12 +46,16 @@ function sniffGeotiff(ctx: SniffContext): AdapterSniff | null {
   };
 }
 
-function parseAsciiGrid(text: string): { bbox?: CatalogBBox; recordCount?: number; headerSummary?: string } {
-  const lines = firstLines(text, 10);
+function parseAsciiGrid(text: string): { bbox?: CatalogBBox; recordCount?: number; headerSummary?: string; cellSizeM?: number } {
   const map: Record<string, number> = {};
-  for (const line of lines) {
-    const match = line.trim().match(/^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize)\s+([-+0-9.eE]+)/i);
-    if (!match) continue;
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || /^[/#;]/.test(trimmed)) continue;
+    const match = trimmed.match(/^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize)\s+([-+0-9.eE]+)/i);
+    if (!match) {
+      if (Object.keys(map).length) break;
+      continue;
+    }
     map[match[1].toLowerCase()] = Number(match[2]);
   }
   const ncols = map.ncols;
@@ -70,6 +74,7 @@ function parseAsciiGrid(text: string): { bbox?: CatalogBBox; recordCount?: numbe
   }
   return {
     bbox,
+    cellSizeM: Number.isFinite(cell) ? cell : undefined,
     recordCount: Number.isFinite(ncols) && Number.isFinite(nrows) ? ncols * nrows : undefined,
     headerSummary: headerSummaryFromText(text),
   };

@@ -26,6 +26,8 @@ import {
   type RasterGrid,
 } from "@/lib/map";
 import { cn } from "@/lib/utils";
+import { isErtSectionPath, parseSectionCsv } from "@/lib/section/parse";
+import { SectionView } from "@/components/workspace/section-view";
 
 interface LayerUiState {
   visible: boolean;
@@ -72,10 +74,23 @@ export function VisualizationStudio() {
     return [...new Set([...fromProject, ...fromJob, ...extra])];
   }, [projectFiles, lastJobResults, compareRunId]);
 
-  const layers = useMemo(
-    () => buildMapLayers({ catalog: projectCatalog, files: allPaths }),
-    [projectCatalog, allPaths]
-  );
+  const layers = useMemo(() => {
+    const mapped = buildMapLayers({ catalog: projectCatalog, files: allPaths });
+    const extras = allPaths.filter(isErtSectionPath).filter((path) => !mapped.some((layer) => layer.path === path));
+    const sectionLayers: MapLayerSpec[] = extras.map((path) => ({
+      id: `section:${path}`,
+      path,
+      label: path.replace(/\\/g, "/").split("/").pop() || path,
+      origin: "derived-run",
+      displayStatus: "viewable",
+      formatId: "ert-section",
+      mediaClass: "section",
+      runId: runIdFromPath(path),
+      units: "ohm.m",
+      representation: "full",
+    }));
+    return [...mapped, ...sectionLayers];
+  }, [projectCatalog, allPaths]);
 
   useEffect(() => {
     setLayerOrder((current) => {
@@ -280,6 +295,11 @@ export function VisualizationStudio() {
 
   const units = mapValueUnits(active?.path || "", active?.formatId, active?.units);
 
+  const section = useMemo(() => {
+    if (!active || !text || !isErtSectionPath(active.path)) return null;
+    return parseSectionCsv(text, active.path);
+  }, [active, text]);
+
   function moveLayer(id: string, dir: -1 | 1) {
     setLayerOrder((current) => {
       const ids = current.length ? current : layers.map((layer) => layer.id);
@@ -432,7 +452,9 @@ export function VisualizationStudio() {
             <span className="text-xs">Loading {active?.label}…</span>
           </div>
         ) : null}
-        {active?.formatId === "geojson" && vector ? (
+        {section ? (
+          <SectionView section={section} />
+        ) : active?.formatId === "geojson" && vector ? (
           <GridMapView
             title={active.label}
             grid={{

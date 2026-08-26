@@ -51,6 +51,7 @@ function gravityInspect(ctx: SniffContext): CatalogInspection {
     columnMapping: inspected.suggestedMapping,
     elevationDatum: inspected.meta.elevationDatum,
     gravityDatum: inspected.meta.gravityDatum,
+    bbox: inspected.bbox,
   };
 }
 

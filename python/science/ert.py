@@ -57,69 +57,10 @@ class ERTMeasurement:
 
 
 def parse_res2dinv_dat(path: str) -> dict:
-    """Parse a Res2DInv general-array or dipole-dipole .dat file (Loke format)."""
-    with open(path, "r", errors="ignore") as handle:
-        lines = [ln.rstrip("\n") for ln in handle]
-    if len(lines) < 4:
-        raise ValueError(f"ERT file too short: {path}")
-    title = lines[0].strip()
-    try:
-        spacing = float(lines[1].split()[0])
-    except (ValueError, IndexError):
-        spacing = 1.0
-    array_code = None
-    try:
-        array_code = int(float(lines[2].split()[0]))
-    except (ValueError, IndexError):
-        array_code = 3
-    array_map = {1: "wenner", 2: "pole_pole", 3: "dipole_dipole", 6: "pole_dipole", 7: "schlumberger"}
-    array = array_map.get(array_code, "dipole_dipole")
-    measurements = []
-    # Search for numeric blocks: x, a, n, rhoa  or  n_data then rows
-    i = 3
-    n_data = None
-    for j, ln in enumerate(lines[3:10], start=3):
-        parts = ln.split()
-        if len(parts) == 1:
-            try:
-                n_data = int(float(parts[0]))
-                i = j + 1
-                break
-            except ValueError:
-                continue
-    if n_data is None:
-        i = 3
-        n_data = 10**9
-    count = 0
-    while i < len(lines) and count < n_data:
-        parts = lines[i].split()
-        i += 1
-        if len(parts) < 3:
-            continue
-        try:
-            nums = [float(p) for p in parts]
-        except ValueError:
-            continue
-        if len(nums) >= 4:
-            x, a, n, rhoa = nums[0], nums[1], nums[2], nums[3]
-        elif len(nums) == 3:
-            x, a, rhoa = nums
-            n = 1.0
-        else:
-            continue
-        measurements.append(
-            {
-                "midpoint_x": x,
-                "a": a if a > 0 else spacing,
-                "n": n,
-                "rhoa": rhoa,
-                "array": array,
-            }
-        )
-        count += 1
-    if not measurements:
-        raise ValueError(f"No ERT measurements parsed from {path}")
-    return {"title": title, "array": array, "spacing": spacing, "measurements": measurements}
+    """Parse G-AID ERT 1.0 (Res2DInv-style) — strict. No array-code or spacing defaults."""
+    from formats.ert import parse_ert_dat
+
+    return parse_ert_dat(path)
 
 
 def occam_1d(ab2: np.ndarray, rhoa: np.ndarray, n_layers: int = 12, max_iter: int = 20, target_rms: float = 1.05) -> dict:
@@ -208,6 +149,8 @@ def invert_2d_smooth(
     max_iter: int = 8,
     lam: float = 0.2,
     damping: float = 0.1,
+    max_misfit_percent: float = 25.0,
+    fail_on_divergence: bool = True,
 ) -> dict:
     """Smoothness-constrained Gauss-Newton 2-D inversion (Loke & Barker 1996).
 
@@ -220,6 +163,8 @@ def invert_2d_smooth(
     """
     if not measurements:
         raise ValueError("No ERT measurements")
+    if len(measurements) < 8:
+        raise ValueError("2-D inversion needs at least 8 measurements.")
     xs = np.array([m["midpoint_x"] for m in measurements], float)
     ns = np.array([m["n"] for m in measurements], float)
     a_sp = np.array([m["a"] for m in measurements], float)
@@ -272,16 +217,30 @@ def invert_2d_smooth(
     model = np.exp(m).reshape(n_z, n_x)
     pred = np.exp(jacobian(m) @ m)
     misfit_pct = 100.0 * float(np.sqrt(np.mean(((pred - rhoa) / np.clip(rhoa, 1e-6, None)) ** 2)))
+    rms_final = rms_hist[-1] if rms_hist else None
+    converged = bool(misfit_pct <= float(max_misfit_percent) and np.isfinite(misfit_pct))
+    if fail_on_divergence and not converged:
+        raise ValueError(
+            f"ERT 2-D inversion did not converge (misfit {misfit_pct:.1f}% > {max_misfit_percent}%). "
+            "No model is written. This is not Res2DInv."
+        )
     return {
         "x_m": x_nodes.tolist(),
         "z_m": z_nodes.tolist(),
         "resistivity_ohm_m": model.tolist(),
         "predicted_rhoa": pred.tolist(),
         "observed_rhoa": rhoa.tolist(),
-        "rms_log": rms_hist[-1] if rms_hist else None,
+        "rms_log": rms_final,
         "misfit_percent": misfit_pct,
         "iterations": len(rms_hist),
-        "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity",
+        "converged": converged,
+        "topography_used": False,
+        "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity. Not Res2DInv.",
+        "limitations": [
+            "Homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+            "Topography is not used in the forward kernel.",
+            "3-D inversion is not implemented.",
+        ],
     }
 
 

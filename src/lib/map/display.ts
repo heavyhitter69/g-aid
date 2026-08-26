@@ -116,6 +116,7 @@ export function formatIdFromPath(path: string): string {
 }
 
 export function isDemAscii(record: { formatId: string; filename?: string; domainHint?: string; relativePath?: string }): boolean {
+  if (record.formatId === "dem-ascii") return true;
   if (record.formatId !== "esri-ascii-grid") return false;
   const name = `${record.filename || ""} ${record.relativePath || ""}`.toLowerCase();
   return record.domainHint === "gis" && /\bdem\b/.test(name);

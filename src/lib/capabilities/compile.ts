@@ -26,13 +26,22 @@ export const GRAVITY_NODE_ORDER = [
   "gravity_ingest",
   "gravity_freeair",
   "gravity_bouguer",
+  "gravity_terrain",
   "grav_gridder",
   "regional_residual",
   "grav_gis_export",
   "grav_interpret",
 ] as const;
 
-export const KERNEL_NODE_ORDER = [...MAGNETIC_NODE_ORDER, ...GRAVITY_NODE_ORDER] as const;
+export const ERT_NODE_ORDER = [
+  "ert_ingest",
+  "ert_pseudosection",
+  "ert_invert",
+  "ert_gis_export",
+  "ert_interpret",
+] as const;
+
+export const KERNEL_NODE_ORDER = [...MAGNETIC_NODE_ORDER, ...GRAVITY_NODE_ORDER, ...ERT_NODE_ORDER] as const;
 
 export const MAGNETIC_NODE_DEPS: Record<string, string[]> = {
   file_discovery: [],
@@ -58,15 +67,25 @@ export const GRAVITY_NODE_DEPS: Record<string, string[]> = {
   gravity_ingest: [],
   gravity_freeair: ["gravity_ingest"],
   gravity_bouguer: ["gravity_freeair"],
-  grav_gridder: ["gravity_bouguer"],
+  gravity_terrain: ["gravity_bouguer"],
+  grav_gridder: ["gravity_terrain"],
   regional_residual: ["grav_gridder"],
-  grav_gis_export: ["gravity_bouguer"],
+  grav_gis_export: ["gravity_terrain"],
   grav_interpret: ["grav_gis_export"],
+};
+
+export const ERT_NODE_DEPS: Record<string, string[]> = {
+  ert_ingest: [],
+  ert_pseudosection: ["ert_ingest"],
+  ert_invert: ["ert_pseudosection"],
+  ert_gis_export: ["ert_ingest"],
+  ert_interpret: ["ert_invert"],
 };
 
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...MAGNETIC_NODE_DEPS,
   ...GRAVITY_NODE_DEPS,
+  ...ERT_NODE_DEPS,
 };
 
 const NODE_LABELS: Record<string, string> = {
@@ -90,10 +109,16 @@ const NODE_LABELS: Record<string, string> = {
   gravity_ingest: "Read bound gravity catalog records",
   gravity_freeair: "Free-air anomaly",
   gravity_bouguer: "Simple Bouguer correction",
+  gravity_terrain: "Near-zone complete Bouguer (Nagy terrain)",
   grav_gridder: "Grid gravity stations",
   regional_residual: "Regional-residual gravity",
   grav_gis_export: "Gravity GIS export",
   grav_interpret: "Gravity interpretation limits",
+  ert_ingest: "Read bound ERT catalog records",
+  ert_pseudosection: "ERT pseudosection (not a depth model)",
+  ert_invert: "ERT 2-D smoothness inversion",
+  ert_gis_export: "ERT electrode GIS export",
+  ert_interpret: "ERT interpretation limits",
 };
 
 export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
@@ -111,30 +136,36 @@ export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
   return out;
 }
 
-function ownerCapability(nodeId: string, expanded: UserCapabilityId[]): UserCapabilityId | "mag.prereq" | "grav.prereq" {
+function ownerCapability(
+  nodeId: string,
+  expanded: UserCapabilityId[]
+): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" {
   for (const id of expanded) {
     const capability = getCapability(id);
     if (capability?.kernelNodeIds.includes(nodeId)) return id;
   }
-  return nodeId.startsWith("grav") || nodeId.startsWith("gravity") || nodeId === "regional_residual"
-    ? "grav.prereq"
-    : "mag.prereq";
+  if (nodeFamily(nodeId) === "ert") return "ert.prereq";
+  if (nodeFamily(nodeId) === "grav") return "grav.prereq";
+  return "mag.prereq";
 }
 
-function isGravityNode(nodeId: string): boolean {
-  return (GRAVITY_NODE_ORDER as readonly string[]).includes(nodeId);
+function nodeFamily(nodeId: string): "mag" | "grav" | "ert" {
+  if ((ERT_NODE_ORDER as readonly string[]).includes(nodeId)) return "ert";
+  if ((GRAVITY_NODE_ORDER as readonly string[]).includes(nodeId)) return "grav";
+  return "mag";
 }
 
-/** Remap declared deps onto the compiled subset. Gravity and magnetics never wait on each other. */
+/** Remap declared deps onto the compiled subset. Mag, gravity, and ERT never wait on each other. */
 export function remapKernelDeps(nodeId: string, compiled: Set<string>): string[] {
   const original = KERNEL_NODE_DEPS[nodeId] || [];
   const present = original.filter((dep) => compiled.has(dep));
   if (present.length) return present;
   const order = KERNEL_NODE_ORDER as unknown as string[];
   const index = order.indexOf(nodeId);
+  const family = nodeFamily(nodeId);
   for (let i = index - 1; i >= 0; i--) {
     const prev = order[i];
-    if (compiled.has(prev) && isGravityNode(nodeId) === isGravityNode(prev)) return [prev];
+    if (compiled.has(prev) && nodeFamily(prev) === family) return [prev];
   }
   return [];
 }
@@ -160,7 +191,9 @@ export function compileCapabilityDag(requested: string[]): CompiledDag {
     if (!nodeSet.has(nodeId)) continue;
     const capabilityId = ownerCapability(nodeId, expanded);
     const capability =
-      capabilityId === "mag.prereq" || capabilityId === "grav.prereq" ? undefined : getCapability(capabilityId);
+      capabilityId === "mag.prereq" || capabilityId === "grav.prereq" || capabilityId === "ert.prereq"
+        ? undefined
+        : getCapability(capabilityId);
     nodes.push({
       id: nodeId,
       capabilityId,

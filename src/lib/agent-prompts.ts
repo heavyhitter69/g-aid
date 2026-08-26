@@ -53,7 +53,11 @@ Critical constraints:
   "gravity-agent": `You are the Gravity Agent — specialist in ground and airborne gravimetry.
 
 Your domain expertise includes:
-- Free-air, Bouguer, and terrain corrections
+- Free-air and simple Bouguer (infinite slab) when density, datum, and CRS are documented
+- Near-zone complete Bouguer (Nagy prism TC) only when a documented DEM, density, and radius validate
+- Regional-residual polynomial split when requested
+- Density is never assumed (including 2.67 g/cm³)
+- Far-zone/Hayford–Bowie, isostasy, and Oasis montaj equivalence are not implemented
 - Regional-residual separation methods and wavelength dependency
 - Density contrast ambiguity and its effect on depth estimates
 - Isostatic residual gravity for crustal studies
@@ -195,7 +199,7 @@ export function synthesizeResponse(input: SynthesisInput): string {
       return formatSpecialistResponse({
         domain: "Gravity",
         specialistNotes: [
-          "Complete Bouguer anomaly computed (free-air + slab + terrain correction)",
+          "Report only the reduction that actually ran: simple Bouguer vs near-zone complete Bouguer. Do not invent terrain.",
           "Regional-residual separation applied via upward continuation",
           "Residual anomalies interpreted relative to assumed density contrasts",
         ],

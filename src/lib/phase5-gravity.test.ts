@@ -281,7 +281,7 @@ test("approved gravity DAG binds catalog IDs and writes a versioned run folder",
   try {
     const catalog = buildProjectCatalog(root);
     const inputs = collectPlanInputs(null, "valid", catalog);
-    assert.ok(inputs.every((item) => item.catalogId && item.adapterId === "gravity-xyz"));
+    assert.ok(inputs.every((item) => item.catalogId && (item.adapterId === "gravity-xyz" || item.adapterId === "dem-ascii")));
     const dag = compileCapabilityDag([
       "grav.ingest",
       "grav.freeair",

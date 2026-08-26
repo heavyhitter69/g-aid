@@ -130,7 +130,10 @@ test("a non-magnetic request does not create a magnetic plan", () => {
     })
   );
   assert.equal(check.ok, false);
-  assert.equal(check.blockers.some((issue) => issue.code === "unsupported_method"), true);
+  assert.equal(
+    check.blockers.some((issue) => issue.code === "no_ert_files" || issue.code === "unsupported_catalog_input"),
+    true
+  );
 });
 
 test("source-file overwrite is blocked and copied under G-AID Output", () => {

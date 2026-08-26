@@ -1,10 +1,5 @@
 import type { CatalogRecord, ProjectCatalog, SupportStatus } from "./types.ts";
-
-const SUPPORTED_ADAPTER_IDS = new Set(["magarrow", "gsm19", "gravity-xyz", "gravity-csv"]);
-
-function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {
-  return record.supportStatus === "supported" && Boolean(record.adapterId && SUPPORTED_ADAPTER_IDS.has(record.adapterId));
-}
+import { isSupportedProcessingRecord } from "./classify.ts";
 
 function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -42,13 +37,17 @@ export function summarizeCatalog(catalog: ProjectCatalog | null, maxRecords = 80
   const gravity = catalog.records.filter(
     (record) => (record.adapterId === "gravity-xyz" || record.adapterId === "gravity-csv") && record.supportStatus === "supported"
   );
+  const dem = catalog.records.filter((record) => record.adapterId === "dem-ascii" && record.supportStatus === "supported");
+  const ert = catalog.records.filter(
+    (record) => (record.adapterId === "ert-dat" || record.adapterId === "ert-csv") && record.supportStatus === "supported"
+  );
   const lines = [
     `Project catalog (${catalog.records.length} source files; G-AID Output skipped)`,
     `Support: supported ${counts.supported}, recognised-unsupported ${counts["recognised-unsupported"]}, unknown ${counts.unknown}`,
-    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}`,
+    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}`,
     catalog.truncated ? `Truncated: ${catalog.truncationReason || "file-count limit reached"}` : "",
     catalog.runs.length ? `Prior runs preserved: ${catalog.runs.map((run) => run.runId).join(", ")}` : "Prior runs preserved: (none)",
-    "This catalog does not imply a magnetic or gravity workflow. Only supported MagArrow, GSM-19, and gravity-contract records can be processing inputs.",
+    "This catalog does not imply a magnetic, gravity, or ERT workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, and ERT-contract records can be processing inputs.",
   ].filter(Boolean);
 
   const shown = catalog.records.slice(0, maxRecords);
@@ -74,6 +73,10 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
   const gravity = catalog.records.filter(
     (r) => (r.adapterId === "gravity-xyz" || r.adapterId === "gravity-csv") && r.supportStatus === "supported"
   ).length;
+  const dem = catalog.records.filter((r) => r.adapterId === "dem-ascii" && r.supportStatus === "supported").length;
+  const ert = catalog.records.filter(
+    (r) => (r.adapterId === "ert-dat" || r.adapterId === "ert-csv") && r.supportStatus === "supported"
+  ).length;
   const formats = new Map<string, number>();
   for (const record of catalog.records) {
     formats.set(record.formatId, (formats.get(record.formatId) || 0) + 1);
@@ -85,7 +88,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     .join(", ");
   const lines = [
     `This folder has **${catalog.records.length}** source files in the project catalog (G-AID Output was skipped).`,
-    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}`,
+    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}`,
     `- **recognised-unsupported** (identified, not processed in this release): ${counts["recognised-unsupported"]}`,
     `- **unknown** (not identified reliably): ${counts.unknown}`,
     formatList ? `Formats: ${formatList}.` : "",
@@ -97,8 +100,14 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
       ? "I can plan MagArrow + GSM-19 magnetics if you ask for that work. Mixed files do not start a magnetic workflow by themselves."
       : "I will not start a magnetic workflow unless you ask for magnetics and both MagArrow and GSM-19 supported records are present.",
     gravity
-      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented."
+      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented. Complete Bouguer also needs a documented dem-ascii record."
       : "Gravity processing needs a documented XYZ/CSV contract, not the first .xyz file.",
+    dem
+      ? "A documented DEM ASCII record is available as a terrain source. I will not download a DEM."
+      : "Complete Bouguer is blocked until a documented DEM (EPSG, Units=m, ElevationDatum) is in the catalog.",
+    ert
+      ? "I can plan ERT ingest/QC, a labelled pseudosection, and a tested 2-D smoothness inversion if you ask."
+      : "ERT processing needs a documented Res2DInv-style .dat or reviewed ERT CSV, not the first .dat file.",
     "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
   ].filter(Boolean);
   return lines.join("\n");

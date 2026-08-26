@@ -42,6 +42,12 @@ const NODE_SCRIPTS: Record<string, string> = {
   regional_residual: SCIENCE,
   grav_gis_export: SCIENCE,
   grav_interpret: SCIENCE,
+  gravity_terrain: SCIENCE,
+  ert_ingest: SCIENCE,
+  ert_pseudosection: SCIENCE,
+  ert_invert: SCIENCE,
+  ert_gis_export: SCIENCE,
+  ert_interpret: SCIENCE,
 };
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
@@ -49,6 +55,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     super();
     // Live path must pass compiled DAG node ids. An empty list registers nothing.
     // Gravity uses this same engine. Do not add a GravityPipeline execution route.
+    // ERT uses this same engine. Do not add a ResistivityPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
     for (const id of KERNEL_NODE_ORDER) {
@@ -67,6 +74,7 @@ export class GravityPipeline extends PipelineEngine {
   }
 }
 
+/** Unused stub. ERT executes through MagneticPreprocessingPipeline + compileCapabilityDag. */
 export class ResistivityPipeline extends PipelineEngine {
   constructor() {
     super();

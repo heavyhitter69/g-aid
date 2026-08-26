@@ -43,6 +43,12 @@ const NODE_SCRIPTS: Record<string, string> = {
   regional_residual: SCIENCE,
   grav_gis_export: SCIENCE,
   grav_interpret: SCIENCE,
+  gravity_terrain: SCIENCE,
+  ert_ingest: SCIENCE,
+  ert_pseudosection: SCIENCE,
+  ert_invert: SCIENCE,
+  ert_gis_export: SCIENCE,
+  ert_interpret: SCIENCE,
 };
 
 function toolsFromLiveRegistry(): ScientificTool[] {
@@ -56,7 +62,8 @@ function toolsFromLiveRegistry(): ScientificTool[] {
         id: nodeId,
         name: capability.title,
         version: capability.version,
-        domain: capability.domain === "gravity" ? "gravity" : "magnetic",
+        domain:
+          capability.domain === "gravity" ? "gravity" : capability.domain === "resistivity" ? "resistivity" : "magnetic",
         description: `${capability.description} (kernel ${nodeId})`,
         inputs: Object.fromEntries(
           Object.entries(capability.parameters).map(([key, parameter]) => [

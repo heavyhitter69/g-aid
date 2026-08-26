@@ -1,6 +1,8 @@
 import { magarrowAdapter } from "./adapters/magarrow.ts";
 import { gsm19Adapter } from "./adapters/gsm19.ts";
 import { gravityCsvAdapter, gravityXyzAdapter } from "./adapters/gravity.ts";
+import { demAsciiAdapter } from "./adapters/dem.ts";
+import { ertCsvAdapter, ertDatAdapter } from "./adapters/ert.ts";
 import { recognisedAdapters } from "./adapters/recognised.ts";
 import type { CatalogAdapter } from "./adapters/types.ts";
 
@@ -9,6 +11,9 @@ const adapters: CatalogAdapter[] = [
   gsm19Adapter,
   gravityXyzAdapter,
   gravityCsvAdapter,
+  demAsciiAdapter,
+  ertDatAdapter,
+  ertCsvAdapter,
   ...recognisedAdapters,
 ];
 

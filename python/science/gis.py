@@ -23,12 +23,17 @@ def read_ascii_grid(path: str) -> Grid:
         lines = handle.read().splitlines()
     meta: dict[str, float] = {}
     i = 0
-    while i < min(12, len(lines)):
-        parts = lines[i].split()
+    header_keys = {"ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"}
+    while i < len(lines):
+        raw = lines[i].strip()
+        if not raw or raw.startswith(("/", "#", ";")):
+            i += 1
+            continue
+        parts = raw.split()
         if len(parts) < 2:
             break
         key = parts[0].lower()
-        if key not in {"ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "nodata_value"}:
+        if key not in header_keys:
             break
         meta[key] = float(parts[1])
         i += 1
@@ -43,12 +48,19 @@ def read_ascii_grid(path: str) -> Grid:
         if len(vals) >= nx * ny:
             break
     arr = np.array(vals[: nx * ny], float).reshape(ny, nx)
+    cell = meta.get("cellsize", 1.0)
+    x0 = meta.get("xllcorner")
+    y0 = meta.get("yllcorner")
+    if x0 is None and "xllcenter" in meta:
+        x0 = meta["xllcenter"] - cell / 2.0
+    if y0 is None and "yllcenter" in meta:
+        y0 = meta["yllcenter"] - cell / 2.0
     return Grid(
         values=arr,
-        x0=meta.get("xllcorner", 0.0),
-        y0=meta.get("yllcorner", 0.0),
-        dx=meta.get("cellsize", 1.0),
-        dy=meta.get("cellsize", 1.0),
+        x0=float(x0 or 0.0),
+        y0=float(y0 or 0.0),
+        dx=cell,
+        dy=cell,
         nodata=meta.get("nodata_value", -9999.0),
         name=os.path.splitext(os.path.basename(path))[0],
     )

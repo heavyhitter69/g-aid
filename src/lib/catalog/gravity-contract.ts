@@ -3,6 +3,8 @@
  * Numeric XYZ without documented columns/CRS/units is not gravity data.
  */
 
+import type { CatalogBBox } from "./types.ts";
+
 export const GRAVITY_XYZ_FORMAT = "gravity-xyz";
 export const GRAVITY_CSV_FORMAT = "gravity-csv";
 export const GRAVITY_ADAPTER_IDS = ["gravity-xyz", "gravity-csv"] as const;
@@ -63,6 +65,7 @@ export interface GravityContractResult {
   meta: GravityHeaderMeta;
   errors: string[];
   warnings: string[];
+  bbox?: CatalogBBox;
 }
 
 function norm(name: string): string {
@@ -174,6 +177,37 @@ export function mappingCoversRequired(mapping: GravityColumnMapping | undefined)
   return Boolean(mapping?.x && mapping?.y && mapping?.gObs);
 }
 
+function xyBBox(text: string, columns: string[], mapping: GravityColumnMapping | undefined): CatalogBBox | undefined {
+  if (!mapping) return undefined;
+  const xi = columns.findIndex((col) => col === mapping.x);
+  const yi = columns.findIndex((col) => col === mapping.y);
+  if (xi < 0 || yi < 0) return undefined;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let headerSeen = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || /^[\\/#;]/.test(line)) continue;
+    const cols = splitColumns(line);
+    if (!headerSeen && !isNumericRow(cols)) {
+      headerSeen = true;
+      continue;
+    }
+    headerSeen = true;
+    const x = Number(cols[xi]);
+    const y = Number(cols[yi]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  if (!Number.isFinite(minX)) return undefined;
+  return { minX, minY, maxX, maxY };
+}
+
 function gravityValues(text: string, columns: string[], gObs: string): number[] {
   const idx = columns.findIndex((col) => col === gObs);
   if (idx < 0) return [];
@@ -253,6 +287,7 @@ export function inspectGravityText(text: string): GravityContractResult {
     meta,
     errors: looksLikeGravity ? errors : ["Not a gravity table under the G-AID contract."],
     warnings,
+    bbox: suggested ? xyBBox(text, columns, suggested) : undefined,
   };
 }
 

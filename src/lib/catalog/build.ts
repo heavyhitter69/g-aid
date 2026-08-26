@@ -111,6 +111,7 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     crs: classified.inspect.crs,
     units: classified.inspect.units,
     bbox: classified.inspect.bbox,
+    cellSizeM: classified.inspect.cellSizeM,
     timeRange: classified.inspect.timeRange,
     recordCount,
     parseErrors: parseErrors.length ? parseErrors : undefined,

@@ -35,8 +35,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
   const runId = plan.runId || generateRunId();
   const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
   const notes = [...(plan.notes || [])];
-  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "none") {
-    notes.push("That method is not in this release. I did not add a magnetic or gravity checklist.");
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic, gravity, or ERT checklist.");
   }
   const next: AgentPlan = {
     ...plan,
@@ -70,6 +70,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     surveyLatitude: next.parameters.surveyLatitude,
     elevationDatum: next.parameters.elevationDatum,
     applyBullardB: next.parameters.applyBullardB,
+    terrainRadiusM: next.parameters.terrainRadiusM,
+    useDemExtent: next.parameters.useDemExtent,
   });
   return next;
 }

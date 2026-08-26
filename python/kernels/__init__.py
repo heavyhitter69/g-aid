@@ -59,13 +59,17 @@ def get_handler(node_id: str):
         "gravity_ingest": gravity_ingest,
         "gravity_freeair": gravity_freeair,
         "gravity_bouguer": gravity_bouguer,
+        "gravity_terrain": gravity_terrain,
         "grav_gridder": grav_gridder,
         "regional_residual": regional_residual,
         "grav_gis_export": grav_gis_export,
         "grav_interpret": grav_interpret,
         "gravity_reduce": gravity_reduce,
+        "ert_ingest": ert_ingest,
         "ert_pseudosection": ert_pseudosection,
         "ert_invert": ert_invert,
+        "ert_gis_export": ert_gis_export,
+        "ert_interpret": ert_interpret,
         "seismic_process": seismic_process,
         "radiometric_correct": radiometric_correct,
         "gpr_process": gpr_process,
@@ -728,6 +732,11 @@ def gravity_bouguer(payload: dict) -> dict:
     return impl(payload)
 
 
+def gravity_terrain(payload: dict) -> dict:
+    from kernels.gravity import gravity_terrain as impl
+    return impl(payload)
+
+
 def grav_gridder(payload: dict) -> dict:
     from kernels.gravity import grav_gridder as impl
     return impl(payload)
@@ -755,58 +764,29 @@ def regional_residual(payload: dict) -> dict:
     return impl(payload)
 
 
-def ert_pseudosection(payload: dict) -> dict:
-    if not step_enabled(payload, "ert", default=True):
-        return skipped("ert_pseudosection", "not in plan")
-    from science.ert import parse_res2dinv_dat, pseudosection_xyz
+def ert_ingest(payload: dict) -> dict:
+    from kernels.ert import ert_ingest as impl
+    return impl(payload)
 
-    node_id = "ert_pseudosection"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("ERT pseudosection needs parameters.inputPath to a Res2DInv .dat")
-    parsed = parse_res2dinv_dat(src)
-    x, z, rho = pseudosection_xyz(parsed["measurements"])
-    df = pd.DataFrame({"x": x, "z": z, "rhoa_ohm_m": rho, "a": [m["a"] for m in parsed["measurements"]], "n": [m["n"] for m in parsed["measurements"]]})
-    path = os.path.join(out, "ert_pseudosection.csv")
-    df.to_csv(path, index=False)
-    write_json(os.path.join(out, "ert_survey.json"), {"title": parsed["title"], "array": parsed["array"], "n": len(df), "formula": "ρa = K ΔV/I (Telford et al. 1990); pseudo-depth n·a/2"})
-    return {"artifacts": [make_artifact("artifact-ert-pseudo", "section", "csv", path, node_id, [src])], "events": [{"type": "NODE_PROGRESS", "message": f"Pseudosection {len(df)} points, array={parsed['array']}."}]}
+
+def ert_pseudosection(payload: dict) -> dict:
+    from kernels.ert import ert_pseudosection as impl
+    return impl(payload)
 
 
 def ert_invert(payload: dict) -> dict:
-    if not step_enabled(payload, "ertInvert", default=True):
-        return skipped("ert_invert", "not in plan")
-    from science.ert import invert_2d_smooth, occam_1d, parse_res2dinv_dat
+    from kernels.ert import ert_invert as impl
+    return impl(payload)
 
-    node_id = "ert_invert"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("ERT inversion needs parameters.inputPath")
-    parsed = parse_res2dinv_dat(src)
-    mode = str(_params(payload).get("ertMode") or "2d")
-    if mode == "1d":
-        m = parsed["measurements"]
-        result = occam_1d(np.array([x["a"] * x["n"] for x in m]), np.array([x["rhoa"] for x in m]))
-        path = write_json(os.path.join(out, "ert_1d_model.json"), result)
-    else:
-        result = invert_2d_smooth(
-            parsed["measurements"],
-            max_iter=int(_params(payload).get("max_iterations") or 8),
-            lam=float(_params(payload).get("damping_factor") or 0.2),
-        )
-        path = write_json(os.path.join(out, "ert_2d_model.json"), result)
-        # also write CSV section
-        z = result["z_m"]
-        x = result["x_m"]
-        rho = np.array(result["resistivity_ohm_m"])
-        rows = [{"x": x[j], "z": z[i], "resistivity_ohm_m": float(rho[i, j])} for i in range(len(z)) for j in range(len(x))]
-        pd.DataFrame(rows).to_csv(os.path.join(out, "ert_2d_model.csv"), index=False)
-    return {
-        "artifacts": [make_artifact("artifact-ert-inv", "section", "json", path, node_id, [src], {"misfit_percent": result.get("misfit_percent") or result.get("rms")})],
-        "events": [{"type": "NODE_PROGRESS", "message": f"ERT inversion misfit={result.get('misfit_percent') or result.get('rms')}."}],
-    }
+
+def ert_gis_export(payload: dict) -> dict:
+    from kernels.ert import ert_gis_export as impl
+    return impl(payload)
+
+
+def ert_interpret(payload: dict) -> dict:
+    from kernels.ert import ert_interpret as impl
+    return impl(payload)
 
 
 def seismic_process(payload: dict) -> dict:

@@ -1,5 +1,5 @@
 /**
- * Live scientific capability model. Magnetics and gravity are the registered packs.
+ * Live scientific capability model. Magnetics, gravity, and ERT are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -15,10 +15,16 @@ export const USER_CAPABILITY_IDS = [
   "grav.ingest",
   "grav.freeair",
   "grav.bouguer",
+  "grav.terrain",
   "grav.grid",
   "grav.residual",
   "grav.gis",
   "grav.interpret",
+  "ert.ingest",
+  "ert.pseudosection",
+  "ert.invert2d",
+  "ert.gis",
+  "ert.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -34,7 +40,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -52,7 +58,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics" | "gravity";
+  domain: "magnetics" | "gravity" | "resistivity";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -68,7 +74,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -111,4 +117,11 @@ export interface BoundInput {
   elevationDatum?: string;
   units?: string;
   crs?: string;
+  bbox?: {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  };
+  cellSizeM?: number;
 }

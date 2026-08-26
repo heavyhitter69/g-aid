@@ -74,6 +74,7 @@ test("only registered capabilities compile; unknown ids are dropped", () => {
   assert.equal(isRegisteredCapability("mag.diurnal"), true);
   assert.equal(isRegisteredCapability("gravity.bouguer"), false);
   assert.equal(isRegisteredCapability("ert.invert"), false);
+  assert.equal(isRegisteredCapability("ert.invert2d"), true);
   const empty = compileCapabilityDag(["gravity.bouguer", "not.a.cap"]);
   assert.deepEqual(empty.nodes.map((node) => node.id), []);
   assert.deepEqual(empty.requestedCapabilityIds, []);
