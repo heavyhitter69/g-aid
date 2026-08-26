@@ -1,0 +1,103 @@
+import type { CatalogRecord, ProjectCatalog, SupportStatus } from "./types.ts";
+
+function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {
+  return record.supportStatus === "supported" && (record.adapterId === "magarrow" || record.adapterId === "gsm19");
+}
+
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+export function countBySupport(catalog: ProjectCatalog): Record<SupportStatus, number> {
+  const counts: Record<SupportStatus, number> = {
+    supported: 0,
+    "recognised-unsupported": 0,
+    unknown: 0,
+  };
+  for (const record of catalog.records) {
+    counts[record.supportStatus] += 1;
+  }
+  return counts;
+}
+
+export function recordsInTarget(catalog: ProjectCatalog | null, targetFolder: string): CatalogRecord[] {
+  const records = catalog?.records ?? [];
+  if (!targetFolder) return records;
+  const prefix = targetFolder.replace(/\\/g, "/").replace(/\/$/, "");
+  return records.filter((record) => {
+    const rel = record.relativePath.replace(/\\/g, "/");
+    return rel === prefix || rel.startsWith(`${prefix}/`);
+  });
+}
+
+export function summarizeCatalog(catalog: ProjectCatalog | null, maxRecords = 80): string {
+  if (!catalog) return "No project catalog. Open a folder to build one.";
+  const counts = countBySupport(catalog);
+  const magarrow = catalog.records.filter((record) => record.adapterId === "magarrow" && record.supportStatus === "supported");
+  const gsm19 = catalog.records.filter((record) => record.adapterId === "gsm19" && record.supportStatus === "supported");
+  const lines = [
+    `Project catalog (${catalog.records.length} source files; G-AID Output skipped)`,
+    `Support: supported ${counts.supported}, recognised-unsupported ${counts["recognised-unsupported"]}, unknown ${counts.unknown}`,
+    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}`,
+    catalog.truncated ? `Truncated: ${catalog.truncationReason || "file-count limit reached"}` : "",
+    catalog.runs.length ? `Prior runs preserved: ${catalog.runs.map((run) => run.runId).join(", ")}` : "Prior runs preserved: (none)",
+    "This catalog does not imply a magnetic workflow. Only supported MagArrow and GSM-19 records can be processing inputs.",
+  ].filter(Boolean);
+
+  const shown = catalog.records.slice(0, maxRecords);
+  for (const record of shown) {
+    const err = record.parseErrors?.length ? `; parse errors: ${record.parseErrors[0]}` : "";
+    lines.push(
+      `- ${record.relativePath} [${record.id}] ${record.supportStatus}, ${record.formatId}/${record.mediaClass}, confidence ${record.sniffConfidence.toFixed(2)}, ${formatSize(record.size)}${err}`
+    );
+  }
+  if (catalog.records.length > shown.length) {
+    lines.push(`- … ${catalog.records.length - shown.length} more (open Dataset Explorer)`);
+  }
+  return lines.join("\n");
+}
+
+export function inventoryAnswer(catalog: ProjectCatalog | null): string {
+  if (!catalog) {
+    return "I don't have a project catalog yet. Open the survey folder (File → Open Folder) and I will inventory source files without assuming a magnetic workflow.";
+  }
+  const counts = countBySupport(catalog);
+  const magarrow = catalog.records.filter((r) => r.adapterId === "magarrow" && r.supportStatus === "supported").length;
+  const gsm19 = catalog.records.filter((r) => r.adapterId === "gsm19" && r.supportStatus === "supported").length;
+  const formats = new Map<string, number>();
+  for (const record of catalog.records) {
+    formats.set(record.formatId, (formats.get(record.formatId) || 0) + 1);
+  }
+  const formatList = [...formats.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 16)
+    .map(([id, n]) => `${id} (${n})`)
+    .join(", ");
+  const lines = [
+    `This folder has **${catalog.records.length}** source files in the project catalog (G-AID Output was skipped).`,
+    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}`,
+    `- **recognised-unsupported** (identified, not processed in this release): ${counts["recognised-unsupported"]}`,
+    `- **unknown** (not identified reliably): ${counts.unknown}`,
+    formatList ? `Formats: ${formatList}.` : "",
+    catalog.truncated ? `The catalog is truncated: ${catalog.truncationReason}` : "",
+    catalog.runs.length
+      ? `Prior run provenance kept: ${catalog.runs.map((run) => run.runId).join(", ")}.`
+      : "",
+    magarrow && gsm19
+      ? "I can plan MagArrow + GSM-19 magnetics if you ask for that work. Mixed files do not start a magnetic workflow by themselves."
+      : "I will not start a magnetic workflow unless you ask for magnetics and both MagArrow and GSM-19 supported records are present.",
+    "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+export function findRecord(catalog: ProjectCatalog | null, id: string): CatalogRecord | undefined {
+  if (!catalog || !id) return undefined;
+  return catalog.records.find((record) => record.id === id);
+}
+
+export function supportedProcessingRecords(catalog: ProjectCatalog | null, targetFolder = ""): CatalogRecord[] {
+  return recordsInTarget(catalog, targetFolder).filter(isSupportedProcessingRecord);
+}

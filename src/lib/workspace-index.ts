@@ -69,12 +69,11 @@ export function formatWorkspaceForAgent(
   if (searchBlock) lines.push(searchBlock);
 
   const surveyFiles = index.files.filter((f) => !isGaidOutputPath(f.relativePath));
-  const magnetic = surveyFiles.filter((f) => f.kind === "gsm19-base" || f.kind === "magarrow");
   const hitPaths = new Set(hits.map((hit) => hit.relativePath.replace(/\\/g, "/")));
   const preferred = surveyFiles.filter((file) =>
     hitPaths.has(file.relativePath.replace(/\\/g, "/"))
   );
-  const shown = (preferred.length ? preferred : magnetic.length ? magnetic : surveyFiles).slice(0, maxFiles);
+  const shown = (preferred.length ? preferred : surveyFiles).slice(0, maxFiles);
   for (const file of shown) {
     lines.push(`- ${file.relativePath} (${kindLabel(file.kind)}, ${formatSize(file.size)})`);
   }
@@ -134,6 +133,18 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   return null;
 }
 
+/** True when the user asked what the open folder contains, not to process it. */
+export function isProjectInventoryQuestion(message: string): boolean {
+  const t = message.trim().toLowerCase();
+  if (!t) return false;
+  if (isProceedPhrase(t) || detectAnalysisIntent(t)) return false;
+  if (/what(?:'s| is|s) in (this|the|my) (project|folder|workspace|survey|directory)/.test(t)) return true;
+  if (/\b(show|list|summarise|summarize)\b.*\b(catalog|dataset|files|inventory)\b/.test(t)) return true;
+  if (/\bwhat files\b/.test(t) && /\b(project|folder|workspace|survey|here)\b/.test(t)) return true;
+  if (/^(inventory|dataset explorer)\b/.test(t)) return true;
+  return false;
+}
+
 /** True when the user asked a definition / explainer, not to work their files. */
 export function isGeneralKnowledgeQuestion(message: string): boolean {
   const t = message.trim();
@@ -147,8 +158,8 @@ export function isGeneralKnowledgeQuestion(message: string): boolean {
 export function wantsWorkspaceContext(message: string): boolean {
   const t = message.trim();
   if (!t || isGeneralKnowledgeQuestion(t)) return false;
-  if (detectAnalysisIntent(t) || isProceedPhrase(t)) return true;
-  return /\b(survey|dataset|workspace|magarrow|gsm-?19|day\s*\d+|g-aid output|this (file|folder|project|grid)|my (data|survey|files)|look at (the |my )?(data|survey|files)|process (the |my |this )?(data|survey)|find |where is|search )\b/i.test(
+  if (detectAnalysisIntent(t) || isProceedPhrase(t) || isProjectInventoryQuestion(t)) return true;
+  return /\b(survey|dataset|workspace|catalog|magarrow|gsm-?19|day\s*\d+|g-aid output|this (file|folder|project|grid)|my (data|survey|files)|look at (the |my )?(data|survey|files)|process (the |my |this )?(data|survey)|find |where is|search )\b/i.test(
     t
   ) || /["'`][^"'`]{2,}["'`]/.test(t) || /\b[A-Z][A-Z0-9_-]{3,}\b/.test(t) || /\.(csv|txt|dat|xyz|las|sgy|segy|dzt)\b/i.test(t);
 }
@@ -164,7 +175,7 @@ export function isProceedPhrase(message: string): boolean {
 }
 
 export function isProcessingRequest(message: string): boolean {
-  if (!message.trim() || isGeneralKnowledgeQuestion(message)) return false;
+  if (!message.trim() || isGeneralKnowledgeQuestion(message) || isProjectInventoryQuestion(message)) return false;
   if (detectAnalysisIntent(message)) return true;
   const t = message.toLowerCase();
   if (/\bday\s*\d+\b/.test(t) && /\b(do|run|perform|apply|start|process|correct|execute|analyse|analyze|plan|grid)\b/.test(t)) {

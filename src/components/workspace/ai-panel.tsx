@@ -23,6 +23,7 @@ import type { StreamPreamble, OpportunityChipViewModel, HypothesisEpistemicType,
 import { AgentActivity } from "@/components/workspace/agent-activity";
 import { summariseFileForAgent } from "@/lib/auto-ingest";
 import { formatWorkspaceForAgent, wantsWorkspaceContext } from "@/lib/workspace-index";
+import { summarizeCatalog } from "@/lib/catalog/summarize";
 import { mergeSearchHits, searchWorkspaceIndex, type WorkspaceSearchHit } from "@/lib/workspace-search";
 import { applyWorkspaceFileUpdates } from "@/lib/workspace-files";
 import { presentJobResultsFromEpilogue } from "@/lib/job-results";
@@ -654,6 +655,7 @@ export function AIPanel() {
     currentProject,
     workspaceRoot,
     workspaceIndex,
+    projectCatalog,
     setActiveFile,
     setWorkspaceView,
     openWorkbenchTab,
@@ -877,8 +879,13 @@ export function AIPanel() {
 
     try {
       // Build file content summaries for the orchestrator
+      const unsafeMedia = new Set(["raster", "point-cloud", "seismic", "binary", "image"]);
       const fileSummaries = projectFiles
         .filter((f) => fileContents[f.id] && !isTemporaryWorkspaceFile(f.id) && !isTemporaryWorkspaceFile(f.name))
+        .filter((f) => {
+          const record = projectCatalog?.records.find((item) => item.relativePath === f.id || item.relativePath === f.path);
+          return !record || !unsafeMedia.has(record.mediaClass);
+        })
         .slice(0, 20)
         .map((f) => summariseFileForAgent(f.id, fileContents[f.id]))
         .join("\n\n");
@@ -902,7 +909,15 @@ export function AIPanel() {
           }
         }
       }
-      const workspaceCatalog = formatWorkspaceForAgent(workspaceIndex, 80, searchHits);
+      let workspaceCatalog = projectCatalog
+        ? summarizeCatalog(projectCatalog, 80)
+        : formatWorkspaceForAgent(workspaceIndex, 80, searchHits);
+      if (projectCatalog && searchHits.length) {
+        workspaceCatalog += `\nSearch hits:\n${searchHits
+          .slice(0, 24)
+          .map((hit) => `- ${hit.relativePath} (${hit.kind}${hit.why ? `, ${hit.why}` : ""})`)
+          .join("\n")}`;
+      }
 
       const contextBlocks: string[] = [];
       if (workspaceCatalog && attachWorkspace) {
@@ -1195,7 +1210,7 @@ let activityId: string | null = null;
   }, [
     inputVal, isGenerating, activeConversation.id, activeConversation.messages, 
     addMessageToConversation, updateMessageInConversation, setConversationState, agentStore, scientificState, projectFiles, 
-    fileContents, currentProject, workspaceRoot, workspaceIndex, selectedMode, updateConversationTopic, assignAiTopic, pluginState, orchestraChoice
+    fileContents, currentProject, workspaceRoot, workspaceIndex, projectCatalog, selectedMode, updateConversationTopic, assignAiTopic, pluginState, orchestraChoice
   ]);
 
   const handleRetryInterrupted = useCallback((agentMsgId: string) => {

@@ -14,7 +14,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --no-warnings src/lib/plan-spec.test.ts && node --experimental-strip-types --no-warnings src/lib/workspace-search.test.ts && node --experimental-strip-types --no-warnings src/lib/phase1-integrity.test.ts",
+    "test": "node --experimental-strip-types --no-warnings src/lib/plan-spec.test.ts && node --experimental-strip-types --no-warnings src/lib/workspace-search.test.ts && node --experimental-strip-types --no-warnings src/lib/phase1-integrity.test.ts && node --experimental-strip-types --no-warnings src/lib/catalog.test.ts",
     "icons": "node scripts/generate-icons.mjs",
     "dist": "npm run icons && npm run build && electron-builder",
     "dist:inno": "node scripts/compile-inno.mjs",

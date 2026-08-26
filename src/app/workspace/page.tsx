@@ -13,6 +13,7 @@ import { VisualizationStudio } from "@/components/workspace/visualization-studio
 import { PluginStoreView } from "@/components/workspace/plugin-store";
 import { FileEditorView } from "@/components/workspace/file-editor";
 import { PendingChangesReview } from "@/components/workspace/pending-changes";
+import { DatasetExplorer } from "@/components/workspace/dataset-explorer";
 import { REVIEW_TAB_ID } from "@/lib/pending-file-changes";
 import { useAppStore } from "@/store/app-store";
 import { ThemeProvider } from "@/components/shared/theme-provider";
@@ -279,26 +280,7 @@ export default function WorkspacePage() {
           </section>
         );
       case "datasets":
-        return (
-          <section className="p-6 bg-[#1e1e1e] h-full text-[#cccccc]">
-            <h2 className="text-lg font-semibold mb-4 text-white">Dataset Explorer</h2>
-            {projectFiles.filter((f) => f.type === "file").length === 0 ? (
-              <p className="text-sm text-[#858585]">Open a survey folder to see its files here. G-AID does not ship sample datasets.</p>
-            ) : (
-              <ul className="space-y-2">
-                {projectFiles
-                  .filter((f) => f.type === "file")
-                  .slice(0, 80)
-                  .map((f) => (
-                    <li key={f.id} className="flex items-center justify-between p-4 bg-[#252526] rounded border border-[#3c3c3c] font-mono text-sm">
-                      <span className="truncate">{f.path || f.name}</span>
-                      <span className="text-xs text-[#858585] shrink-0 ml-3">{f.name}</span>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </section>
-        );
+        return <DatasetExplorer />;
       case "extensions":
         return <PluginStoreView />;
       case "file-editor":

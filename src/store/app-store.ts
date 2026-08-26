@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
+import type { ProjectCatalog } from "@/lib/catalog/types";
 import type { JobResults } from "@/lib/job-results";
 import type { WorkStep } from "@/lib/work-steps";
 import { conversationTitleFromText, isPlaceholderTopic } from "@/lib/conversation-title";
@@ -97,6 +98,7 @@ interface AppState {
   lastWorkspaceRoot: string | null;
   lastCurrentProject: string | null;
   workspaceIndex: WorkspaceIndex | null;
+  projectCatalog: ProjectCatalog | null;
   recentProjects: RecentProject[];
   processingStatus: "idle" | "running" | "complete" | "error";
   theme: "light" | "dark";
@@ -165,6 +167,7 @@ interface AppState {
   addProjectFile: (file: ProjectFile) => void;
   setCurrentProject: (projectName: string | null, path?: string, fileCount?: number) => void;
   setWorkspaceRoot: (root: string | null, index?: WorkspaceIndex | null) => void;
+  setProjectCatalog: (catalog: ProjectCatalog | null) => void;
   setOpenFileDialogOpen: (value: boolean) => void;
   setOpenFolderDialogOpen: (value: boolean) => void;
   setSaveAsDialogOpen: (value: boolean) => void;
@@ -239,6 +242,7 @@ const initialState = {
   lastWorkspaceRoot: null as string | null,
   lastCurrentProject: null as string | null,
   workspaceIndex: null as WorkspaceIndex | null,
+  projectCatalog: null as ProjectCatalog | null,
   recentProjects: [] as RecentProject[],
   processingStatus: "idle" as const,
   theme: "dark" as const,
@@ -521,6 +525,7 @@ export const useAppStore = create<AppState>()(
         workspaceIndex: index ?? null,
         ...(root ? { lastWorkspaceRoot: root } : {}),
       })),
+      setProjectCatalog: (catalog) => set({ projectCatalog: catalog }),
       setOpenFileDialogOpen: (value) => set({ isOpenFileDialogOpen: value }),
       setOpenFolderDialogOpen: (value) => set({ isOpenFolderDialogOpen: value }),
       setSaveAsDialogOpen: (value) => set({ isSaveAsDialogOpen: value }),
@@ -578,6 +583,7 @@ export const useAppStore = create<AppState>()(
         currentProject: null,
         workspaceRoot: null,
         workspaceIndex: null,
+        projectCatalog: null,
         projectFiles: [],
         fileContents: {},
         workbenchTabs: [],

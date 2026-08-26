@@ -88,6 +88,20 @@ test("incomplete magnetic input blocks diurnal execution", () => {
   assert.equal(baseOnly.blockers.some((issue) => issue.code === "incomplete_mag"), true);
 });
 
+test("a mixed folder with mag files does not default to magnetic work", () => {
+  const intent = inferIntentFromFiles(null, {
+    root: "/surveys/MIX",
+    folders: ["DAY 1", "gis"],
+    files: [
+      { relativePath: "DAY 1/rover.csv", name: "rover.csv", size: 20, ext: "csv", kind: "magarrow" },
+      { relativePath: "DAY 1/base.txt", name: "base.txt", size: 20, ext: "txt", kind: "gsm19-base" },
+      { relativePath: "gis/dem.asc", name: "dem.asc", size: 20, ext: "asc", kind: "other" },
+    ],
+    truncated: false,
+  }, "DAY 1", "process this folder");
+  assert.equal(intent, "none");
+});
+
 test("a non-magnetic request does not create a magnetic plan", () => {
   const ert = intentToSteps("resistivity", "run ERT on line 4");
   assert.equal(ert.diurnal, false);

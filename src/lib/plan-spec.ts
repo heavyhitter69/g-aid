@@ -4,6 +4,8 @@
  */
 
 import type { AnalysisIntent } from "@/lib/workspace-index";
+import type { ProjectCatalog, SupportStatus } from "./catalog/types.ts";
+import { findRecord, recordsInTarget } from "./catalog/summarize.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -48,10 +50,14 @@ export const EMPTY_STEPS: PlanSteps = {
 export type PlanIntent = AnalysisIntent | "none";
 
 export interface PlanInput {
+  catalogId: string;
   path: string;
   kind?: string;
   size?: number;
   checksum?: string;
+  supportStatus?: SupportStatus;
+  adapterId?: string | null;
+  formatId?: string;
 }
 
 export interface AgentPlan {
@@ -604,7 +610,23 @@ function countFromBrief(brief: string, label: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
-export function validatePlan(plan: AgentPlan): PlanValidation {
+function magCountsFromCatalog(plan: AgentPlan, catalog: ProjectCatalog): { magarrow: number; gsm: number } {
+  const scoped = recordsInTarget(catalog, plan.targetFolder);
+  return {
+    magarrow: scoped.filter((record) => record.supportStatus === "supported" && record.adapterId === "magarrow").length,
+    gsm: scoped.filter((record) => record.supportStatus === "supported" && record.adapterId === "gsm19").length,
+  };
+}
+
+function magCountsFromInputs(plan: AgentPlan): { magarrow: number; gsm: number } | null {
+  const inputs = plan.inputs || [];
+  if (!inputs.length || inputs.some((item) => !item.catalogId && !item.adapterId && !item.kind)) return null;
+  const magarrow = inputs.filter((item) => item.adapterId === "magarrow" || item.kind === "magarrow").length;
+  const gsm = inputs.filter((item) => item.adapterId === "gsm19" || item.kind === "gsm19-base" || item.kind === "gsm19").length;
+  return { magarrow, gsm };
+}
+
+export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): PlanValidation {
   const blockers: PlanIssue[] = [];
   const warnings: PlanIssue[] = [];
   const notes: PlanIssue[] = (plan.notes || []).map((message) => ({
@@ -637,8 +659,58 @@ export function validatePlan(plan: AgentPlan): PlanValidation {
     });
   }
 
-  const magarrow = countFromBrief(plan.workspaceBrief || "", "MagArrow airborne");
-  const gsm = countFromBrief(plan.workspaceBrief || "", "GSM-19 base station");
+  const inputs = plan.inputs || [];
+  const nonSupported = inputs.filter((item) => item.supportStatus && item.supportStatus !== "supported");
+  if (nonSupported.length) {
+    blockers.push({
+      level: "blocker",
+      code: "unsupported_catalog_input",
+      message:
+        "Recognised-unsupported and unknown files cannot be processing inputs. Bind supported MagArrow and GSM-19 catalog records only.",
+    });
+  }
+  if (magneticStepsEnabled(plan.steps) && inputs.length && inputs.some((item) => !item.catalogId)) {
+    blockers.push({
+      level: "blocker",
+      code: "missing_catalog_id",
+      message: "Magnetic plans must bind catalog record IDs, not raw file paths or extension searches.",
+    });
+  }
+  if (catalog && inputs.length) {
+    for (const item of inputs) {
+      if (!item.catalogId) continue;
+      const record = findRecord(catalog, item.catalogId);
+      if (!record) {
+        blockers.push({
+          level: "blocker",
+          code: "unknown_catalog_id",
+          message: `Catalog record ${item.catalogId} is not in the project catalog.`,
+        });
+        continue;
+      }
+      if (record.supportStatus !== "supported") {
+        blockers.push({
+          level: "blocker",
+          code: "unsupported_catalog_input",
+          message: `${record.relativePath} is ${record.supportStatus} and cannot be a processing input.`,
+        });
+      }
+    }
+  }
+
+  let magarrow = countFromBrief(plan.workspaceBrief || "", "MagArrow airborne");
+  let gsm = countFromBrief(plan.workspaceBrief || "", "GSM-19 base station");
+  if (catalog) {
+    const counted = magCountsFromCatalog(plan, catalog);
+    magarrow = counted.magarrow;
+    gsm = counted.gsm;
+  } else {
+    const fromInputs = magCountsFromInputs(plan);
+    if (fromInputs && (fromInputs.magarrow > 0 || fromInputs.gsm > 0 || inputs.length > 0)) {
+      magarrow = fromInputs.magarrow;
+      gsm = fromInputs.gsm;
+    }
+  }
   const magMissing = magarrow == null || magarrow === 0;
   const gsmMissing = gsm == null || gsm === 0;
   if (plan.steps.diurnal && magMissing && gsmMissing) {

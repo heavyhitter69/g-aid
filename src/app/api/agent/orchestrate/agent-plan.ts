@@ -15,6 +15,7 @@ import {
   type WorkspaceSearchHit,
 } from "@/lib/workspace-search";
 import { generateRunId, resolveRunLayout } from "@/lib/run-layout";
+import { loadProjectCatalog, summarizeCatalog, type ProjectCatalog } from "@/lib/catalog";
 import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan } from "./implementation-plan";
 import {
   applyChatPatches,
@@ -84,9 +85,11 @@ export function upsertAgentPlan(options: {
   editorMarkdown?: string;
   searchHits?: WorkspaceSearchHit[];
   searchMisses?: string[];
+  catalog?: ProjectCatalog | null;
 }): AgentPlan {
   const existing = getPendingPlan(options.sessionId, options.workspaceRoot);
   const projectName = options.projectName || path.basename(options.workspaceRoot);
+  const catalog = options.catalog ?? loadProjectCatalog(options.workspaceRoot);
   const hits = options.searchHits ?? searchWorkspaceIndex(options.workspaceIndex, options.userText);
   const misses = options.searchMisses ?? unmatchedNeedles(extractSearchNeedles(options.userText).named, hits);
   const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex, hits);
@@ -139,14 +142,19 @@ export function upsertAgentPlan(options: {
     ];
   }
 
-  draft.inputs = collectPlanInputs(options.workspaceIndex, draft.targetFolder);
-  draft.workspaceBrief = buildWorkspaceBrief(
-    options.workspaceIndex,
-    options.workspaceRoot,
-    draft.targetFolder,
-    hits,
-    misses
-  );
+  draft.inputs = collectPlanInputs(options.workspaceIndex, draft.targetFolder, catalog);
+  draft.workspaceBrief = [
+    buildWorkspaceBrief(
+      options.workspaceIndex,
+      options.workspaceRoot,
+      draft.targetFolder,
+      hits,
+      misses
+    ),
+    catalog ? summarizeCatalog(catalog, 40) : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const painted = paintPlan(draft);
   setPendingPlan(options.sessionId, painted);
   return painted;
@@ -166,6 +174,7 @@ export function buildPlanningPrompt(options: {
   userText: string;
   history: { sender: string; text: string }[];
   plan: AgentPlan;
+  catalog?: ProjectCatalog | null;
 }): string {
   const historyBlock = options.history
     .map((msg) => {
@@ -186,7 +195,7 @@ export function buildPlanningPrompt(options: {
   )
     .map((item) => item.replace(/^- /, "").replace(/\s*<!--.*?-->\s*/g, ""))
     .join("; ");
-  const validation = validatePlan(options.plan);
+  const validation = validatePlan(options.plan, options.catalog);
   const science = [...validation.notes, ...validation.warnings, ...validation.blockers]
     .map((issue) => issue.message)
     .join(" ");

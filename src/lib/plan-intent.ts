@@ -1,5 +1,7 @@
-import { detectAnalysisIntent, filesInTarget, type AnalysisIntent, type WorkspaceIndex } from "./workspace-index.ts";
-import { EMPTY_STEPS, type PlanSteps } from "./plan-spec.ts";
+import { detectAnalysisIntent, type AnalysisIntent, type WorkspaceIndex } from "./workspace-index.ts";
+import { EMPTY_STEPS, type PlanInput, type PlanSteps } from "./plan-spec.ts";
+import type { ProjectCatalog } from "./catalog/types.ts";
+import { supportedProcessingRecords } from "./catalog/summarize.ts";
 
 function magSuite(enabled: boolean): Pick<
   PlanSteps,
@@ -70,22 +72,29 @@ export function inferIntentFromFiles(
   if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr)\b/.test(m)) {
     return detectAnalysisIntent(message) || "none";
   }
-  const scoped = filesInTarget(index, targetFolder);
-  const air = scoped.filter((file) => file.kind === "magarrow").length;
-  const base = scoped.filter((file) => file.kind === "gsm19-base").length;
-  const wantsWork =
-    /\b(do|run|perform|apply|start|process|correct|execute|analyse|analyze|plan|grid)\b/.test(m) ||
-    /\bday\s*\d+\b/.test(m);
-  if (wantsWork && air > 0 && base > 0) return "magnetic";
+  void index;
+  void targetFolder;
   return "none";
 }
 
-export function collectPlanInputs(index: WorkspaceIndex | null, targetFolder: string) {
-  return filesInTarget(index, targetFolder)
-    .filter((file) => file.kind === "magarrow" || file.kind === "gsm19-base")
-    .map((file) => ({
-      path: file.relativePath,
-      kind: file.kind,
-      size: file.size,
+/** Bind only supported MagArrow / GSM-19 catalog records. Never extension search. */
+export function collectPlanInputs(
+  index: WorkspaceIndex | null,
+  targetFolder: string,
+  catalog?: ProjectCatalog | null
+): PlanInput[] {
+  if (catalog) {
+    return supportedProcessingRecords(catalog, targetFolder).map((record) => ({
+      catalogId: record.id,
+      path: record.relativePath,
+      kind: record.adapterId === "gsm19" ? "gsm19-base" : "magarrow",
+      size: record.size,
+      checksum: record.checksum.value,
+      supportStatus: record.supportStatus,
+      adapterId: record.adapterId,
+      formatId: record.formatId,
     }));
+  }
+  void index;
+  return [];
 }

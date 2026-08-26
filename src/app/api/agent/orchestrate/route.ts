@@ -13,9 +13,11 @@ import {
   isGeneralKnowledgeQuestion,
   isProceedPhrase,
   isProcessingRequest,
+  isProjectInventoryQuestion,
   splitUserAndContext,
   type WorkspaceIndex,
 } from "@/lib/workspace-index";
+import { inventoryAnswer, loadProjectCatalog } from "@/lib/catalog";
 import { streamOrchestra } from "@/lib/ollama-orchestra";
 import type { PluginState } from "@/lib/plugins";
 import { resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
@@ -151,10 +153,18 @@ export async function POST(request: NextRequest): Promise<Response> {
   let pending = getPendingPlan(sessionId);
   const intent = detectAnalysisIntent(userText);
   const root = typeof workspaceRoot === "string" ? workspaceRoot.trim() : "";
+  const catalog = root ? loadProjectCatalog(root) : null;
+
+  if (root && isProjectInventoryQuestion(userText) && !isProceedPhrase(userText)) {
+    return streamAgentResponse(inventoryAnswer(catalog), {
+      type: "synthesis_complete",
+      awaitingApproval: false,
+    });
+  }
 
   if (pending && isProceedPhrase(userText)) {
     pending = syncPendingFromEditor(sessionId, editorMarkdown) || pending;
-    const check = validatePlan(pending);
+    const check = validatePlan(pending, catalog);
     if (!check.ok) {
       return streamAgentResponse(
         `I can't start yet. ${check.blockers.map((issue) => issue.message).join(" ")} Edit the plan or tell me what to change.`,
@@ -193,11 +203,13 @@ export async function POST(request: NextRequest): Promise<Response> {
         editorMarkdown,
         searchHits: hits,
         searchMisses: misses,
+        catalog,
       });
       const prompt = buildPlanningPrompt({
         userText,
         history: Array.isArray(history) ? history.slice(-8) : [],
         plan,
+        catalog,
       });
       return await proxyOrchestra(
         prompt,

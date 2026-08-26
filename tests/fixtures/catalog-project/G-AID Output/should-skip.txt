@@ -1,0 +1,1 @@
+This file is inside G-AID Output and must not become a source catalog record.
