@@ -18,6 +18,7 @@ import {
   type WorkspaceIndex,
 } from "@/lib/workspace-index";
 import { inventoryAnswer, loadProjectCatalog } from "@/lib/catalog";
+import { buildMapLayers, isMapQuestion, listRunArtifactPaths, mapWorkspaceAnswer } from "@/lib/map";
 import { streamOrchestra } from "@/lib/ollama-orchestra";
 import type { PluginState } from "@/lib/plugins";
 import { resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
@@ -157,6 +158,15 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   if (root && isProjectInventoryQuestion(userText) && !isProceedPhrase(userText)) {
     return streamAgentResponse(inventoryAnswer(catalog), {
+      type: "synthesis_complete",
+      awaitingApproval: false,
+    });
+  }
+
+  if (root && isMapQuestion(userText) && !isProceedPhrase(userText) && !isProcessingRequest(userText)) {
+    const files = catalog ? listRunArtifactPaths(root, catalog.runs) : [];
+    const layers = buildMapLayers({ catalog, files });
+    return streamAgentResponse(mapWorkspaceAnswer({ catalog, layers, message: userText }), {
       type: "synthesis_complete",
       awaitingApproval: false,
     });

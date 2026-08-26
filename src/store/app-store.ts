@@ -93,6 +93,8 @@ interface AppState {
   assignedAgent: AgentProfile | null;
   workspaceView: WorkspaceView;
   lastJobResults: JobResults | null;
+  mapFocus: { catalogId?: string; artifactId?: string; path?: string } | null;
+  compareRunId: string | null;
   currentProject: string | null;
   workspaceRoot: string | null;
   lastWorkspaceRoot: string | null;
@@ -140,6 +142,8 @@ interface AppState {
   completeOnboarding: () => void;
   setWorkspaceView: (view: WorkspaceView) => void;
   presentJobResults: (results: JobResults) => void;
+  setMapFocus: (focus: { catalogId?: string; artifactId?: string; path?: string } | null) => void;
+  setCompareRunId: (runId: string | null) => void;
   setProcessingStatus: (status: "idle" | "running" | "complete" | "error") => void;
   setTheme: (theme: "light" | "dark") => void;
   toggleAgentSidebar: () => void;
@@ -237,6 +241,8 @@ const initialState = {
   assignedAgent: null,
   workspaceView: "dashboard" as WorkspaceView,
   lastJobResults: null as JobResults | null,
+  mapFocus: null as { catalogId?: string; artifactId?: string; path?: string } | null,
+  compareRunId: null as string | null,
   currentProject: null as string | null,
   workspaceRoot: null as string | null,
   lastWorkspaceRoot: null as string | null,
@@ -330,7 +336,7 @@ export const useAppStore = create<AppState>()(
             : [...s.workbenchTabs, { id, type: "view" as const, title }];
           const reveal =
             results.activeLayerId ||
-            results.files.find((file: string) => /\.(tif|tiff|asc|npz|npy)$/i.test(file)) ||
+            results.files.find((file: string) => /\.(tif|tiff|asc|npz|npy|geojson)$/i.test(file)) ||
             results.productsRel;
           return {
             lastJobResults: results,
@@ -345,6 +351,21 @@ export const useAppStore = create<AppState>()(
             }),
           };
         }),
+      setMapFocus: (focus) =>
+        set((s) => {
+          const id = "visualization";
+          const alreadyOpen = s.workbenchTabs.some((t) => t.id === id);
+          const workbenchTabs = alreadyOpen
+            ? s.workbenchTabs
+            : [...s.workbenchTabs, { id, type: "view" as const, title: "Map" }];
+          return {
+            mapFocus: focus,
+            workbenchTabs,
+            activeWorkbenchTabId: id,
+            workspaceView: "visualization" as WorkspaceView,
+          };
+        }),
+      setCompareRunId: (runId) => set({ compareRunId: runId }),
       setProcessingStatus: (status) => set({ processingStatus: status }),
       setTheme: (theme) => set({ theme }),
       toggleAgentSidebar: () => set((s) => ({ isAgentSidebarOpen: !s.isAgentSidebarOpen })),
@@ -591,6 +612,8 @@ export const useAppStore = create<AppState>()(
         activeWorkbenchTabId: null,
         workspaceView: "dashboard",
         lastJobResults: null,
+        mapFocus: null,
+        compareRunId: null,
       }),
       hideConversation: (id) => set((s) => {
         const updated = s.conversations.map((c) => (c.id === id ? { ...c, hidden: true } : c));

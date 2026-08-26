@@ -2,54 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map as MapIcon } from "lucide-react";
+import { parseEsriAscii, type RasterGrid } from "@/lib/map/ascii";
 
-export interface AsciiGrid {
-  ncols: number;
-  nrows: number;
-  xllcorner: number;
-  yllcorner: number;
-  cellsize: number;
-  nodata: number;
-  values: Float64Array;
-}
-
-export function parseEsriAscii(text: string): AsciiGrid | null {
-  const lines = text.split(/\r?\n/);
-  const meta: Record<string, number> = {};
-  let i = 0;
-  while (i < lines.length && i < 12) {
-    const parts = lines[i].trim().split(/\s+/);
-    if (parts.length < 2) break;
-    const key = parts[0].toLowerCase();
-    if (!["ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "nodata_value"].includes(key)) break;
-    meta[key] = parseFloat(parts[1]);
-    i += 1;
-  }
-  const ncols = meta.ncols;
-  const nrows = meta.nrows;
-  if (!ncols || !nrows || ncols > 4000 || nrows > 4000) return null;
-  const values = new Float64Array(ncols * nrows);
-  let n = 0;
-  for (; i < lines.length && n < values.length; i++) {
-    const parts = lines[i].trim().split(/\s+/);
-    for (const part of parts) {
-      if (!part) continue;
-      values[n] = parseFloat(part);
-      n += 1;
-      if (n >= values.length) break;
-    }
-  }
-  if (n < values.length * 0.5) return null;
-  return {
-    ncols,
-    nrows,
-    xllcorner: meta.xllcorner ?? 0,
-    yllcorner: meta.yllcorner ?? 0,
-    cellsize: meta.cellsize ?? 1,
-    nodata: meta.nodata_value ?? -9999,
-    values,
-  };
-}
+export type AsciiGrid = RasterGrid;
+export { parseEsriAscii };
 
 function colorFor(t: number, ramp: "jet" | "gray" | "viridis" = "jet"): [number, number, number] {
   const x = Math.max(0, Math.min(1, t));
@@ -274,12 +230,24 @@ export function GridMapView({
   note,
   overlay,
   overlayLines,
+  units = "nT",
+  warnings,
+  opacity = 1,
+  crsLabel,
+  onInspect,
+  onProfile,
 }: {
   title: string;
   grid: AsciiGrid | null;
   note?: string;
   overlay?: { x: number; y: number }[];
   overlayLines?: { x: number; y: number }[][];
+  units?: string;
+  warnings?: string[];
+  opacity?: number;
+  crsLabel?: string;
+  onInspect?: (hit: { x: number; y: number; value: number | null; nodata: boolean }) => void;
+  onProfile?: (a: { x: number; y: number }, b: { x: number; y: number }) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLCanvasElement>(null);
@@ -293,6 +261,7 @@ export function GridMapView({
   const [showLineaments, setShowLineaments] = useState(true);
   const [cursor, setCursor] = useState<string>("");
   const [fitted, setFitted] = useState(0);
+  const profileA = useRef<{ x: number; y: number } | null>(null);
 
   const stats = useMemo(() => {
     if (!grid) return null;
@@ -382,7 +351,9 @@ export function GridMapView({
     ctx.fillRect(0, 0, w, h);
     ctx.imageSmoothingEnabled = false;
     ctx.setTransform(scale, 0, 0, scale, panX, panY);
+    ctx.globalAlpha = Math.max(0.15, Math.min(1, opacity));
     ctx.drawImage(raster, 0, 0);
+    ctx.globalAlpha = 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (showPath && sampledOverlay.length) {
       ctx.fillStyle = "rgba(255,255,255,0.9)";
@@ -429,7 +400,7 @@ export function GridMapView({
     const lo = stretch === "pct" ? stats.p2 : stats.min;
     const hi = stretch === "pct" ? stats.p98 : stats.max;
     drawMapChrome(ctx, w, h, grid.cellsize, scale, ramp, lo, hi);
-  }, [grid, sampledOverlay, sampledLines, showPath, showContours, showLineaments, contourCache, stats, stretch, ramp]);
+  }, [grid, sampledOverlay, sampledLines, showPath, showContours, showLineaments, contourCache, stats, stretch, ramp, opacity]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -516,6 +487,7 @@ export function GridMapView({
         <div className="flex items-center gap-2 min-w-0">
           <MapIcon className="h-4 w-4 text-[#4ec9b0] shrink-0" />
           <span className="text-[#cccccc] text-[13px] font-medium truncate">{title}</span>
+          {crsLabel ? <span className="text-[10px] text-[#858585] font-mono truncate">{crsLabel}</span> : null}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-[#cccccc] shrink-0">
           <select
@@ -560,11 +532,34 @@ export function GridMapView({
           </span>
         </div>
       </div>
+      {warnings?.length ? (
+        <div className="px-3 py-1.5 bg-[#3a2a12] text-[#f0c674] text-[11px] leading-snug border-b border-[#2b2b2b]">
+          {warnings.join(" ")}
+        </div>
+      ) : null}
+      {grid.preview ? (
+        <div className="px-3 py-1 bg-[#252526] text-[#858585] text-[11px] border-b border-[#2b2b2b]">
+          {grid.previewNote || "Preview/overview — not the full dataset."}
+        </div>
+      ) : null}
       <div
         ref={hostRef}
         className="flex-1 min-h-0 relative cursor-crosshair"
         onMouseDown={(e) => {
           if (e.button !== 0) return;
+          if (e.shiftKey && onProfile) {
+            const hit = toGrid(e.clientX, e.clientY);
+            if (!hit) return;
+            const pt = { x: hit.x, y: hit.y };
+            if (!profileA.current) {
+              profileA.current = pt;
+              setCursor("Profile start set. Shift-click the end point.");
+              return;
+            }
+            onProfile(profileA.current, pt);
+            profileA.current = null;
+            return;
+          }
           viewState.current.dragging = true;
           viewState.current.lastX = e.clientX;
           viewState.current.lastY = e.clientY;
@@ -583,9 +578,10 @@ export function GridMapView({
             setCursor("");
             return;
           }
-          const val =
-            Number.isFinite(hit.v) && hit.v !== grid.nodata ? `${hit.v.toFixed(2)} nT` : "nodata";
-          setCursor(`${hit.x.toFixed(1)}, ${hit.y.toFixed(1)} · ${val}`);
+          const nodata = !Number.isFinite(hit.v) || hit.v === grid.nodata;
+          const val = nodata ? "nodata" : `${hit.v.toFixed(2)} ${units}`;
+          setCursor(`${hit.x.toFixed(1)}, ${hit.y.toFixed(1)} · ${val}${crsLabel ? ` · ${crsLabel}` : ""}`);
+          onInspect?.({ x: hit.x, y: hit.y, value: nodata ? null : hit.v, nodata });
         }}
         onMouseUp={() => {
           viewState.current.dragging = false;
@@ -600,9 +596,9 @@ export function GridMapView({
       </div>
       <div className="px-4 py-1.5 border-t border-[#2b2b2b] text-[11px] text-[#858585] font-mono flex justify-between gap-3">
         <span>
-          {lo.toFixed(2)} – {hi.toFixed(2)} nT
+          {lo.toFixed(2)} – {hi.toFixed(2)} {units}
         </span>
-        <span className="truncate">{cursor || "Scroll to zoom · drag to pan · double-click to fit"}</span>
+        <span className="truncate">{cursor || "Scroll to zoom · drag to pan · double-click to fit · Shift-click two points for a profile"}</span>
       </div>
     </div>
   );

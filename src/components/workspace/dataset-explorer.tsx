@@ -16,9 +16,17 @@ function statusClass(status: SupportStatus): string {
 }
 
 function RecordRow({ record }: { record: CatalogRecord }) {
+  const setMapFocus = useAppStore((s) => s.setMapFocus);
   const errors = record.parseErrors?.join("; ");
+  const spatial = record.mediaClass === "raster" || record.mediaClass === "vector";
   return (
-    <tr className="border-b border-[#3c3c3c] align-top">
+    <tr
+      className={`border-b border-[#3c3c3c] align-top ${spatial ? "cursor-pointer hover:bg-[#2a2d2e]" : ""}`}
+      onClick={() => {
+        if (!spatial) return;
+        setMapFocus({ catalogId: record.id, path: record.relativePath });
+      }}
+    >
       <td className="px-3 py-2 font-mono text-xs text-[#cccccc]">
         <div className="truncate max-w-[28rem]" title={record.relativePath}>
           {record.relativePath}
@@ -75,6 +83,7 @@ export function DatasetExplorer() {
         {catalog.records.length} source files
         {catalog.truncated ? " (truncated)" : ""}. Supported {supported}, recognised-unsupported {recognised}, unknown {unknown}.
         Mixed folders do not start a magnetic workflow. Only supported MagArrow and GSM-19 records can be processing inputs.
+        Click a raster or vector row to locate it on the map workspace. Shapefile, LAS, and SEG-Y will not decode as map layers.
       </p>
       {catalog.records.length === 0 ? (
         <p className="text-sm text-[#858585]">No source files were catalogued in this folder.</p>

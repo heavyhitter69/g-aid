@@ -12,12 +12,15 @@ import {
   posixPath,
   rasterLayersFromPaths,
 } from "./raster-layers";
+import { runIdFromPath } from "./map/layers";
 
 export interface JobResults {
   taskFolder: string;
   productsRel: string;
   files: string[];
   activeLayerId?: string;
+  runId?: string;
+  compareRunId?: string;
 }
 
 export {
@@ -82,16 +85,19 @@ export function openJobMapFromPath(relPath: string, kind: "file" | "folder" = "f
 
   const files = pathsUnder(all, folder).filter((id) => id !== folder);
   const layers = rasterLayersFromPaths(files);
-  if (!layers.length) return false;
+  const vectors = files.filter((id) => /\.geojson$/i.test(id));
+  if (!layers.length && !vectors.length) return false;
   const preferred =
     kind === "file"
-      ? layers.find((layer) => fileStem(layer.id) === fileStem(prefix))?.id
+      ? layers.find((layer) => fileStem(layer.id) === fileStem(prefix))?.id ||
+        vectors.find((id) => fileStem(id) === fileStem(prefix))
       : undefined;
   store.presentJobResults({
     taskFolder: fileBasename(folder) || "Results",
     productsRel: folder,
     files,
     activeLayerId: preferred,
+    runId: runIdFromPath(folder),
   });
   return true;
 }
