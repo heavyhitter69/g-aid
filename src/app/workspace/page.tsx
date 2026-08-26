@@ -26,7 +26,7 @@ import { relativePathInProject, rootFolderName } from "@/lib/project-tree";
 import { autoIngestFile } from "@/lib/auto-ingest";
 import { useScientificState } from "@/store/scientific-state";
 import type { ProjectFile } from "@/types/project";
-import { openWorkspaceFolder, applyWorkspaceIndex } from "@/lib/open-workspace";
+import { openWorkspaceFolder, openWorkspaceAt, applyWorkspaceIndex } from "@/lib/open-workspace";
 import { isDesktop } from "@/lib/desktop";
 import {
   conversationFromUrl,
@@ -64,6 +64,7 @@ export default function WorkspacePage() {
     addProjectFile,
     openWorkbenchTab,
     currentProject,
+    workspaceRoot,
     setCurrentProject,
     setProjectFiles,
     activeFile,
@@ -277,14 +278,21 @@ export default function WorkspacePage() {
         return (
           <section className="p-6 bg-[#1e1e1e] h-full text-[#cccccc]">
             <h2 className="text-lg font-semibold mb-4 text-white">Dataset Explorer</h2>
-            <ul className="space-y-2">
-              {["line4_ert.dat", "ip_chargeability.csv", "bh03_log.csv", "survey_grid.segy"].map((f) => (
-                <li key={f} className="flex items-center justify-between p-4 bg-[#252526] rounded border border-[#3c3c3c] font-mono text-sm">
-                  <span>{f}</span>
-                  <span className="text-xs text-[#858585]">Ready</span>
-                </li>
-              ))}
-            </ul>
+            {projectFiles.filter((f) => f.type === "file").length === 0 ? (
+              <p className="text-sm text-[#858585]">Open a survey folder to see its files here. G-AID does not ship sample datasets.</p>
+            ) : (
+              <ul className="space-y-2">
+                {projectFiles
+                  .filter((f) => f.type === "file")
+                  .slice(0, 80)
+                  .map((f) => (
+                    <li key={f.id} className="flex items-center justify-between p-4 bg-[#252526] rounded border border-[#3c3c3c] font-mono text-sm">
+                      <span className="truncate">{f.path || f.name}</span>
+                      <span className="text-xs text-[#858585] shrink-0 ml-3">{f.name}</span>
+                    </li>
+                  ))}
+              </ul>
+            )}
           </section>
         );
       case "extensions":
@@ -538,16 +546,8 @@ export default function WorkspacePage() {
                 <button className="hover:text-[#cccccc] transition-colors">Output</button>
                 <button className="text-[#cccccc] border-b border-[#007acc] pb-1 -mb-[9px]">Terminal</button>
               </div>
-              <div className="flex-1 overflow-y-auto p-2 font-mono text-[12px] leading-relaxed">
-                <div><span className="text-[#007acc]">PS C:\Users\sarko\Documents\geophysics-demo2.0&gt;</span> npm run dev</div>
-                <div className="mt-1">
-                  <span className="text-[#858585]">&gt; geophysics-demo@0.1.0 dev</span><br/>
-                  <span className="text-[#858585]">&gt; next dev</span>
-                </div>
-                <div className="text-[#4caf50] mt-2">ready - started server on 0.0.0.0:3000, url: http://localhost:3000</div>
-                <div className="text-[#cccccc] mt-1">event - compiled client and server successfully in 1240 ms (142 modules)</div>
-                <div className="text-[#cccccc]">wait  - compiling...</div>
-                <div className="text-[#4caf50]">event - compiled client and server successfully in 118 ms (142 modules)</div>
+              <div className="flex-1 overflow-y-auto p-2 font-mono text-[12px] leading-relaxed text-[#858585]">
+                Processing messages appear in chat while a plan runs. This panel is not a live shell.
               </div>
             </div>
           )}
@@ -819,65 +819,51 @@ export default function WorkspacePage() {
                 Select local folder from computer...
               </button>
 
-              <span className="text-[10px] uppercase text-[#858585] font-bold block">Available Geophysical Projects</span>
-              <div className="space-y-1">
-                {[
-                  {
-                    name: "Nevada Basin Survey 2026",
-                    desc: "Wenner-Schlumberger quad-pole ERT lines, regional gravity anomalies, and clay stratigraphy well logs.",
-                    files: ["line4_ert.dat", "basin_gravity.grd", "survey_layout.json", "inversion_config.yaml", "well_log_bh12.csv"]
-                  },
-                  {
-                    name: "Death Valley ERT Project",
-                    desc: "Hyper-arid deep crustal resistivity models, active graben fault gravity logs, and thermal well surveys.",
-                    files: ["dv_survey_ert.dat", "valley_gravity.grd", "fault_layout.json", "dv_solver_setup.yaml"]
-                  },
-                  {
-                    name: "Colorado Aquifer Gravity Grid",
-                    desc: "Ogallala sandstone aquifer boundaries, high-density water table depletion surveys, and flow JSON parameters.",
-                    files: ["co_aquifer_ert.dat", "gravity_anomaly.grd", "aquifer_wells.csv"]
-                  },
-                  {
-                    name: "Texas Groundwater Inversion",
-                    desc: "Deep limestone karst water reserves, aquifer subsidence gravity logs, and fracture mesh grids.",
-                    files: ["tx_groundwater.dat", "karst_gravity.grd", "subsidence_wells.csv", "karst_inversion.yaml"]
-                  }
-                ].map((proj) => {
-                  const isActive = currentProject === proj.name;
-                  return (
-                    <button
-                      key={proj.name}
-                      onClick={() => {
-                        setCurrentProject(proj.name, `/${proj.name.toLowerCase().replace(/\s+/g, "-")}`, proj.files.length);
-                        // Populate project-specific files dynamically!
-                        const populated: ProjectFile[] = proj.files.map((f) => ({
-                          id: f,
-                          name: f,
-                          type: "file" as const,
-                          path: `/${proj.name.toLowerCase().replace(/\s+/g, "-")}/${f}`,
-                        }));
-                        setProjectFiles(populated);
-                        setOpenFolderDialogOpen(false);
-                      }}
-                      className={cn(
-                        "w-full text-left p-3 rounded-lg border transition-all cursor-pointer bg-transparent",
-                        isActive 
-                          ? "border-[#007acc] bg-[#007acc]/5 hover:bg-[#007acc]/10" 
-                          : "border-[#2b2b2b] hover:border-[#3c3c3c] hover:bg-white/5"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Folder className={cn("h-4 w-4", isActive ? "text-[#007acc]" : "text-[#858585]")} />
-                        <span className="text-xs font-bold text-white">{proj.name}</span>
-                        {isActive && <span className="text-[9px] bg-[#007acc]/20 text-[#007acc] px-1.5 py-0.5 rounded font-medium ml-auto">Active</span>}
-                      </div>
-                      <p className="text-[10px] text-[#858585] leading-relaxed mb-1">{proj.desc}</p>
-                      <div className="text-[9px] font-mono text-[#555555] truncate">
-                        Files: {proj.files.join(", ")}
-                      </div>
-                    </button>
-                  );
-                })}
+              <span className="text-[10px] uppercase text-[#858585] font-bold block">Recent folders on this computer</span>
+              <div className="space-y-1 max-h-[280px] overflow-y-auto">
+                {recentProjects.filter((proj) => {
+                  const p = proj.path || "";
+                  return p.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(p);
+                }).length === 0 ? (
+                  <p className="text-[11px] text-[#858585] px-1 py-2">No recent folders yet. G-AID does not include built-in survey datasets.</p>
+                ) : (
+                  recentProjects
+                    .filter((proj) => {
+                      const p = proj.path || "";
+                      return p.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(p);
+                    })
+                    .map((proj) => {
+                      const isActive = workspaceRoot === proj.path || currentProject === proj.name;
+                      return (
+                        <button
+                          key={proj.path}
+                          onClick={() => {
+                            void openWorkspaceAt(proj.path)
+                              .then((ok) => {
+                                if (ok) setOpenFolderDialogOpen(false);
+                              })
+                              .catch((err) => console.warn("Could not reopen folder:", err));
+                          }}
+                          className={cn(
+                            "w-full text-left p-3 rounded-lg border transition-all cursor-pointer bg-transparent",
+                            isActive
+                              ? "border-[#007acc] bg-[#007acc]/5 hover:bg-[#007acc]/10"
+                              : "border-[#2b2b2b] hover:border-[#3c3c3c] hover:bg-white/5"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Folder className={cn("h-4 w-4", isActive ? "text-[#007acc]" : "text-[#858585]")} />
+                            <span className="text-xs font-bold text-white">{proj.name}</span>
+                            {isActive && <span className="text-[9px] bg-[#007acc]/20 text-[#007acc] px-1.5 py-0.5 rounded font-medium ml-auto">Open</span>}
+                          </div>
+                          <p className="text-[10px] text-[#858585] leading-relaxed font-mono truncate">{proj.path}</p>
+                          <div className="text-[9px] font-mono text-[#555555] truncate">
+                            {proj.fileCount ? `${proj.fileCount} files` : ""}
+                          </div>
+                        </button>
+                      );
+                    })
+                )}
               </div>
             </div>
           </div>
@@ -905,7 +891,7 @@ export default function WorkspacePage() {
                   type="text" 
                   value={saveAsName}
                   onChange={(e) => setSaveAsName(e.target.value)}
-                  placeholder="e.g. line4_ert_copy.dat"
+                  placeholder="e.g. flight-line-copy.csv"
                   className="w-full bg-[#252526] border border-[#3c3c3c] text-white text-xs px-3 py-2 rounded focus:outline-none focus:border-[#007acc] outline-none font-mono"
                 />
               </div>

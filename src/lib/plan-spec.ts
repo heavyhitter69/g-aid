@@ -471,14 +471,6 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const dens = raw.match(/\b(\d(?:\.\d+)?)\s*g\s*\/?\s*c(?:c|m3)\b/i);
   if (dens) parameters.density = parseFloat(dens[1]);
 
-  const dayMatch = raw.match(/\bday\s*0*(\d+)\b/i);
-  if (dayMatch) {
-    const n = dayMatch[1];
-    if (!targetFolder || !new RegExp(`day\\s*0*${n}$`, "i").test(targetFolder.split("/").pop() || "")) {
-      targetFolder = `DAY ${n}`;
-    }
-  }
-
   return {
     ...plan,
     steps,

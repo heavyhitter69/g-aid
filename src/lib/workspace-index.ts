@@ -15,6 +15,15 @@ export interface WorkspaceIndex {
   truncated: boolean;
 }
 
+/** Search hit shape used in catalogs. Kept here so this file has no search import cycle. */
+export interface WorkspaceCatalogHit {
+  relativePath: string;
+  name?: string;
+  kind: string;
+  why?: string;
+  snippet?: string;
+}
+
 function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -28,58 +37,52 @@ function kindLabel(kind: string): string {
   return kind;
 }
 
-/** Compact catalog for the orchestrator — paths and types, not file bodies. */
-export function formatWorkspaceForAgent(index: WorkspaceIndex | null, maxFiles = 80): string {
-  if (!index) return "";
-  const lines: string[] = [
-    `Root: ${index.root}`,
-    `Folders: ${index.folders.filter((f) => !isGaidOutputPath(f)).slice(0, 40).join(", ") || "(none)"}`,
-    `Files indexed: ${index.files.filter((f) => !isGaidOutputPath(f.relativePath)).length}${index.truncated ? " (truncated)" : ""}`,
-  ];
-
-  const surveyFiles = index.files.filter((f) => !isGaidOutputPath(f.relativePath));
-  const magnetic = surveyFiles.filter((f) => f.kind === "gsm19-base" || f.kind === "magarrow");
-  const shown = (magnetic.length ? magnetic : surveyFiles).slice(0, maxFiles);
-  for (const file of shown) {
-    lines.push(`- ${file.relativePath} (${kindLabel(file.kind)}, ${formatSize(file.size)})`);
+function formatCatalogHits(hits: WorkspaceCatalogHit[], misses: string[] = []): string {
+  const lines: string[] = [];
+  if (hits.length) {
+    lines.push("Search hits (from the open folder, not a built-in catalog):");
+    for (const hit of hits.slice(0, 24)) {
+      const extra = hit.snippet ? ` — ${hit.snippet}` : "";
+      lines.push(`- ${hit.relativePath} (${hit.kind}${hit.why ? `, ${hit.why}` : ""}${extra})`);
+    }
   }
-  if (surveyFiles.length > shown.length) {
-    lines.push(`- … ${surveyFiles.length - shown.length} more files`);
+  if (misses.length) {
+    lines.push(`Named but not found in the open folder: ${misses.join(", ")}`);
   }
   return lines.join("\n");
 }
 
-export function inferTargetFolder(
-  message: string,
-  index: WorkspaceIndex | null
+/** Compact catalog for the orchestrator — paths and types, not file bodies. */
+export function formatWorkspaceForAgent(
+  index: WorkspaceIndex | null,
+  maxFiles = 80,
+  hits: WorkspaceCatalogHit[] = []
 ): string {
-  const folders = (index?.folders ?? []).filter((f) => !isGaidOutputPath(f));
-  const files = (index?.files ?? []).filter((f) => !isGaidOutputPath(f.relativePath));
-  const names = [
-    ...folders.map((f) => f.replace(/\\/g, "/")),
-    ...files.map((f) => f.relativePath.replace(/\\/g, "/").split("/")[0]).filter(Boolean),
+  if (!index) return "";
+  const lines: string[] = [
+    `Root: ${index.root}`,
+    `Folders: ${index.folders.filter((f) => !isGaidOutputPath(f)).slice(0, 40).join(", ") || "(none)"}`,
+    `Files indexed: ${index.files.filter((f) => !isGaidOutputPath(f.relativePath)).length}${index.truncated ? " (truncated; name a folder or file and I will search)" : ""}`,
   ];
-  const unique = [...new Set(names)];
 
-  const dayMatch = message.match(/\bday\s*0*(\d+)\b/i);
-  if (dayMatch) {
-    const n = dayMatch[1];
-    const re = new RegExp(`^day\\s*0*${n}$`, "i");
-    const hit = unique.find((f) => re.test(f.split("/").pop() || f));
-    if (hit) return hit;
-    const nested = files.find((f) =>
-      f.relativePath.split(/[\\/]/).some((part) => re.test(part))
-    );
-    if (nested) {
-      const parts = nested.relativePath.replace(/\\/g, "/").split("/");
-      const idx = parts.findIndex((part) => re.test(part));
-      if (idx >= 0) return parts.slice(0, idx + 1).join("/");
-    }
+  const searchBlock = formatCatalogHits(hits);
+  if (searchBlock) lines.push(searchBlock);
+
+  const surveyFiles = index.files.filter((f) => !isGaidOutputPath(f.relativePath));
+  const magnetic = surveyFiles.filter((f) => f.kind === "gsm19-base" || f.kind === "magarrow");
+  const hitPaths = new Set(hits.map((hit) => hit.relativePath.replace(/\\/g, "/")));
+  const preferred = surveyFiles.filter((file) =>
+    hitPaths.has(file.relativePath.replace(/\\/g, "/"))
+  );
+  const shown = (preferred.length ? preferred : magnetic.length ? magnetic : surveyFiles).slice(0, maxFiles);
+  for (const file of shown) {
+    lines.push(`- ${file.relativePath} (${kindLabel(file.kind)}, ${formatSize(file.size)})`);
   }
-  return "";
+  if (surveyFiles.length > shown.length) {
+    lines.push(`- … ${surveyFiles.length - shown.length} more files (name one to search)`);
+  }
+  return lines.join("\n");
 }
-
-export const GAID_OUTPUT_DIR = "G-AID Output";
 
 /** True for G-AID Output itself or anything nested under it. */
 export function isGaidOutputPath(rel: string): boolean {
@@ -88,6 +91,8 @@ export function isGaidOutputPath(rel: string): boolean {
     .split("/")
     .some((part) => part.toLowerCase() === "g-aid output");
 }
+
+export const GAID_OUTPUT_DIR = "G-AID Output";
 
 export type AnalysisIntent =
   | "diurnal"
@@ -143,9 +148,9 @@ export function wantsWorkspaceContext(message: string): boolean {
   const t = message.trim();
   if (!t || isGeneralKnowledgeQuestion(t)) return false;
   if (detectAnalysisIntent(t) || isProceedPhrase(t)) return true;
-  return /\b(survey|dataset|workspace|magarrow|gsm-?19|day\s*\d+|g-aid output|this (file|folder|project|grid)|my (data|survey|files)|look at (the |my )?(data|survey|files)|process (the |my |this )?(data|survey))\b/i.test(
+  return /\b(survey|dataset|workspace|magarrow|gsm-?19|day\s*\d+|g-aid output|this (file|folder|project|grid)|my (data|survey|files)|look at (the |my )?(data|survey|files)|process (the |my |this )?(data|survey)|find |where is|search )\b/i.test(
     t
-  );
+  ) || /["'`][^"'`]{2,}["'`]/.test(t) || /\b[A-Z][A-Z0-9_-]{3,}\b/.test(t) || /\.(csv|txt|dat|xyz|las|sgy|segy|dzt)\b/i.test(t);
 }
 
 export function isProceedPhrase(message: string): boolean {
@@ -194,7 +199,9 @@ export function filesInTarget(index: WorkspaceIndex | null, targetFolder: string
 export function buildWorkspaceBrief(
   index: WorkspaceIndex | null,
   root: string,
-  targetFolder: string
+  targetFolder: string,
+  hits: WorkspaceCatalogHit[] = [],
+  misses: string[] = []
 ): string {
   const survey = root.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || root;
   const days = dayFolderNames(index);
@@ -213,6 +220,8 @@ export function buildWorkspaceBrief(
     `  MagArrow airborne: ${air.length}`,
     `  Other: ${other.length}`,
   ];
+  const searchBlock = formatCatalogHits(hits, misses);
+  if (searchBlock) lines.push(searchBlock);
   const shown = [...base, ...air, ...other].slice(0, 40);
   for (const file of shown) {
     lines.push(`  - ${file.relativePath} (${kindLabel(file.kind)}, ${formatSize(file.size)})`);

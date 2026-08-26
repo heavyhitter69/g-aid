@@ -1,10 +1,20 @@
 import path from "path";
-import type { AnalysisIntent, WorkspaceIndex } from "@/lib/workspace-index";
 import {
   buildWorkspaceBrief,
   detectAnalysisIntent,
-  inferTargetFolder,
+  isAbsoluteDiskPath,
+  type AnalysisIntent,
+  type WorkspaceIndex,
 } from "@/lib/workspace-index";
+import {
+  extractSearchNeedles,
+  grepWorkspaceRoot,
+  inferTargetFolder,
+  mergeSearchHits,
+  searchWorkspaceIndex,
+  unmatchedNeedles,
+  type WorkspaceSearchHit,
+} from "@/lib/workspace-search";
 import { resolveOutputLayout } from "@/lib/output-layout";
 import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan, type PlanSteps } from "./implementation-plan";
 import {
@@ -117,6 +127,19 @@ export function applyParameterTweaks(message: string, plan: AgentPlan): AgentPla
   return applyChatPatches(plan, message);
 }
 
+export function collectWorkspaceSearch(
+  userText: string,
+  workspaceRoot: string,
+  workspaceIndex: WorkspaceIndex | null
+): { hits: WorkspaceSearchHit[]; misses: string[] } {
+  const needles = extractSearchNeedles(userText);
+  let hits = searchWorkspaceIndex(workspaceIndex, userText);
+  if (needles.all.length && isAbsoluteDiskPath(workspaceRoot)) {
+    hits = mergeSearchHits(hits, grepWorkspaceRoot(workspaceRoot, userText));
+  }
+  return { hits, misses: unmatchedNeedles(needles.named, hits) };
+}
+
 export function upsertAgentPlan(options: {
   sessionId: string;
   userText: string;
@@ -124,6 +147,8 @@ export function upsertAgentPlan(options: {
   workspaceIndex: WorkspaceIndex | null;
   projectName: string;
   editorMarkdown?: string;
+  searchHits?: WorkspaceSearchHit[];
+  searchMisses?: string[];
 }): AgentPlan {
   const existing = getPendingPlan(options.sessionId);
   const projectName = options.projectName || path.basename(options.workspaceRoot);
@@ -131,7 +156,9 @@ export function upsertAgentPlan(options: {
     detectAnalysisIntent(options.userText) ||
     existing?.intent ||
     "magnetic";
-  const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex);
+  const hits = options.searchHits ?? searchWorkspaceIndex(options.workspaceIndex, options.userText);
+  const misses = options.searchMisses ?? unmatchedNeedles(extractSearchNeedles(options.userText).named, hits);
+  const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex, hits);
 
   let draft: AgentPlan;
   if (existing) {
@@ -165,12 +192,22 @@ export function upsertAgentPlan(options: {
     };
     draft = applyChatPatches(draft, options.userText);
     draft = normalizePlan(draft);
+    if (inferredTarget) draft.targetFolder = inferredTarget;
+  }
+
+  if (misses.length) {
+    draft.notes = [
+      ...(draft.notes || []),
+      `I could not find ${misses.map((item) => `"${item}"`).join(", ")} in the open folder. I will not invent a path.`,
+    ];
   }
 
   draft.workspaceBrief = buildWorkspaceBrief(
     options.workspaceIndex,
     options.workspaceRoot,
-    draft.targetFolder
+    draft.targetFolder,
+    hits,
+    misses
   );
   const painted = paintPlan(draft);
   setPendingPlan(options.sessionId, painted);
@@ -230,7 +267,7 @@ ${historyBlock || "(none)"}
 USER:
 ${options.userText}
 
-Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. If I restored or refused a change, say why in one sentence. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
+Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. If I restored or refused a change, say why in one sentence. If search listed names I could not find, say so and do not invent a folder. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
 }
 
 export function visibleAssistantText(raw: string): string {

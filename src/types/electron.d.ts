@@ -27,6 +27,20 @@ declare global {
     openNewWindow: () => Promise<void>;
     pickFolder: (options?: { title?: string }) => Promise<string | null>;
     indexWorkspace: (root: string) => Promise<GaidWorkspaceIndex>;
+    searchWorkspace: (
+      root: string,
+      query: string,
+      options?: { maxHits?: number }
+    ) => Promise<
+      {
+        relativePath: string;
+        name: string;
+        kind: string;
+        score: number;
+        why: string;
+        snippet?: string;
+      }[]
+    >;
     readWorkspaceFile: (
       root: string,
       relativePath: string

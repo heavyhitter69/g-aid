@@ -628,6 +628,9 @@ ipcMain.handle("pick-folder", async (event, options) => {
 ipcMain.handle("index-workspace", async (_event, root) => {
   return workspaceFs.indexWorkspace(root);
 });
+ipcMain.handle("search-workspace", async (_event, root, query, options) => {
+  return workspaceFs.searchWorkspace(root, query, options || {});
+});
 
 ipcMain.handle("read-workspace-file", async (_event, root, relativePath) => {
   return workspaceFs.readWorkspaceFile(root, relativePath);

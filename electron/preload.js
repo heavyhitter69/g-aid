@@ -45,7 +45,9 @@ contextBridge.exposeInMainWorld("gaidDesktop", {
   openAuxWindow: (pathname) => ipcRenderer.invoke("open-aux-window", pathname),
   openNewWindow: () => ipcRenderer.invoke("open-new-window"),
   pickFolder: (options) => ipcRenderer.invoke("pick-folder", options || {}),
-  indexWorkspace: (root) => ipcRenderer.invoke("index-workspace", root),
+    indexWorkspace: (root) => ipcRenderer.invoke("index-workspace", root),
+    searchWorkspace: (root, query, options) =>
+      ipcRenderer.invoke("search-workspace", root, query, options || {}),
   readWorkspaceFile: (root, relativePath) =>
     ipcRenderer.invoke("read-workspace-file", root, relativePath),
   createWorkspaceFile: (root, relativePath, content) =>

@@ -5,7 +5,7 @@
 
 import type { NextRequest } from "next/server";
 import { getPendingPlan } from "./implementation-plan";
-import { buildPlanningPrompt, syncPendingFromEditor, upsertAgentPlan } from "./agent-plan";
+import { buildPlanningPrompt, collectWorkspaceSearch, syncPendingFromEditor, upsertAgentPlan } from "./agent-plan";
 import { patchStreamEpilogue } from "./stream-epilogue";
 import { streamPlanDecision } from "../execute-plan";
 import {
@@ -175,13 +175,14 @@ export async function POST(request: NextRequest): Promise<Response> {
   const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn });
   if (planTurn && !root) {
     return streamAgentResponse(
-      "Open the survey folder first (**File → Open Folder**). Open the main survey (for example TEMA SURVEY), not a single day, so I can see DAY 1, DAY 2, … and write results to `G-AID Output` under that folder.",
+      "Open the survey folder first (**File → Open Folder**). Open the parent survey folder — not a single file — so I can search the days or lines inside it and write results to `G-AID Output`.",
       { type: "synthesis_complete", awaitingApproval: false }
     );
   }
 
   try {
     if (planTurn && root) {
+      const { hits, misses } = collectWorkspaceSearch(userText, root, workspaceIndex ?? null);
       const plan = upsertAgentPlan({
         sessionId,
         userText,
@@ -189,6 +190,8 @@ export async function POST(request: NextRequest): Promise<Response> {
         workspaceIndex: workspaceIndex ?? null,
         projectName: projectName || "",
         editorMarkdown,
+        searchHits: hits,
+        searchMisses: misses,
       });
       const prompt = buildPlanningPrompt({
         userText,

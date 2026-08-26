@@ -10,8 +10,8 @@ function safeLeaf(name: string, fallback: string): string {
 
 /**
  * Put G-AID Output inside the survey folder, with a single day/job folder under it.
- * SANBUSI/DAY 1 → {root}/SANBUSI/G-AID Output/DAY 1 - diurnal+IGRF
- * DAY 1 (workspace is SANBUSI) → {root}/G-AID Output/DAY 1 - diurnal+IGRF
+ * Nested target `Block_A/Line_02` → `{root}/Block_A/G-AID Output/Line_02 - {job}`
+ * Day folder `DAY 1` at workspace root → `{root}/G-AID Output/DAY 1 - {job}`
  */
 export function resolveOutputLayout(
   workspaceRoot: string,

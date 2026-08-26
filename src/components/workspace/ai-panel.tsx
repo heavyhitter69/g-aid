@@ -23,6 +23,7 @@ import type { StreamPreamble, OpportunityChipViewModel, HypothesisEpistemicType,
 import { AgentActivity } from "@/components/workspace/agent-activity";
 import { summariseFileForAgent } from "@/lib/auto-ingest";
 import { formatWorkspaceForAgent, wantsWorkspaceContext } from "@/lib/workspace-index";
+import { mergeSearchHits, searchWorkspaceIndex, type WorkspaceSearchHit } from "@/lib/workspace-search";
 import { applyWorkspaceFileUpdates } from "@/lib/workspace-files";
 import { presentJobResultsFromEpilogue } from "@/lib/job-results";
 import { refreshWorkspaceIndex } from "@/lib/open-workspace";
@@ -882,8 +883,26 @@ export function AIPanel() {
         .map((f) => summariseFileForAgent(f.id, fileContents[f.id]))
         .join("\n\n");
 
-      const workspaceCatalog = formatWorkspaceForAgent(workspaceIndex);
       const attachWorkspace = wantsWorkspaceContext(userMsg);
+      let searchHits: WorkspaceSearchHit[] = [];
+      if (attachWorkspace && workspaceIndex) {
+        searchHits = searchWorkspaceIndex(workspaceIndex, userMsg);
+        if (workspaceRoot && window.gaidDesktop?.searchWorkspace) {
+          try {
+            const extra = await window.gaidDesktop.searchWorkspace(workspaceRoot, userMsg, { maxHits: 40 });
+            searchHits = mergeSearchHits(
+              searchHits,
+              extra.map((hit) => ({
+                ...hit,
+                why: (hit.why === "content" || hit.why === "kind" || hit.why === "name" ? hit.why : "path") as WorkspaceSearchHit["why"],
+              }))
+            );
+          } catch (err) {
+            console.warn("Workspace search failed:", err);
+          }
+        }
+      }
+      const workspaceCatalog = formatWorkspaceForAgent(workspaceIndex, 80, searchHits);
 
       const contextBlocks: string[] = [];
       if (workspaceCatalog && attachWorkspace) {

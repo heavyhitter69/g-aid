@@ -292,8 +292,8 @@ function formatOrchestratorResponse(
         `   * Click **File > Open File...** (or press \`Ctrl+O\`) to pick files from your local drive.`,
         `   * Supported extensions include \`.dat\`, \`.grd\`, \`.csv\`, \`.json\`, \`.segy\`, \`.las\`, etc.`,
         ``,
-        `3. **Switch Between Demo Projects**`,
-        `   * Click **File > Open Folder...** and choose one of the built-in geological models (e.g., *Nevada Basin Survey*, *Death Valley*, or *Colorado Aquifer*).`,
+        `3. **Recent folders**`,
+        `   * After you open a folder, it appears under **File > Open Folder...** as a recent project on this computer. G-AID does not ship with built-in survey datasets.`,
       ].join("\n");
     }
 
@@ -303,8 +303,8 @@ function formatOrchestratorResponse(
         ``,
         `To switch projects or open local workspaces:`,
         `1. Go to the top menu and select **File > Open Folder...** (\`Ctrl+M Ctrl+O\`).`,
-        `2. You can select a local folder from your computer or switch to one of G-AID's built-in demo datasets listed in the popup modal.`,
-        `3. Once loaded, G-AID's workspace will calibrate its active files, sidebar views, and scientific agents accordingly.`,
+        `2. Pick a folder on this computer. Recent folders you already opened can be chosen from the same dialog.`,
+        `3. Once loaded, Explorer, the map, and G-AID's agents work from that folder only.`,
       ].join("\n");
     }
 
