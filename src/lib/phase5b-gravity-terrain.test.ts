@@ -9,6 +9,7 @@ import { collectPlanInputs } from "./plan-intent.ts";
 import {
   applyChatPatches,
   EMPTY_STEPS,
+  renderImplementationPlan,
   validatePlan,
   type AgentPlan,
 } from "./plan-spec.ts";
@@ -19,6 +20,8 @@ import {
 } from "./capabilities/index.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
 import { buildMapLayers, mapValueUnits } from "./map/index.ts";
+import { layerLabel } from "./raster-layers.ts";
+import { gravityProductWarnings } from "./gravity-product.ts";
 import type { CatalogRecord } from "./catalog/types.ts";
 
 const fixtureSrc = path.join(process.cwd(), "tests/fixtures/gravity-project");
@@ -57,7 +60,7 @@ function terrainPlan(root: string, overrides: Partial<AgentPlan> = {}): AgentPla
     targetFolder: "valid",
     projectName: "GRAVITY",
     intent: "gravity",
-    steps: { ...EMPTY_STEPS, gravity: true, completeBouguer: true },
+    steps: { ...EMPTY_STEPS, gravity: true, nearZoneTerrain: true },
     parameters: {
       baseReference: "mean_base",
       density: 2.67,
@@ -73,7 +76,7 @@ function terrainPlan(root: string, overrides: Partial<AgentPlan> = {}): AgentPla
       "grav.ingest",
       "grav.freeair",
       "grav.bouguer",
-      "grav.terrain",
+      "grav.terrain_near_zone",
       "grav.grid",
       "grav.gis",
       "grav.interpret",
@@ -82,8 +85,9 @@ function terrainPlan(root: string, overrides: Partial<AgentPlan> = {}): AgentPla
   };
 }
 
-test("grav.terrain is registered; default gravity DAG still omits it", () => {
-  assert.equal(isRegisteredCapability("grav.terrain"), true);
+test("grav.terrain_near_zone is registered; grav.terrain is not; default gravity DAG still omits terrain", () => {
+  assert.equal(isRegisteredCapability("grav.terrain_near_zone"), true);
+  assert.equal(isRegisteredCapability("grav.terrain"), false);
   const simple = compileCapabilityDag([
     "grav.ingest",
     "grav.freeair",
@@ -99,7 +103,7 @@ test("grav.terrain is registered; default gravity DAG still omits it", () => {
     "grav.ingest",
     "grav.freeair",
     "grav.bouguer",
-    "grav.terrain",
+    "grav.terrain_near_zone",
     "grav.grid",
     "grav.gis",
     "grav.interpret",
@@ -144,7 +148,7 @@ test("documented DEM ASCII is a supported dem-ascii terrain source", () => {
   }
 });
 
-test("missing DEM blocks complete Bouguer", () => {
+test("missing DEM blocks near-zone terrain-corrected Bouguer", () => {
   const root = tmpCopy();
   try {
     const catalog = buildProjectCatalog(root);
@@ -157,7 +161,7 @@ test("missing DEM blocks complete Bouguer", () => {
   }
 });
 
-test("incompatible DEM CRS blocks complete Bouguer", () => {
+test("incompatible DEM CRS blocks near-zone terrain-corrected Bouguer", () => {
   const root = tmpCopy();
   try {
     const catalog = buildProjectCatalog(root);
@@ -170,7 +174,7 @@ test("incompatible DEM CRS blocks complete Bouguer", () => {
   }
 });
 
-test("absent vertical datum blocks complete Bouguer", () => {
+test("absent vertical datum blocks near-zone terrain-corrected Bouguer", () => {
   const root = tmpCopy();
   try {
     const catalog = buildProjectCatalog(root);
@@ -187,7 +191,7 @@ test("absent vertical datum blocks complete Bouguer", () => {
   }
 });
 
-test("insufficient DEM coverage blocks complete Bouguer", () => {
+test("insufficient DEM coverage blocks near-zone terrain-corrected Bouguer", () => {
   const root = tmpCopy();
   try {
     const catalog = buildProjectCatalog(root);
@@ -218,19 +222,54 @@ test("invalid density and mixed units still block", () => {
   }
 });
 
-test("chat requesting complete Bouguer grants grav.terrain and does not silently default density", () => {
+test("chat requesting complete Bouguer grants grav.terrain_near_zone and does not label it Complete Bouguer", () => {
   const plan = terrainPlan("/tmp", {
     steps: { ...EMPTY_STEPS, gravity: true },
     capabilities: ["grav.ingest", "grav.freeair", "grav.bouguer", "grav.grid", "grav.gis", "grav.interpret"],
     parameters: { baseReference: "mean_base" },
   });
   const patched = applyChatPatches(plan, "also run complete Bouguer with terrain correction radius 150 m density 2.67 g/cm3");
-  assert.ok(patched.capabilities?.includes("grav.terrain"));
-  assert.equal(patched.steps.completeBouguer, true);
+  assert.ok(patched.capabilities?.includes("grav.terrain_near_zone"));
+  assert.equal(patched.capabilities?.includes("grav.terrain"), false);
+  assert.equal(patched.steps.nearZoneTerrain, true);
   assert.equal(patched.parameters.density, 2.67);
   assert.equal(patched.parameters.terrainRadiusM, 150);
+  assert.ok(
+    patched.reviewDecisions?.some(
+      (d) =>
+        d.capabilityId === "grav.terrain_near_zone" &&
+        /not a Complete Bouguer Anomaly|does not produce a Complete Bouguer/i.test(d.reason)
+    )
+  );
   const noDensity = applyChatPatches(plan, "add terrain correction");
-  assert.ok(noDensity.reviewDecisions?.some((d) => d.capabilityId === "grav.terrain" && d.status === "needs-data"));
+  assert.ok(noDensity.reviewDecisions?.some((d) => d.capabilityId === "grav.terrain_near_zone" && d.status === "needs-data"));
+});
+
+test("implementation plan names near-zone terrain-corrected Bouguer and refuses Complete Bouguer product copy", () => {
+  const md = renderImplementationPlan({
+    projectName: "GRAVITY",
+    targetFolder: "valid",
+    taskFolder: "r1",
+    steps: { ...EMPTY_STEPS, gravity: true, nearZoneTerrain: true },
+    baseReference: "mean_base",
+    capabilities: [
+      "grav.ingest",
+      "grav.freeair",
+      "grav.bouguer",
+      "grav.terrain_near_zone",
+      "grav.grid",
+      "grav.interpret",
+    ],
+    density: 2.67,
+    surveyLatitude: 10.8,
+    elevationDatum: "orthometric",
+    applyBullardB: false,
+    terrainRadiusM: 150,
+  });
+  assert.match(md, /near-zone terrain-corrected Bouguer/i);
+  assert.match(md, /Far-zone and intermediate-zone/i);
+  assert.match(md, /Bullard B/);
+  assert.ok(!/product: complete bouguer anomaly/i.test(md));
 });
 
 test("valid terrain-corrected plan binds DEM provenance and a versioned run folder", () => {
@@ -255,14 +294,22 @@ test("valid terrain-corrected plan binds DEM provenance and a versioned run fold
   }
 });
 
-test("complete Bouguer grids are labelled separately from simple Bouguer on the map", () => {
-  assert.equal(mapValueUnits("G-AID Output/runs/r1/complete_bouguer_grid.asc"), "mGal");
+test("near-zone terrain-corrected grids are labelled separately from simple Bouguer and not as Complete Bouguer", () => {
+  const nz = "G-AID Output/runs/r1/near_zone_terrain_corrected_bouguer_grid.asc";
+  assert.equal(mapValueUnits(nz), "mGal");
   assert.equal(mapValueUnits("G-AID Output/runs/r1/bouguer_grid.asc"), "mGal");
+  assert.match(layerLabel(nz), /near-zone terrain-corrected Bouguer/i);
+  assert.ok(!/complete bouguer anomaly/i.test(layerLabel(nz)));
+  const warnings = gravityProductWarnings({ path: nz, densityGcc: 2.67, terrainRadiusM: 150, bullardB: false });
+  assert.ok(warnings.some((line) => /not equivalent/i.test(line)));
+  assert.ok(warnings.some((line) => /far-zone/i.test(line)));
+  assert.ok(warnings.some((line) => /Bullard B/i.test(line)));
   const layers = buildMapLayers({
     catalog: null,
-    files: ["G-AID Output/runs/r1/complete_bouguer_grid.asc", "G-AID Output/runs/r1/bouguer_grid.asc"],
+    files: [nz, "G-AID Output/runs/r1/bouguer_grid.asc"],
   });
-  assert.ok(layers.some((layer) => /complete_bouguer/.test(layer.path)));
+  assert.ok(layers.some((layer) => /near_zone_terrain_corrected_bouguer/.test(layer.path)));
+  assert.ok(layers.some((layer) => /not complete Bouguer/i.test(layer.label)));
 });
 
 test("inspectDemText requires documented CRS, metres, and vertical datum", () => {
@@ -273,7 +320,7 @@ test("inspectDemText requires documented CRS, metres, and vertical datum", () =>
   assert.equal(ready.epsg, 32630);
 });
 
-test("end-to-end near-zone complete Bouguer when science deps exist", () => {
+test("end-to-end near-zone terrain-corrected Bouguer when science deps exist", () => {
   const probe = spawnSync("python3", ["-c", "import numpy, pandas, scipy; print('ok')"], { encoding: "utf8" });
   if (probe.status !== 0) {
     console.log(`ok  (python terrain E2E skipped)`);
@@ -345,15 +392,19 @@ test("end-to-end near-zone complete Bouguer when science deps exist", () => {
     );
     assert.equal(py.status, 0, py.stderr || py.stdout);
     const run = path.join(outDir, taskFolder);
-    assert.equal(fs.existsSync(path.join(run, "gravity_complete.csv")), true);
-    assert.equal(fs.existsSync(path.join(run, "complete_bouguer_grid.asc")), true);
-    const qc = JSON.parse(fs.readFileSync(path.join(run, "gravity_terrain_qc.json"), "utf8"));
+    assert.equal(fs.existsSync(path.join(run, "near_zone_terrain_corrected_bouguer.csv")), true);
+    assert.equal(fs.existsSync(path.join(run, "near_zone_terrain_corrected_bouguer_grid.asc")), true);
+    const qc = JSON.parse(fs.readFileSync(path.join(run, "near_zone_terrain_corrected_bouguer_qc.json"), "utf8"));
     assert.equal(qc.far_zone, false);
+    assert.equal(qc.intermediate_zone, false);
+    assert.equal(qc.not_complete_bouguer, true);
     assert.equal(qc.dem_catalog_id, dem.id);
-    assert.match(qc.convention, /near-zone complete Bouguer/i);
+    assert.match(qc.convention, /near-zone terrain-corrected Bouguer/i);
+    assert.ok(!/complete Bouguer Anomaly/i.test(qc.product_name));
     const report = JSON.parse(fs.readFileSync(path.join(run, "gravity_interpretation.json"), "utf8"));
-    assert.ok(report.observations.some((line: string) => /near-zone complete Bouguer/i.test(line)));
+    assert.ok(report.observations.some((line: string) => /near-zone terrain-corrected Bouguer/i.test(line)));
     assert.ok(report.not_established.some((line: string) => /drill/i.test(line)));
+    assert.ok(report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
     const simpleQc = JSON.parse(fs.readFileSync(path.join(run, "gravity_bouguer_qc.json"), "utf8"));
     assert.match(simpleQc.convention, /simple Bouguer/i);
   } finally {

@@ -19,6 +19,7 @@ import {
   type ReviewDecision,
   type UserCapabilityId,
 } from "./capabilities/index.ts";
+import { NEAR_ZONE_STATEMENTS } from "./gravity-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -34,7 +35,7 @@ export type PlanSteps = {
   gis: boolean;
   gravity: boolean;
   residual: boolean;
-  completeBouguer: boolean;
+  nearZoneTerrain: boolean;
   ert: boolean;
   ertInvert: boolean;
   seismic: boolean;
@@ -54,7 +55,7 @@ export const EMPTY_STEPS: PlanSteps = {
   gis: false,
   gravity: false,
   residual: false,
-  completeBouguer: false,
+  nearZoneTerrain: false,
   ert: false,
   ertInvert: false,
   seismic: false,
@@ -185,7 +186,7 @@ export const STEP_KEYS = [
   "gis",
   "gravity",
   "residual",
-  "completeBouguer",
+  "nearZoneTerrain",
   "ert",
   "ertInvert",
   "seismic",
@@ -228,7 +229,7 @@ export const MAGNETIC_STEP_KEYS = [
   "gis",
 ] as const satisfies readonly StepKey[];
 
-export const GRAVITY_STEP_KEYS = ["gravity", "residual", "completeBouguer"] as const satisfies readonly StepKey[];
+export const GRAVITY_STEP_KEYS = ["gravity", "residual", "nearZoneTerrain"] as const satisfies readonly StepKey[];
 
 export const ERT_STEP_KEYS = ["ert", "ertInvert"] as const satisfies readonly StepKey[];
 
@@ -250,7 +251,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   gis: ["gis_export", "excel_export_adapter", "report_export_adapter"],
   gravity: ["gravity_ingest", "gravity_freeair", "gravity_bouguer", "grav_gridder", "grav_gis_export", "grav_interpret"],
   residual: ["regional_residual"],
-  completeBouguer: ["gravity_terrain"],
+  nearZoneTerrain: ["gravity_terrain"],
   ert: ["ert_ingest", "ert_pseudosection", "ert_gis_export", "ert_interpret"],
   ertInvert: ["ert_invert"],
   seismic: ["seismic_process"],
@@ -290,7 +291,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "lineaments", re: /\blineament/i },
   { key: "gis", re: /\bgeotiff\b|\bgeojson\b|\bgis\b/i },
   { key: "gravity", re: /\bbouguer\b|\bfree[ -]?air\b|\blatitude\b/i },
-  { key: "completeBouguer", re: /\bcomplete\s+bouguer\b|\bterrain\s+correct/i },
+  { key: "nearZoneTerrain", re: /\bnear[\s-]?zone\s+terrain|\bterrain[\s-]?correct(?:ed|ion)?\s+bouguer|\bterrain\s+correct|\bcomplete\s+bouguer\b/i },
   { key: "residual", re: /\bregional\b.*\bresidual\b|\bresidual gravity\b/i },
   { key: "ertInvert", re: /\binvert(?:ing|ed)? the ert\b|\bert inversion\b|\b2d invert/i },
   { key: "ert", re: /\bpseudosection\b|\bert\b|\bresistivity\b/i },
@@ -348,8 +349,8 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
       return "Write GeoTIFF, ASC, and GeoJSON products";
     case "gravity":
       return "Apply latitude, free-air, and simple Bouguer corrections";
-    case "completeBouguer":
-      return "Apply near-zone Nagy terrain correction (complete Bouguer only if DEM + density + radius validate)";
+    case "nearZoneTerrain":
+      return "Apply near-zone Nagy terrain correction (near-zone terrain-corrected Bouguer; not Complete Bouguer)";
     case "residual":
       return "Separate regional and residual gravity";
     case "ert":
@@ -400,6 +401,15 @@ export function renderImplementationPlan(opts: {
   const items = workItems(opts.steps, target, opts.baseReference);
   const products = opts.productsRel || `G-AID Output/${opts.taskFolder}`;
   const notes = (opts.notes || []).filter(Boolean);
+  if (opts.steps.nearZoneTerrain) {
+    for (const line of NEAR_ZONE_STATEMENTS) {
+      if (!notes.includes(line)) notes.push(line);
+    }
+    const bullard = opts.applyBullardB
+      ? "Bullard B / spherical-cap curvature: enabled (LaFehr 1991)."
+      : "Bullard B / spherical-cap curvature: off unless requested.";
+    if (!notes.includes(bullard)) notes.push(bullard);
+  }
   const bound = (opts.inputs || []).map((item) => `- \`${item.catalogId}\` ${item.path} (${item.adapterId || item.kind || "bound"})`);
   const artifacts = dag.requestedCapabilityIds.flatMap((id) =>
     (getCapability(id)?.expectedArtifacts || []).map((name) => `- ${name}`)
@@ -421,14 +431,14 @@ export function renderImplementationPlan(opts: {
     typeof opts.surveyLatitude === "number" ? `Survey latitude: ${opts.surveyLatitude}° (Somigliana; easting/northing is not latitude)` : "",
     opts.elevationDatum ? `Elevation datum: ${opts.elevationDatum}` : "",
     opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
-    opts.steps.completeBouguer
+    opts.steps.nearZoneTerrain
       ? typeof opts.terrainRadiusM === "number"
-        ? `Terrain radius: ${opts.terrainRadiusM} m (near-zone Nagy). Far-zone is not applied.`
+        ? `Product: near-zone terrain-corrected Bouguer anomaly. Terrain radius: ${opts.terrainRadiusM} m (Nagy prisms). Far-zone and intermediate-zone terrain are not applied. Not a Complete Bouguer Anomaly.`
         : opts.useDemExtent
-          ? "Terrain radius: bound DEM extent (still near-zone only; far-zone is not applied)."
-          : "Terrain radius: required before Proceed (or say use DEM extent)."
+          ? "Product: near-zone terrain-corrected Bouguer anomaly. Terrain window: bound DEM extent (still near-zone only). Far-zone/intermediate-zone not applied. Not a Complete Bouguer Anomaly."
+          : "Near-zone terrain radius: required before Proceed (or say use DEM extent). Far-zone is not implemented."
       : gravityStepsEnabled(opts.steps)
-        ? "Anomaly: simple Bouguer (infinite slab). Not complete Bouguer unless grav.terrain is approved."
+        ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless grav.terrain_near_zone is approved. Neither product is a Complete Bouguer Anomaly."
         : "",
   ].filter(Boolean);
   const thisRunFallback = ertStepsEnabled(opts.steps)
@@ -483,7 +493,10 @@ function sectionBody(markdown: string, heading: string): string | null {
 
 function parseStepKey(line: string): StepKey | undefined {
   const tagged = line.match(/<!--\s*step:([a-zA-Z]+)\s*-->/);
-  if (tagged && STEP_KEYS.includes(tagged[1] as StepKey)) return tagged[1] as StepKey;
+  if (tagged) {
+    const raw = tagged[1] === "completeBouguer" ? "nearZoneTerrain" : tagged[1];
+    if (STEP_KEYS.includes(raw as StepKey)) return raw as StepKey;
+  }
   const stripped = line.replace(/<!--.*?-->/g, "").replace(/^[-*]\s+(\[[ xX~!s]?\]\s*)?/, "").trim();
   if (!stripped || stripped.startsWith("Ask for a specific")) return undefined;
   for (const row of STEP_FALLBACK) {
@@ -665,12 +678,13 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
         !nextSet.has("mag.igrf") &&
         !(typeof parameters.inclination === "number" && typeof parameters.declination === "number");
       const needsDensity =
-        (id === "grav.bouguer" || id === "grav.terrain") &&
+        (id === "grav.bouguer" || id === "grav.terrain_near_zone") &&
         !(typeof parameters.density === "number" && Number.isFinite(parameters.density));
       const needsTerrain =
-        id === "grav.terrain" &&
+        id === "grav.terrain_near_zone" &&
         !parameters.useDemExtent &&
         !(typeof parameters.terrainRadiusM === "number" && Number.isFinite(parameters.terrainRadiusM));
+      const completeAsk = /\bcomplete\s+bouguer\b/.test(m) && id === "grav.terrain_near_zone";
       decisions.push({
         at: now,
         message: raw,
@@ -681,8 +695,10 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
           : needsDensity
             ? "Bouguer correction was requested. Supply a density in g/cm³. I will not assume 2.67."
             : needsTerrain
-              ? "Near-zone complete Bouguer needs a documented DEM and a terrain radius (or use DEM extent). Far-zone is not implemented."
-              : `Accepted ${capability?.title || id}. Only the registry can run it.`,
+              ? "Near-zone terrain-corrected Bouguer needs a documented DEM and a terrain radius (or use DEM extent). Far-zone is not implemented. This is not a Complete Bouguer Anomaly."
+              : completeAsk
+                ? "Accepted grav.terrain_near_zone as a near-zone terrain-corrected Bouguer anomaly. G-AID does not produce a Complete Bouguer Anomaly: far-zone and intermediate-zone terrain are not included, and this is not equivalent to a commercial complete Bouguer product."
+                : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
   }

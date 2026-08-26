@@ -1,0 +1,81 @@
+{
+  "observations": [
+    "ERT measurements were ingested under the G-AID ERT 1.0 contract.",
+    "Pseudosection present: True",
+    "2-D inversion present: True"
+  ],
+  "assumptions": [
+    "Apparent resistivity is as supplied in ohm\u00b7m.",
+    "Pseudo-depth n\u00b7a/2 is a plotting convention.",
+    "2-D model uses a homogeneous-half-space sensitivity kernel; topography is not in the forward operator."
+  ],
+  "uncertainty": [
+    "A smoothness model is non-unique.",
+    "The kernel is not equivalent to Res2DInv or a 2.5-D finite-difference forward model."
+  ],
+  "recommendations": [
+    "Do not treat a resistivity high/low as lithology, groundwater, ore, or a drill target."
+  ],
+  "not_established": [
+    "Groundwater is not established.",
+    "Lithology is not established.",
+    "Ore bodies are not established.",
+    "Drill targets are not established.",
+    "3-D inversion was not performed."
+  ],
+  "qc": {
+    "ert_ingest_qc.json": {
+      "files": [
+        {
+          "path": "valid/line.dat",
+          "catalogId": "ert-valid",
+          "n": 30,
+          "array": "dipole_dipole",
+          "array_code": 3,
+          "spacing_m": 5.0,
+          "units": "ohm.m",
+          "epsg": 32630,
+          "topography_flag": 0,
+          "topography_n": 0,
+          "duplicates": 0,
+          "topography_used_in_forward": false
+        }
+      ],
+      "n": 30,
+      "array": "dipole_dipole",
+      "units": "ohm.m",
+      "assumptions": "None. Array, spacing, and units came from the G-AID ERT 1.0 contract.",
+      "topography_used_in_forward": false
+    },
+    "ert_survey.json": {
+      "n": 30,
+      "array": "dipole_dipole",
+      "units": "ohm.m",
+      "interpolation": "none \u2014 discrete measurements at conventional pseudo-depth",
+      "model_status": "not a depth model",
+      "formula": "pseudo-depth = n\u00b7a/2 (dipole-dipole plotting convention)",
+      "limitations": [
+        "Pseudosection \u2260 depth model.",
+        "Apparent resistivity \u2260 true resistivity."
+      ]
+    },
+    "ert_invert_qc.json": {
+      "misfit_percent": 1.975768815491345e-13,
+      "rms_log": 1.9593680287469198e-15,
+      "iterations": 8,
+      "converged": true,
+      "topography_used": false,
+      "n_measurements": 30,
+      "units": "ohm.m",
+      "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity. Not Res2DInv.",
+      "limitations": [
+        "Homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+        "Topography is not used in the forward kernel.",
+        "3-D inversion is not implemented."
+      ],
+      "not_res2dinv": true,
+      "not_3d": true
+    }
+  },
+  "interpretation_limit": "Apparent resistivity and a smoothness model are not geology."
+}

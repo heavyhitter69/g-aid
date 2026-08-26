@@ -27,7 +27,7 @@ const NODE_LABELS: Record<string, { running: string; done: string }> = {
   gravity_ingest: { running: "Reading gravity stations", done: "Read gravity stations" },
   gravity_freeair: { running: "Applying free-air correction", done: "Applied free-air correction" },
   gravity_bouguer: { running: "Applying simple Bouguer correction", done: "Applied simple Bouguer correction" },
-  gravity_terrain: { running: "Applying near-zone Nagy terrain correction", done: "Applied near-zone complete Bouguer" },
+  gravity_terrain: { running: "Applying near-zone Nagy terrain correction", done: "Applied near-zone terrain-corrected Bouguer" },
   grav_gridder: { running: "Gridding gravity stations", done: "Gridded gravity stations" },
   grav_gis_export: { running: "Writing gravity GIS", done: "Wrote gravity GIS" },
   grav_interpret: { running: "Writing gravity interpretation limits", done: "Wrote gravity interpretation limits" },

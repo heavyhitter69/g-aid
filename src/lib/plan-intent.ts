@@ -33,9 +33,9 @@ export function intentToSteps(
     next.gravity = true;
     next.residual = true;
   }
-  if (/\bcomplete\s+bouguer\b|\bterrain\s+correct/.test(m)) {
+  if (/\bcomplete\s+bouguer\b|\bterrain\s+correct|\bnear[\s-]?zone\s+terrain/.test(m)) {
     next.gravity = true;
-    next.completeBouguer = true;
+    next.nearZoneTerrain = true;
   }
   if (intent === "resistivity" || /\bert\b|\bpseudosection\b|\bresistivity\b/.test(m)) {
     next.ert = true;

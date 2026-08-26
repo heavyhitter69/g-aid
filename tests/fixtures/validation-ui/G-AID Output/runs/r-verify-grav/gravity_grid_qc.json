@@ -1,0 +1,8 @@
+{
+  "crs_epsg": 32630,
+  "dx": 100.0,
+  "nx": 8,
+  "ny": 8,
+  "source_column": "near_zone_terrain_corrected_bouguer_mgal",
+  "units": "mGal"
+}

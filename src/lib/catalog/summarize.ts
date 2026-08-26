@@ -100,11 +100,11 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
       ? "I can plan MagArrow + GSM-19 magnetics if you ask for that work. Mixed files do not start a magnetic workflow by themselves."
       : "I will not start a magnetic workflow unless you ask for magnetics and both MagArrow and GSM-19 supported records are present.",
     gravity
-      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented. Complete Bouguer also needs a documented dem-ascii record."
+      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented. Near-zone terrain-corrected Bouguer also needs a documented dem-ascii record. That product is not a Complete Bouguer Anomaly."
       : "Gravity processing needs a documented XYZ/CSV contract, not the first .xyz file.",
     dem
-      ? "A documented DEM ASCII record is available as a terrain source. I will not download a DEM."
-      : "Complete Bouguer is blocked until a documented DEM (EPSG, Units=m, ElevationDatum) is in the catalog.",
+      ? "A documented DEM ASCII record is available as a near-zone terrain source. I will not download a DEM or apply far-zone terrain."
+      : "Near-zone terrain-corrected Bouguer is blocked until a documented DEM (EPSG, Units=m, ElevationDatum) is in the catalog.",
     ert
       ? "I can plan ERT ingest/QC, a labelled pseudosection, and a tested 2-D smoothness inversion if you ask."
       : "ERT processing needs a documented Res2DInv-style .dat or reviewed ERT CSV, not the first .dat file.",

@@ -78,6 +78,7 @@ export interface MapLayerSpec {
   units?: string;
   reason?: string;
   representation: "full" | "preview" | "undecoded";
+  warnings?: string[];
 }
 
 export interface OverlayDecision {

@@ -4,7 +4,9 @@ Normal gravity (WGS-84 / Somigliana): Moritz (2000) Geodetic Reference System 19
 Free-air:      Δg_FA = g_obs − γ + 0.3086 h            (mGal, h in metres)
 Simple Bouguer: Δg_B  = Δg_FA − 2πGρ h                 (Bullard A)
 Bullard B:     closed-form spherical cap (LaFehr 1991)
-Terrain:       rectangular prisms (Nagy 1966) if a DEM grid is supplied.
+Terrain:       rectangular prisms (Nagy 1966) inside a configured near-zone
+               radius or DEM extent. This is a near-zone terrain-corrected
+               Bouguer anomaly, not a Complete Bouguer Anomaly.
 
 G = 6.67430e-11 m³ kg⁻¹ s⁻².  2πG in mGal/m per g cm⁻³ = 0.041908.
 """
@@ -96,9 +98,11 @@ def prism_gz_vectorized(x1, x2, y1, y2, z1, z2, density_gcc: float):
             for k, z in enumerate((z1, z2)):
                 r = np.sqrt(x * x + y * y + z * z)
                 sign = (-1) ** (i + j + k)
+                # Nagy 1966: x ln(y+r) + y ln(x+r) − z arctan2(xy, zr).
+                # |x| inside the log is incorrect once a corner coordinate is negative.
                 acc = acc + sign * (
-                    x * np.log(np.abs(y) + r + 1e-12)
-                    + y * np.log(np.abs(x) + r + 1e-12)
+                    x * np.log(np.maximum(y + r, 1e-12))
+                    + y * np.log(np.maximum(x + r, 1e-12))
                     - z * np.arctan2(x * y, z * r + 1e-12)
                 )
     return G_SI * rho * acc * 1.0e5
@@ -131,8 +135,9 @@ def terrain_correction_prisms(
 
     Each DEM cell is a rectangular prism of the mass difference between the DEM
     surface and the station slab plane. TC = |gz| so both hills and valleys
-    add a positive correction (conventional complete Bouguer). Far-zone /
-    Hayford–Bowie compartments are not implemented.
+    add a positive correction. This is a near-zone terrain correction, not a
+    Complete Bouguer Anomaly. Far-zone / intermediate-zone / Hayford–Bowie
+    compartments are not implemented.
 
     Returns arrays plus coverage statistics. Density and radius are required.
     """
@@ -187,7 +192,7 @@ def terrain_correction_prisms(
         "cells_used": cells_used.reshape(east.shape),
         "radius_m": radius,
         "density_gcc": float(density_gcc),
-        "method": "Nagy 1966 rectangular prisms, near-zone only",
+        "method": "Nagy 1966 rectangular prisms, near-zone only — not Complete Bouguer",
         "far_zone": False,
     }
 

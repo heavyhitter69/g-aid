@@ -1,0 +1,23 @@
+{
+  "files": [
+    {
+      "path": "valid/line.dat",
+      "catalogId": "ert-valid",
+      "n": 30,
+      "array": "dipole_dipole",
+      "array_code": 3,
+      "spacing_m": 5.0,
+      "units": "ohm.m",
+      "epsg": 32630,
+      "topography_flag": 0,
+      "topography_n": 0,
+      "duplicates": 0,
+      "topography_used_in_forward": false
+    }
+  ],
+  "n": 30,
+  "array": "dipole_dipole",
+  "units": "ohm.m",
+  "assumptions": "None. Array, spacing, and units came from the G-AID ERT 1.0 contract.",
+  "topography_used_in_forward": false
+}

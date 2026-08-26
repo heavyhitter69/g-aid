@@ -4,6 +4,7 @@ import { layerLabel } from "../raster-layers.ts";
 import type { MapLayerSpec, RunArtifact } from "./types.ts";
 import { displayAdapterFor, formatIdFromPath, isDemAscii } from "./display.ts";
 import { crsFromEpsg, crsFromPrj } from "./crs.ts";
+import { gravityProductWarnings, isNearZoneTerrainPath } from "../gravity-product.ts";
 
 function posix(path: string): string {
   return path.replace(/\\/g, "/");
@@ -18,7 +19,7 @@ export function mapValueUnits(path: string, formatId?: string, recorded?: string
     if (/gravity|bouguer|free_air|free-air/.test(n)) return "mGal";
     return "coordinate";
   }
-  if (/bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
+  if (/near_zone_terrain_corrected_bouguer|bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
   return "nT";
 }
 
@@ -84,6 +85,7 @@ export function layerSpecFromArtifact(artifact: RunArtifact, run?: CatalogRunPro
     reason: adapter?.reason,
     representation: viewable ? "full" : "undecoded",
     units: mapValueUnits(artifact.path, artifact.formatId),
+    warnings: isNearZoneTerrainPath(artifact.path) ? [...gravityProductWarnings({ path: artifact.path })] : undefined,
   };
 }
 

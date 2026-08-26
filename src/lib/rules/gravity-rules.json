@@ -76,7 +76,7 @@
       "hypothesisStatement": "Processing assumption: Bouguer and terrain corrections must be verified before geological interpretation. Incomplete terrain correction in rugged topography can produce artefacts of ±5–20 mGal — larger than many geological signals.",
       "confidenceModifier": -0.06,
       "epistemicType": "processing_assumption",
-      "additionalRecommendations": ["Confirm DEM resolution matches survey grid spacing", "Apply complete Bouguer correction including terrain correction to at least 167 km radius"]
+      "additionalRecommendations": ["Confirm DEM resolution matches survey grid spacing", "G-AID applies only near-zone Nagy prism terrain correction inside the configured DEM radius/extent. Far-zone terrain to 167 km is not implemented; do not treat the result as a Complete Bouguer Anomaly"]
     }
   },
   {

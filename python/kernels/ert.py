@@ -11,6 +11,16 @@ import pandas as pd
 from science.artifacts import make_artifact, task_dir, write_json, write_lineage
 
 
+def _attach_validation_copy(out: str, filename: str) -> str | None:
+    src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "validation", "results", filename))
+    if not os.path.isfile(src):
+        return None
+    dest = os.path.join(out, filename)
+    with open(src, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    return write_json(dest, payload)
+
+
 def _params(payload: dict) -> dict:
     return payload.get("parameters") or {}
 
@@ -227,13 +237,17 @@ def ert_invert(payload: dict) -> dict:
         "not_3d": True,
     }
     qc_path = write_json(os.path.join(out, "ert_invert_qc.json"), qc)
-    write_lineage(out, node_id, qc["formula"], qc, [src], [json_path, csv_path, qc_path])
+    validation_path = _attach_validation_copy(out, "ert_synthetic_recovery.json")
+    write_lineage(out, node_id, qc["formula"], qc, [src], [json_path, csv_path, qc_path] + ([validation_path] if validation_path else []))
+    artifacts = [
+        make_artifact("artifact-ert-inv", "section", "json", json_path, node_id, [src], qc),
+        make_artifact("artifact-ert-inv-csv", "section", "csv", csv_path, node_id, [src]),
+        make_artifact("artifact-ert-inv-qc", "qc_report", "json", qc_path, node_id, [src]),
+    ]
+    if validation_path:
+        artifacts.append(make_artifact("artifact-ert-recovery", "qc_report", "json", validation_path, node_id, [src]))
     return {
-        "artifacts": [
-            make_artifact("artifact-ert-inv", "section", "json", json_path, node_id, [src], qc),
-            make_artifact("artifact-ert-inv-csv", "section", "csv", csv_path, node_id, [src]),
-            make_artifact("artifact-ert-inv-qc", "qc_report", "json", qc_path, node_id, [src]),
-        ],
+        "artifacts": artifacts,
         "events": [
             {
                 "type": "NODE_PROGRESS",

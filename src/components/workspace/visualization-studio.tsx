@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { isErtSectionPath, parseSectionCsv } from "@/lib/section/parse";
 import { SectionView } from "@/components/workspace/section-view";
+import { gravityProductWarnings } from "@/lib/gravity-product";
 
 interface LayerUiState {
   visible: boolean;
@@ -290,6 +291,8 @@ export function VisualizationStudio() {
     vector?.data.previewNote,
     geojsonExtentNote,
     raster?.preview || vector?.data.preview ? "This view is a preview/overview — not the full dataset." : "",
+    ...(active ? gravityProductWarnings({ path: active.path }) : []),
+    ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
   ].filter(Boolean);
 

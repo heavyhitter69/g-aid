@@ -1,0 +1,9 @@
+{
+  "n": 9,
+  "mean_free_air_mgal": -76.11000644378873,
+  "elevation_datum": "orthometric",
+  "latitude_source": "parameters.surveyLatitude",
+  "formula": "\u0394g_FA = g_obs \u2212 \u03b3_Somigliana + 0.3086 h  (Moritz 2000; h metres, g mGal)",
+  "units": "mGal",
+  "terrain": "not applied"
+}

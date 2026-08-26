@@ -15,7 +15,7 @@ export const USER_CAPABILITY_IDS = [
   "grav.ingest",
   "grav.freeair",
   "grav.bouguer",
-  "grav.terrain",
+  "grav.terrain_near_zone",
   "grav.grid",
   "grav.residual",
   "grav.gis",

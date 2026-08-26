@@ -201,7 +201,7 @@ export function validateCapabilityContracts(options: {
     }
   }
 
-  if (expanded.includes("grav.bouguer") || expanded.includes("grav.terrain")) {
+  if (expanded.includes("grav.bouguer") || expanded.includes("grav.terrain_near_zone")) {
     const density = options.parameters.density;
     if (typeof density === "number" && Number.isFinite(density) && (density < 1.2 || density > 3.5)) {
       issues.push({
@@ -212,7 +212,7 @@ export function validateCapabilityContracts(options: {
     }
   }
 
-  if (expanded.includes("grav.terrain")) {
+  if (expanded.includes("grav.terrain_near_zone")) {
     issues.push(...terrainContractIssues(options, gravityInputs));
   }
 
@@ -306,7 +306,7 @@ function terrainContractIssues(
         level: "blocker",
         code: "dem_no_vertical_datum",
         message:
-          "Complete Bouguer needs a DEM vertical datum (orthometric or ellipsoidal). I will not assume one or download a DEM.",
+          "Near-zone terrain-corrected Bouguer needs a DEM vertical datum (orthometric or ellipsoidal). I will not assume one or download a DEM.",
       });
     } else if (crsMismatch.length) {
       issues.push({
@@ -319,7 +319,7 @@ function terrainContractIssues(
         level: "blocker",
         code: "no_dem",
         message:
-          "Complete Bouguer needs a supported dem-ascii catalog record (EPSG, Units=m, ElevationDatum). I will not download or invent a DEM.",
+          "Near-zone terrain-corrected Bouguer needs a supported dem-ascii catalog record (EPSG, Units=m, ElevationDatum). I will not download or invent a DEM. This is not a Complete Bouguer Anomaly.",
       });
     }
     return issues;
@@ -337,7 +337,7 @@ function terrainContractIssues(
       level: "blocker",
       code: "dem_no_vertical_datum",
       message:
-        "Complete Bouguer needs a DEM vertical datum (orthometric or ellipsoidal). I will not assume one.",
+        "Near-zone terrain-corrected Bouguer needs a DEM vertical datum (orthometric or ellipsoidal). I will not assume one.",
     });
   } else if (stationDatum && demDatum !== stationDatum) {
     issues.push({
@@ -362,7 +362,7 @@ function terrainContractIssues(
       level: "blocker",
       code: "terrain_radius_required",
       message:
-        "Complete Bouguer needs a near-zone terrain radius in metres, or an explicit request to use the DEM extent. Far-zone is not implemented.",
+        "Near-zone terrain-corrected Bouguer needs a terrain radius in metres, or an explicit request to use the DEM extent. Far-zone and intermediate-zone terrain are not implemented. This is not a Complete Bouguer Anomaly.",
     });
   }
 

@@ -109,7 +109,7 @@ const NODE_LABELS: Record<string, string> = {
   gravity_ingest: "Read bound gravity catalog records",
   gravity_freeair: "Free-air anomaly",
   gravity_bouguer: "Simple Bouguer correction",
-  gravity_terrain: "Near-zone complete Bouguer (Nagy terrain)",
+  gravity_terrain: "Near-zone terrain-corrected Bouguer (Nagy; not complete Bouguer)",
   grav_gridder: "Grid gravity stations",
   regional_residual: "Regional-residual gravity",
   grav_gis_export: "Gravity GIS export",

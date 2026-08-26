@@ -1,0 +1,15 @@
+{
+  "runId": "r-verify-grav",
+  "planHash": "fixture-verify-grav",
+  "capabilities": [
+    "grav.ingest",
+    "grav.freeair",
+    "grav.bouguer",
+    "grav.terrain_near_zone",
+    "grav.grid",
+    "grav.gis",
+    "grav.interpret"
+  ],
+  "product": "near-zone terrain-corrected Bouguer anomaly",
+  "not_complete_bouguer": true
+}

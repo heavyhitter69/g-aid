@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "n": 9,
+      "crs_epsg": 32630,
+      "units_in": "mGal",
+      "elevation_datum": "orthometric",
+      "gravity_datum": "IGSN71",
+      "mapping": {
+        "x": "X",
+        "y": "Y",
+        "gObs": "Gravity",
+        "elevation": "Elevation",
+        "stationId": "Station"
+      },
+      "path": "/workspace/tests/fixtures/gravity-project/valid/stations.xyz",
+      "formula": "G-AID gravity contract 1.0: named columns + documented CRS/units",
+      "catalogId": "grav-valid"
+    }
+  ],
+  "n": 9,
+  "mapping": null,
+  "assumptions": "None. CRS, units, and mapping came from the file contract or a reviewed plan mapping."
+}

@@ -1,0 +1,21 @@
+{
+  "node_id": "gravity_terrain",
+  "formula": "\u0394g_NZTC = \u0394g_FA \u2212 2\u03c0G\u03c1h [+ Bullard B if requested] + TC_Nagy(R or DEM extent). TC is |gz| of DEM\u2212slab prisms (Nagy 1966) inside the near-zone window. Far-zone and intermediate-zone / Hayford\u2013Bowie are not applied.",
+  "parameters": {
+    "density": 2.67,
+    "terrainRadiusM": 150.0,
+    "useDemExtent": false,
+    "demCatalogId": "dem-valid",
+    "demChecksum": "fixture"
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/gravity_bouguer.csv",
+    "/workspace/tests/fixtures/gravity-project/valid/dem.asc"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/near_zone_terrain_corrected_bouguer.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/near_zone_terrain_corrected_bouguer_qc.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/gravity_terrain_benchmarks.json"
+  ],
+  "created_at": "2026-08-26T22:16:51.714906Z"
+}

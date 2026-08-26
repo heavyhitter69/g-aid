@@ -1,0 +1,17 @@
+{
+  "misfit_percent": 1.975768815491345e-13,
+  "rms_log": 1.9593680287469198e-15,
+  "iterations": 8,
+  "converged": true,
+  "topography_used": false,
+  "n_measurements": 30,
+  "units": "ohm.m",
+  "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity. Not Res2DInv.",
+  "limitations": [
+    "Homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+    "Topography is not used in the forward kernel.",
+    "3-D inversion is not implemented."
+  ],
+  "not_res2dinv": true,
+  "not_3d": true
+}
