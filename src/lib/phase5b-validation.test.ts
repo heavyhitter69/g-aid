@@ -7,6 +7,7 @@ import { parseSectionCsv } from "./section/parse.ts";
 import { layerLabel } from "./raster-layers.ts";
 import { gravityProductWarnings, NEAR_ZONE_MAP_LABEL } from "./gravity-product.ts";
 import { isRegisteredCapability } from "./capabilities/index.ts";
+import { isUsableSupabaseConfig } from "./supabase/config.ts";
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -33,6 +34,18 @@ function runPython(script: string) {
 test("grav.terrain is not a live capability id", () => {
   assert.equal(isRegisteredCapability("grav.terrain_near_zone"), true);
   assert.equal(isRegisteredCapability("grav.terrain"), false);
+});
+
+test("placeholder Supabase env is treated as unconfigured so desktop verification can run", () => {
+  assert.equal(isUsableSupabaseConfig(undefined, undefined), false);
+  assert.equal(
+    isUsableSupabaseConfig("https://placeholder.supabase.co", "eyJplaceholder"),
+    false
+  );
+  assert.equal(
+    isUsableSupabaseConfig("https://abcd.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.real"),
+    true
+  );
 });
 
 test("independent gravity terrain benchmarks pass and refuse Complete Bouguer naming", () => {
@@ -98,6 +111,30 @@ test("validation-ui ERT fixtures parse as labelled sections with invert QC", () 
   assert.equal(qc.not_res2dinv, true);
   assert.ok(fs.existsSync(path.join(root, "plan.json")));
   assert.ok(fs.existsSync(path.join(root, "ert_synthetic_recovery.json")));
+});
+
+test("desktop UI verification is recorded and does not claim Complete Bouguer", () => {
+  const report = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "docs/validation/results/phase5b_desktop_ui.json"), "utf8")
+  );
+  assert.equal(report.passed, true);
+  assert.equal(report.source, "live-react-page");
+  assert.equal(report.not_complete_bouguer, true);
+  assert.equal(report.not_res2dinv, true);
+  assert.equal(report.tabs.gravity.title, NEAR_ZONE_MAP_LABEL);
+  assert.match(report.tabs.gravity.warnings, /Far-zone and intermediate-zone/);
+  assert.match(report.tabs.gravity.warnings, /EPSG:32630 does not match EPSG:4326/);
+  assert.equal(report.tabs.pseudo.heading, "ERT pseudosection");
+  assert.equal(report.tabs.invert.heading, "ERT 2-D smoothness model");
+  assert.equal(report.tabs.provenance.gravity_run, "r-verify-grav");
+  assert.equal(report.tabs.provenance.ert_run, "r-verify-ert");
+  for (const name of ["gravity-map.webp", "ert-pseudosection.webp", "ert-invert.webp", "provenance-crs.webp"]) {
+    assert.ok(fs.existsSync(path.join(process.cwd(), "docs/validation/results/screenshots", name)));
+  }
+  const gravRoot = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav");
+  const ertRoot = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs/r-verify-ert");
+  assert.ok(fs.existsSync(path.join(gravRoot, "phase5b_desktop_ui.json")));
+  assert.ok(fs.existsSync(path.join(ertRoot, "phase5b_desktop_ui.json")));
 });
 
 if (failed) {

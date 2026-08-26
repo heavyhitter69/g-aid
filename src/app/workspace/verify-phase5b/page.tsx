@@ -66,8 +66,15 @@ export default function Phase5bVerifyPage() {
   if (error) {
     return <p className="p-6 text-sm text-red-300">Verification fixtures failed to load: {error}</p>;
   }
-  if (!data || !grid || !pseudo || !model) {
+  if (!data) {
     return <p className="p-6 text-sm text-[#858585]">Loading Phase 5B verification fixtures…</p>;
+  }
+  if (!grid || !pseudo || !model) {
+    return (
+      <p className="p-6 text-sm text-red-300">
+        Fixtures loaded but the gravity grid or ERT section failed to parse. This is not a Complete Bouguer or Res2DInv product.
+      </p>
+    );
   }
 
   return (
@@ -113,15 +120,18 @@ export default function Phase5bVerifyPage() {
         {tab === "provenance" ? (
           <div className="p-4 text-[12px] space-y-3 overflow-auto">
             <p data-testid="grav-provenance">
-              Run {data.gravity.runId} · plan {String(data.gravity.planHash).slice(0, 8)}
+              Run {data.gravity.runId} · plan {String(data.gravity.planHash)}
             </p>
             <p data-testid="ert-provenance">
-              Run {data.ert.runId} · plan {String(data.ert.planHash).slice(0, 8)}
+              Run {data.ert.runId} · plan {String(data.ert.planHash)}
             </p>
             <p data-testid="crs-warning">{data.crsConflict.warning}</p>
             <p>Gravity product: {data.gravity.productName}</p>
             <p>Bullard B: {String(data.gravity.qc.bullard_b_status)}</p>
-            <p>DEM cell size: {String(data.gravity.qc.dem_cellsize_m)} m, coverage {String(data.gravity.qc.mean_coverage_fraction)}</p>
+            <p>
+              DEM cell size: {String(data.gravity.qc.dem_cellsize_m)} m, coverage{" "}
+              {(Number(data.gravity.qc.mean_coverage_fraction) * 100).toFixed(1)}%
+            </p>
             <p>Far-zone: {String(data.gravity.qc.far_zone)}; intermediate-zone: {String(data.gravity.qc.intermediate_zone)}</p>
             <p>ERT invert topography used: {String(data.ert.qc.topography_used)}; not Res2DInv: {String(data.ert.qc.not_res2dinv)}</p>
             <ul className="list-disc pl-5 text-[#9d9d9d]">

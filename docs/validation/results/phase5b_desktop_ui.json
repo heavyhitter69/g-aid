@@ -1,0 +1,67 @@
+{
+  "product_name": "near-zone terrain-corrected Bouguer anomaly",
+  "capability": "grav.terrain_near_zone",
+  "not_complete_bouguer": true,
+  "not_res2dinv": true,
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["GridMapView", "SectionView"],
+  "url": "http://127.0.0.1:3000/workspace/verify-phase5b",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-26T22:46:00Z",
+  "electron_packaged_app": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same GridMapView and SectionView).",
+    "A packaged Electron .exe was not launched in this environment.",
+    "Placeholder Supabase env is treated as unconfigured so local desktop verification can run.",
+    "Provenance screenshot captured plan hashes truncated to 8 characters (fixture-). The page now prints the full plan hash and coverage as a percent."
+  ],
+  "tabs": {
+    "gravity": {
+      "passed": true,
+      "title": "Near-zone terrain-corrected Bouguer (not complete Bouguer)",
+      "crs": "EPSG:32630",
+      "units": "mGal",
+      "map_visible": true,
+      "colorbar_range": "-92.11 – -86.32 mGal",
+      "grid": "8 x 8 · 100.00 m",
+      "warnings": "Product: near-zone terrain-corrected Bouguer anomaly. Terrain correction is limited to the configured DEM extent or radius. Cells outside that window are ignored. Far-zone and intermediate-zone terrain effects are not included. Hayford–Bowie compartments are not implemented. This anomaly is not equivalent to a fully regional or commercial Complete Bouguer product. Bullard B / spherical-cap curvature: off unless requested. Reduction density: 2.67 g/cm³ (user-confirmed). Near-zone radius: 150 m. DEM cell size: 25 m. DEM coverage inside the near-zone window: 100.0%. Vertical datum: orthometric. Overlay blocked: documented CRS EPSG:32630 does not match EPSG:4326. G-AID will not reproject silently.",
+      "screenshot": "docs/validation/results/screenshots/gravity-map.webp"
+    },
+    "pseudo": {
+      "passed": true,
+      "heading": "ERT pseudosection",
+      "section_visible": true,
+      "units": "ohm.m",
+      "z_reference": "pseudo-depth n*a/2 — plotting convention not inversion depth",
+      "model_status": "not a depth model",
+      "warnings": "A pseudosection is not a depth model and is not true resistivity.",
+      "screenshot": "docs/validation/results/screenshots/ert-pseudosection.webp"
+    },
+    "invert": {
+      "passed": true,
+      "heading": "ERT 2-D smoothness model",
+      "section_visible": true,
+      "units": "ohm.m",
+      "z_reference": "model depth below a flat surface; topography not used",
+      "model_status": "2-D smoothness inversion — not Res2DInv",
+      "warnings": "This smoothness model is not Res2DInv, not 3-D, and not lithology, groundwater, ore, or a drill target.",
+      "screenshot": "docs/validation/results/screenshots/ert-invert.webp"
+    },
+    "provenance": {
+      "passed": true,
+      "gravity_run": "r-verify-grav",
+      "ert_run": "r-verify-ert",
+      "product": "near-zone terrain-corrected Bouguer anomaly",
+      "bullard_b": "off",
+      "dem_cell_size_m": 25,
+      "coverage_fraction": 1,
+      "far_zone": false,
+      "intermediate_zone": false,
+      "crs_warning": "Overlay blocked: documented CRS EPSG:32630 does not match EPSG:4326. G-AID will not reproject silently.",
+      "not_established_includes": "A Complete Bouguer Anomaly is not established without far-zone and intermediate-zone terrain.",
+      "screenshot": "docs/validation/results/screenshots/provenance-crs.webp"
+    }
+  }
+}

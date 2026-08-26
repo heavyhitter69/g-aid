@@ -238,7 +238,17 @@ def ert_invert(payload: dict) -> dict:
     }
     qc_path = write_json(os.path.join(out, "ert_invert_qc.json"), qc)
     validation_path = _attach_validation_copy(out, "ert_synthetic_recovery.json")
-    write_lineage(out, node_id, qc["formula"], qc, [src], [json_path, csv_path, qc_path] + ([validation_path] if validation_path else []))
+    ui_path = _attach_validation_copy(out, "phase5b_desktop_ui.json")
+    write_lineage(
+        out,
+        node_id,
+        qc["formula"],
+        qc,
+        [src],
+        [json_path, csv_path, qc_path]
+        + ([validation_path] if validation_path else [])
+        + ([ui_path] if ui_path else []),
+    )
     artifacts = [
         make_artifact("artifact-ert-inv", "section", "json", json_path, node_id, [src], qc),
         make_artifact("artifact-ert-inv-csv", "section", "csv", csv_path, node_id, [src]),
@@ -246,6 +256,8 @@ def ert_invert(payload: dict) -> dict:
     ]
     if validation_path:
         artifacts.append(make_artifact("artifact-ert-recovery", "qc_report", "json", validation_path, node_id, [src]))
+    if ui_path:
+        artifacts.append(make_artifact("artifact-ert-desktop-ui", "qc_report", "json", ui_path, node_id, [src]))
     return {
         "artifacts": artifacts,
         "events": [

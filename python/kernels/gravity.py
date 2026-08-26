@@ -359,6 +359,7 @@ def gravity_terrain(payload: dict) -> dict:
     }
     qc_path = write_json(os.path.join(out, "near_zone_terrain_corrected_bouguer_qc.json"), qc)
     validation_path = _attach_validation_copy(out, "gravity_terrain_benchmarks.json")
+    ui_path = _attach_validation_copy(out, "phase5b_desktop_ui.json")
     write_lineage(
         out,
         node_id,
@@ -371,7 +372,9 @@ def gravity_terrain(payload: dict) -> dict:
             "demChecksum": qc["dem_checksum"],
         },
         [src, str(dem_path)],
-        [path, qc_path] + ([validation_path] if validation_path else []),
+        [path, qc_path]
+        + ([validation_path] if validation_path else [])
+        + ([ui_path] if ui_path else []),
     )
     artifacts = [
         make_artifact("artifact-grav-nztc", "processed_dataset", "csv", path, node_id, [src], qc),
@@ -379,6 +382,8 @@ def gravity_terrain(payload: dict) -> dict:
     ]
     if validation_path:
         artifacts.append(make_artifact("artifact-grav-terrain-bench", "qc_report", "json", validation_path, node_id, [src]))
+    if ui_path:
+        artifacts.append(make_artifact("artifact-grav-desktop-ui", "qc_report", "json", ui_path, node_id, [src]))
     return {
         "artifacts": artifacts,
         "events": [

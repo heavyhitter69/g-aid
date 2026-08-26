@@ -5,9 +5,11 @@ product is a **near-zone terrain-corrected Bouguer anomaly** (`grav.terrain_near
 The ERT pack is G-AID ERT 1.0 ingest, labelled pseudosection, and a tested 2-D
 smoothness invert. Neither pack claims Oasis montaj or Res2DInv equivalence.
 
-**Support bar:** not fully met until independent kernel benchmarks, synthetic ERT
-recovery limits, and desktop UI verification of map/section/CRS/provenance are
-all recorded below.
+**Support bar for this pack:** met with the documented limits below. Independent
+kernel benchmarks, synthetic ERT recovery limits, and a live desktop UI pass of
+map / section / CRS / provenance are recorded. This does **not** meet the support
+bar for Complete Bouguer, far-zone terrain, Hayford–Bowie, Res2DInv, 3-D ERT, or
+topography-aware ERT.
 
 ## Gravity kernel benchmarks
 
@@ -46,16 +48,25 @@ Workspace route: `/workspace/verify-phase5b` (same `GridMapView` and `SectionVie
 as the live map workspace), fed by versioned fixtures under
 `tests/fixtures/validation-ui/G-AID Output/runs/`.
 
-Checks:
+Live React pass recorded 2026-08-26 at viewport 1280×800
+(`results/phase5b_desktop_ui.json`):
 
-- Gravity grid legend is **Near-zone terrain-corrected Bouguer (not complete Bouguer)**
-- Warnings include near-zone window, far-zone/intermediate-zone omitted, Bullard B status, DEM cell size/coverage/datum, density
-- ERT pseudosection labelled not a depth model
-- ERT invert labelled smoothness model, not Res2DInv
-- CRS overlay conflict warning (EPSG:32630 vs 4326)
-- Versioned run id + plan hash provenance
+| Check | Result |
+|---|---|
+| Gravity legend **Near-zone terrain-corrected Bouguer (not complete Bouguer)** | pass |
+| Warning bar: DEM radius/extent, far-zone/intermediate omitted, Bullard B off, DEM 25 m / 100% coverage / orthometric, density 2.67 g/cm³ user-confirmed, not commercial Complete Bouguer | pass |
+| Colorbar units mGal; CRS EPSG:32630 | pass |
+| ERT pseudosection labelled not a depth model | pass |
+| ERT invert labelled 2-D smoothness model, not Res2DInv | pass |
+| CRS overlay blocked (EPSG:32630 vs 4326) | pass |
+| Versioned run ids `r-verify-grav` / `r-verify-ert` | pass |
 
-UI verification outcome is filled after the desktop pass in this run.
+Screenshots: `results/screenshots/gravity-map.webp`, `ert-pseudosection.webp`,
+`ert-invert.webp`, `provenance-crs.webp`.
+
+A packaged Electron executable was not launched; the verified UI is the Next.js
+workspace that Electron hosts. Kernel runs copy these JSON reports into the
+versioned run folder when present.
 
 ## Product copy that remains forbidden
 
@@ -63,3 +74,14 @@ UI verification outcome is filled after the desktop pass in this run.
 - Oasis montaj / Res2DInv equivalence
 - Groundwater confirmation, lithology certainty, ore bodies, drill targets
 - Far-zone / Hayford–Bowie / 167 km terrain
+
+## Next complete scientific pack (recommendation)
+
+**Topography-aware ERT 2.5-D forward and invert** — only as a full pack with
+ingest, an independent forward oracle, recovery tests on known structure plus
+topography, QC, section visualisation, provenance, and interpretation limits.
+Do not advertise it as Res2DInv.
+
+Far-zone gravity terrain (Hayford–Bowie or equivalent) remains a separate pack
+and is the only honest path to a Complete Bouguer product. It is not supported
+today.
