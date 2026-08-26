@@ -1,6 +1,6 @@
 import { ScientificArtifact } from './interfaces';
 import { PipelineEngine, PipelineNode, ChildProcessRuntime, NodeResult } from './PipelineEngine';
-import { MAGNETIC_NODE_DEPS, MAGNETIC_NODE_ORDER } from "@/lib/capabilities/compile";
+import { KERNEL_NODE_ORDER, remapKernelDeps } from "@/lib/capabilities/compile";
 
 class PythonNode extends PipelineNode {
   scriptPath: string;
@@ -35,35 +35,32 @@ const NODE_SCRIPTS: Record<string, string> = {
   lineament_extractor: SCIENCE,
   euler_deconvolution: SCIENCE,
   gis_export: SCIENCE,
+  gravity_ingest: SCIENCE,
+  gravity_freeair: SCIENCE,
+  gravity_bouguer: SCIENCE,
+  grav_gridder: SCIENCE,
+  regional_residual: SCIENCE,
+  grav_gis_export: SCIENCE,
+  grav_interpret: SCIENCE,
 };
-
-function remapDeps(nodeId: string, compiled: Set<string>): string[] {
-  const original = MAGNETIC_NODE_DEPS[nodeId] || [];
-  const present = original.filter((dep) => compiled.has(dep));
-  if (present.length) return present;
-  const order = MAGNETIC_NODE_ORDER as unknown as string[];
-  const index = order.indexOf(nodeId);
-  for (let i = index - 1; i >= 0; i--) {
-    if (compiled.has(order[i])) return [order[i]];
-  }
-  return [];
-}
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
   constructor(nodeIds?: string[]) {
     super();
     // Live path must pass compiled DAG node ids. An empty list registers nothing.
+    // Gravity uses this same engine. Do not add a GravityPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
-    for (const id of MAGNETIC_NODE_ORDER) {
+    for (const id of KERNEL_NODE_ORDER) {
       if (!compiled.has(id)) continue;
       const script = NODE_SCRIPTS[id];
       if (!script) continue;
-      this.registerNode(new PythonNode(id, script, remapDeps(id, compiled)));
+      this.registerNode(new PythonNode(id, script, remapKernelDeps(id, compiled)));
     }
   }
 }
 
+/** Unused stub. Gravity executes through MagneticPreprocessingPipeline + compileCapabilityDag. */
 export class GravityPipeline extends PipelineEngine {
   constructor() {
     super();

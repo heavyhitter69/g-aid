@@ -1,6 +1,5 @@
 /**
  * Map display types. This is viewing, not geophysical processing.
- * Magnetic remains the only executable science pack.
  */
 
 export const DISPLAY_FORMATS = [

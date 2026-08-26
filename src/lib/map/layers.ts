@@ -9,6 +9,19 @@ function posix(path: string): string {
   return path.replace(/\\/g, "/");
 }
 
+/** Value units for a map layer. Gravity grids are mGal; magnetics stay nT unless the catalog says otherwise. */
+export function mapValueUnits(path: string, formatId?: string, recorded?: string): string {
+  if (recorded) return recorded;
+  const n = posix(path).toLowerCase();
+  if (formatId === "dem-ascii" || /\bdem\b/.test(n)) return "m";
+  if (formatId === "geojson" || n.endsWith(".geojson")) {
+    if (/gravity|bouguer|free_air|free-air/.test(n)) return "mGal";
+    return "coordinate";
+  }
+  if (/bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
+  return "nT";
+}
+
 export function artifactId(runId: string, relativePath: string): string {
   return `art:${runId}:${posix(relativePath).split("/").pop()}`;
 }
@@ -47,7 +60,7 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
     mediaClass: record.mediaClass,
     supportStatus: record.supportStatus,
     crs,
-    units: record.units,
+    units: mapValueUnits(record.relativePath, formatId, record.units),
     reason: adapter?.reason,
     representation: decoded && viewable ? "full" : "undecoded",
   };
@@ -70,6 +83,7 @@ export function layerSpecFromArtifact(artifact: RunArtifact, run?: CatalogRunPro
     planHash: artifact.planHash || run?.planHash,
     reason: adapter?.reason,
     representation: viewable ? "full" : "undecoded",
+    units: mapValueUnits(artifact.path, artifact.formatId),
   };
 }
 

@@ -1,6 +1,6 @@
 /**
- * ScientificTool registry — magnetic kernel bindings from the live capability registry.
- * Gravity, ERT, seismic, and other packs are not registered for execution.
+ * ScientificTool registry — kernel bindings from the live capability registry.
+ * ERT, seismic, GPR, and radiometrics are not registered for execution.
  */
 
 import crypto from "crypto";
@@ -36,6 +36,13 @@ const NODE_SCRIPTS: Record<string, string> = {
   lineament_extractor: SCIENCE,
   euler_deconvolution: SCIENCE,
   gis_export: SCIENCE,
+  gravity_ingest: SCIENCE,
+  gravity_freeair: SCIENCE,
+  gravity_bouguer: SCIENCE,
+  grav_gridder: SCIENCE,
+  regional_residual: SCIENCE,
+  grav_gis_export: SCIENCE,
+  grav_interpret: SCIENCE,
 };
 
 function toolsFromLiveRegistry(): ScientificTool[] {
@@ -49,7 +56,7 @@ function toolsFromLiveRegistry(): ScientificTool[] {
         id: nodeId,
         name: capability.title,
         version: capability.version,
-        domain: "magnetic",
+        domain: capability.domain === "gravity" ? "gravity" : "magnetic",
         description: `${capability.description} (kernel ${nodeId})`,
         inputs: Object.fromEntries(
           Object.entries(capability.parameters).map(([key, parameter]) => [

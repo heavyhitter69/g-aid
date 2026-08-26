@@ -1,7 +1,9 @@
 import type { CatalogRecord, ProjectCatalog, SupportStatus } from "./types.ts";
 
+const SUPPORTED_ADAPTER_IDS = new Set(["magarrow", "gsm19", "gravity-xyz", "gravity-csv"]);
+
 function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {
-  return record.supportStatus === "supported" && (record.adapterId === "magarrow" || record.adapterId === "gsm19");
+  return record.supportStatus === "supported" && Boolean(record.adapterId && SUPPORTED_ADAPTER_IDS.has(record.adapterId));
 }
 
 function formatSize(bytes: number): string {
@@ -37,13 +39,16 @@ export function summarizeCatalog(catalog: ProjectCatalog | null, maxRecords = 80
   const counts = countBySupport(catalog);
   const magarrow = catalog.records.filter((record) => record.adapterId === "magarrow" && record.supportStatus === "supported");
   const gsm19 = catalog.records.filter((record) => record.adapterId === "gsm19" && record.supportStatus === "supported");
+  const gravity = catalog.records.filter(
+    (record) => (record.adapterId === "gravity-xyz" || record.adapterId === "gravity-csv") && record.supportStatus === "supported"
+  );
   const lines = [
     `Project catalog (${catalog.records.length} source files; G-AID Output skipped)`,
     `Support: supported ${counts.supported}, recognised-unsupported ${counts["recognised-unsupported"]}, unknown ${counts.unknown}`,
-    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}`,
+    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}`,
     catalog.truncated ? `Truncated: ${catalog.truncationReason || "file-count limit reached"}` : "",
     catalog.runs.length ? `Prior runs preserved: ${catalog.runs.map((run) => run.runId).join(", ")}` : "Prior runs preserved: (none)",
-    "This catalog does not imply a magnetic workflow. Only supported MagArrow and GSM-19 records can be processing inputs.",
+    "This catalog does not imply a magnetic or gravity workflow. Only supported MagArrow, GSM-19, and gravity-contract records can be processing inputs.",
   ].filter(Boolean);
 
   const shown = catalog.records.slice(0, maxRecords);
@@ -66,6 +71,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
   const counts = countBySupport(catalog);
   const magarrow = catalog.records.filter((r) => r.adapterId === "magarrow" && r.supportStatus === "supported").length;
   const gsm19 = catalog.records.filter((r) => r.adapterId === "gsm19" && r.supportStatus === "supported").length;
+  const gravity = catalog.records.filter(
+    (r) => (r.adapterId === "gravity-xyz" || r.adapterId === "gravity-csv") && r.supportStatus === "supported"
+  ).length;
   const formats = new Map<string, number>();
   for (const record of catalog.records) {
     formats.set(record.formatId, (formats.get(record.formatId) || 0) + 1);
@@ -77,7 +85,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     .join(", ");
   const lines = [
     `This folder has **${catalog.records.length}** source files in the project catalog (G-AID Output was skipped).`,
-    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}`,
+    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}`,
     `- **recognised-unsupported** (identified, not processed in this release): ${counts["recognised-unsupported"]}`,
     `- **unknown** (not identified reliably): ${counts.unknown}`,
     formatList ? `Formats: ${formatList}.` : "",
@@ -88,6 +96,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     magarrow && gsm19
       ? "I can plan MagArrow + GSM-19 magnetics if you ask for that work. Mixed files do not start a magnetic workflow by themselves."
       : "I will not start a magnetic workflow unless you ask for magnetics and both MagArrow and GSM-19 supported records are present.",
+    gravity
+      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented."
+      : "Gravity processing needs a documented XYZ/CSV contract, not the first .xyz file.",
     "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
   ].filter(Boolean);
   return lines.join("\n");

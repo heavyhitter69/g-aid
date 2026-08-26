@@ -16,6 +16,7 @@ import {
 import { isGaidOutputPath, GAID_OUTPUT_DIR } from "../workspace-index.ts";
 import { RUNS_SUBDIR } from "../run-layout.ts";
 import type { SniffContext } from "./adapters/types.ts";
+import { mergeGravityMappingFromPrevious } from "./gravity-mapping.ts";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -113,6 +114,9 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     timeRange: classified.inspect.timeRange,
     recordCount,
     parseErrors: parseErrors.length ? parseErrors : undefined,
+    columnMapping: classified.inspect.columnMapping,
+    elevationDatum: classified.inspect.elevationDatum,
+    gravityDatum: classified.inspect.gravityDatum,
     provenance: {
       method: classified.method,
       adapterId: classified.adapterId || undefined,
@@ -253,13 +257,14 @@ export function buildProjectCatalog(root: string, options: BuildCatalogOptions =
 
   walk(resolvedRoot);
   records.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  const merged = records.map((record) => mergeGravityMappingFromPrevious(record, options.previous));
 
   return {
     schemaVersion: CATALOG_SCHEMA_VERSION,
     generatedAt: (options.now ?? new Date()).toISOString(),
     previousGeneratedAt: options.previous?.generatedAt,
     workspaceRoot: resolvedRoot,
-    records,
+    records: merged,
     runs: collectRuns(resolvedRoot, options.previous),
     truncated,
     truncationReason: truncated ? `Stopped after ${limit} source files.` : undefined,

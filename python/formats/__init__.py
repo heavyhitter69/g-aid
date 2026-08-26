@@ -278,46 +278,10 @@ def magarrow_survey_date(df: pd.DataFrame) -> datetime | None:
 
 
 def parse_geosoft_xyz(path: str) -> pd.DataFrame:
-    """Geosoft XYZ / space-delimited X Y [Z] value with optional / or \\ comments."""
-    xs, ys, zs, vals, lines = [], [], [], [], []
-    current_line = "1"
-    with open(path, "r", errors="ignore") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if not line or line.startswith("/") or line.startswith("\\") or line.startswith("#"):
-                if line.lower().startswith("/line") or line.lower().startswith("line"):
-                    parts = line.replace("=", " ").split()
-                    current_line = parts[-1]
-                continue
-            if line.lower().startswith("line"):
-                current_line = line.split()[-1]
-                continue
-            parts = line.replace(",", " ").split()
-            if len(parts) < 3:
-                continue
-            try:
-                x = float(parts[0])
-                y = float(parts[1])
-                if len(parts) >= 4:
-                    z = float(parts[2])
-                    v = float(parts[3])
-                else:
-                    z = np.nan
-                    v = float(parts[2])
-            except ValueError:
-                continue
-            xs.append(x)
-            ys.append(y)
-            zs.append(z)
-            vals.append(v)
-            lines.append(current_line)
-    if not vals:
-        raise ValueError(f"No XYZ samples in {path}")
-    df = pd.DataFrame({"x": xs, "y": ys, "z": zs, "value": vals, "line_id": lines})
-    df["timestamp"] = np.arange(len(df), dtype=float)
-    df["source"] = "xyz"
-    df["crs_epsg"] = 0
-    df["unit"] = ""
+    """Deprecated loose XYZ. Gravity pack uses formats.gravity.parse_gravity_table."""
+    from formats.gravity import parse_gravity_table
+
+    df, _qc = parse_gravity_table(path)
     return df
 
 

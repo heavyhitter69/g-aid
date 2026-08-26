@@ -90,13 +90,6 @@ def _candidates_from_catalog(params: dict, base_dir: str, node_id: str) -> tuple
             filepath = os.path.abspath(str(filepath))
         name = os.path.basename(filepath)
         if not kind:
-            events.append(
-                _qc(
-                    "critical",
-                    f"Skipped {name} ({catalog_id}): not a supported MagArrow or GSM-19 catalog binding.",
-                    node_id,
-                )
-            )
             continue
         if not os.path.isfile(filepath):
             events.append(_qc("fatal", f"Bound catalog file is missing: {rel or filepath} ({catalog_id}).", node_id))

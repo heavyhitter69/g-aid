@@ -77,7 +77,7 @@ export function inferIntentFromFiles(
   return "none";
 }
 
-/** Bind only supported MagArrow / GSM-19 catalog records. Never extension search. */
+/** Bind supported MagArrow / GSM-19 / gravity-contract catalog records. Never extension search. */
 export function collectPlanInputs(
   index: WorkspaceIndex | null,
   targetFolder: string,
@@ -87,12 +87,21 @@ export function collectPlanInputs(
     return supportedProcessingRecords(catalog, targetFolder).map((record) => ({
       catalogId: record.id,
       path: record.relativePath,
-      kind: record.adapterId === "gsm19" ? "gsm19-base" : "magarrow",
+      kind:
+        record.adapterId === "gsm19"
+          ? "gsm19-base"
+          : record.adapterId === "magarrow"
+            ? "magarrow"
+            : record.adapterId || undefined,
       size: record.size,
       checksum: record.checksum.value,
       supportStatus: record.supportStatus,
       adapterId: record.adapterId,
       formatId: record.formatId,
+      columnMapping: record.columnMapping,
+      elevationDatum: record.elevationDatum,
+      units: record.units,
+      crs: record.crs,
     }));
   }
   void index;

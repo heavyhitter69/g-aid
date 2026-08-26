@@ -56,8 +56,14 @@ def get_handler(node_id: str):
         "gis_export": gis_export,
         "lineament_extractor": lineament_extractor,
         "euler_deconvolution": euler_deconvolution_node,
-        "gravity_reduce": gravity_reduce,
+        "gravity_ingest": gravity_ingest,
+        "gravity_freeair": gravity_freeair,
+        "gravity_bouguer": gravity_bouguer,
+        "grav_gridder": grav_gridder,
         "regional_residual": regional_residual,
+        "grav_gis_export": grav_gis_export,
+        "grav_interpret": grav_interpret,
+        "gravity_reduce": gravity_reduce,
         "ert_pseudosection": ert_pseudosection,
         "ert_invert": ert_invert,
         "seismic_process": seismic_process,
@@ -707,86 +713,46 @@ def euler_deconvolution_node(payload: dict) -> dict:
     }
 
 
-def gravity_reduce(payload: dict) -> dict:
-    if not step_enabled(payload, "gravity", default=True):
-        return skipped("gravity_reduce", "not in plan")
-    from science.gravity import latitude_free_air_bouguer, terrain_correction_prisms
-    from science.gis import read_ascii_grid
+def gravity_ingest(payload: dict) -> dict:
+    from kernels.gravity import gravity_ingest as impl
+    return impl(payload)
 
-    node_id = "gravity_reduce"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath") or _find(out, "gravity_canonical.csv", "xyz_canonical.csv")
-    df = pd.read_csv(src)
-    lat_col = "y" if "y" in df.columns else None
-    if lat_col is None:
-        raise ValueError("Gravity reduction needs latitude in column y")
-    gcol = "value" if "value" in df.columns else "g_obs"
-    hcol = "z" if "z" in df.columns else "height"
-    density = float(_params(payload).get("density") or 2.67)
-    reduced = latitude_free_air_bouguer(df[gcol], df[lat_col], df[hcol], density_gcc=density)
-    for key, val in reduced.items():
-        if key != "density_gcc":
-            df[key] = val
-    events = []
-    formula = "Somigliana + 0.3086h − 2πGρh + Bullard B (Moritz 2000; LaFehr 1991)"
-    dem_path = _params(payload).get("demPath")
-    if not dem_path:
-        base = str(_params(payload).get("baseDir") or "")
-        for root in (out, base):
-            if not root:
-                continue
-            for name in ("dem.asc", "DEM.asc"):
-                cand = os.path.join(root, name)
-                if os.path.isfile(cand):
-                    dem_path = cand
-                    break
-            if dem_path:
-                break
-    if dem_path and os.path.isfile(dem_path):
-        from science.crs import project_points
-        dem = read_ascii_grid(dem_path)
-        east, north, _crs = project_points(df["x"], df["y"])
-        tc = terrain_correction_prisms(east, north, df[hcol].to_numpy(), dem, density)
-        df["terrain_mgal"] = tc
-        df["bouguer_mgal"] = df["bouguer_mgal"].to_numpy() + tc
-        formula += "; Nagy 1966 prism terrain"
-        events.append({"type": "NODE_PROGRESS", "message": f"Terrain correction from {os.path.basename(dem_path)}."})
-    path = os.path.join(out, "gravity_reduced.csv")
-    df.to_csv(path, index=False)
-    write_json(os.path.join(out, "gravity_qc.json"), {"density_gcc": density, "formula": formula, "dem": dem_path})
-    return {
-        "artifacts": [make_artifact("artifact-grav-1", "processed_dataset", "csv", path, node_id, [src])],
-        "events": events + [{"type": "NODE_PROGRESS", "message": f"Bouguer reduction at {density} g/cm³."}],
-    }
+
+def gravity_freeair(payload: dict) -> dict:
+    from kernels.gravity import gravity_freeair as impl
+    return impl(payload)
+
+
+def gravity_bouguer(payload: dict) -> dict:
+    from kernels.gravity import gravity_bouguer as impl
+    return impl(payload)
+
+
+def grav_gridder(payload: dict) -> dict:
+    from kernels.gravity import grav_gridder as impl
+    return impl(payload)
+
+
+def grav_gis_export(payload: dict) -> dict:
+    from kernels.gravity import grav_gis_export as impl
+    return impl(payload)
+
+
+def grav_interpret(payload: dict) -> dict:
+    from kernels.gravity import grav_interpret as impl
+    return impl(payload)
+
+
+def gravity_reduce(payload: dict) -> dict:
+    raise ValueError(
+        "gravity_reduce is not on the live DAG. Use gravity_freeair/gravity_bouguer. "
+        "Density is never defaulted to 2.67."
+    )
 
 
 def regional_residual(payload: dict) -> dict:
-    if not step_enabled(payload, "residual", default=True):
-        return skipped("regional_residual", "not in plan")
-    from science.crs import CRS, project_points
-    from science.fft_filters import upward_continue
-    from science.gis import export_grid_bundle
-    from science.gravity import polynomial_regional
-    from science.grid import minimum_curvature
-
-    node_id = "regional_residual"
-    out = task_dir(payload)
-    src = _find(out, "gravity_reduced.csv")
-    df = pd.read_csv(src)
-    east, north, crs = project_points(df["x"], df["y"])
-    grid = minimum_curvature(east, north, df["bouguer_mgal"].to_numpy(), crs_epsg=crs.epsg, units="mGal", name="bouguer")
-    method = str(_params(payload).get("method") or "upward_continuation")
-    if method == "polynomial":
-        regional, residual = polynomial_regional(grid, order=int(_params(payload).get("polyOrder") or 2))
-    else:
-        height = float(_params(payload).get("continuation_height") or _params(payload).get("continuationHeightM") or 5000)
-        regional = upward_continue(grid, height)
-        residual = grid.copy_with(grid.masked() - regional.masked(), name="residual", units="mGal")
-    artifacts = []
-    for g in (grid, regional, residual):
-        paths = export_grid_bundle(g, out, g.name, crs)
-        artifacts.append(make_artifact(f"artifact-{g.name}", "grid", "tif", paths["tif"], node_id))
-    return {"artifacts": artifacts, "events": [{"type": "NODE_PROGRESS", "message": f"Regional-residual via {method}."}]}
+    from kernels.gravity import regional_residual as impl
+    return impl(payload)
 
 
 def ert_pseudosection(payload: dict) -> dict:

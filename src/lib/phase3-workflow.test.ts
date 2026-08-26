@@ -256,12 +256,16 @@ test("review comments record accepted, refused, and needs-data", () => {
   );
 
   const gravity = applyChatPatches(magPlan(root), "also run gravity and Bouguer on this survey");
+  assert.equal(gravity.steps.gravity, true);
+  assert.ok(gravity.capabilities?.includes("grav.bouguer"));
   assert.ok(
     gravity.reviewDecisions?.some(
-      (decision) => decision.status === "refused" && /gravity/i.test(String(decision.capabilityId) + decision.reason)
+      (decision) =>
+        decision.capabilityId === "grav.bouguer" &&
+        (decision.status === "accepted" || decision.status === "needs-data")
     )
   );
-  assert.equal(gravity.steps.gravity, false);
+  assert.equal(isRegisteredCapability("grav.bouguer"), true);
 
   const needs = applyChatPatches(
     magPlan(root, {

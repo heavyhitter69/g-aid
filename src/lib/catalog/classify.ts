@@ -25,7 +25,7 @@ export function classifyPeek(ctx: SniffContext): Classification {
       adapter,
       sniff,
       inspect,
-      supportStatus: adapter.supportStatus,
+      supportStatus: inspect.supportStatus || adapter.supportStatus,
       adapterId: adapter.id,
       formatId: sniff.formatId || adapter.formatId,
       mediaClass: sniff.mediaClass,
@@ -48,6 +48,8 @@ export function classifyPeek(ctx: SniffContext): Classification {
   };
 }
 
+const SUPPORTED_ADAPTER_IDS = new Set(["magarrow", "gsm19", "gravity-xyz", "gravity-csv"]);
+
 export function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {
-  return record.supportStatus === "supported" && (record.adapterId === "magarrow" || record.adapterId === "gsm19");
+  return record.supportStatus === "supported" && Boolean(record.adapterId && SUPPORTED_ADAPTER_IDS.has(record.adapterId));
 }

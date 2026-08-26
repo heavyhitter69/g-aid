@@ -3,7 +3,7 @@ import path from "path";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
 import { workStepFromEvent } from "@/lib/work-steps";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
-import { magneticStepsEnabled, validatePlan } from "@/lib/plan-spec";
+import { gravityStepsEnabled, magneticStepsEnabled, validatePlan } from "@/lib/plan-spec";
 import {
   allocateApprovedRun,
   appendRunLog,
@@ -150,7 +150,7 @@ async function runDiurnalPipeline(
   const dag = dagForPlan(pending);
   const nodeIds = compiledNodeIds(dag);
   if (!nodeIds.length) {
-    enqueue("- ❌ **No compiled magnetic nodes.** Unregistered methods are not executed.\n");
+    enqueue("- ❌ **No compiled processing nodes.** Unregistered methods are not executed.\n");
     return { files: [], ok: false };
   }
   const pipeline = new MagneticPreprocessingPipeline(nodeIds);
@@ -166,6 +166,14 @@ async function runDiurnalPipeline(
     inclination: pending.parameters.inclination,
     declination: pending.parameters.declination,
     inputPath: pending.parameters.inputPath,
+    surveyLatitude: pending.parameters.surveyLatitude,
+    elevationDatum: pending.parameters.elevationDatum,
+    gravityUnits: pending.parameters.gravityUnits,
+    crsEpsg: pending.parameters.crsEpsg,
+    applyBullardB: pending.parameters.applyBullardB,
+    gravityMapping: pending.parameters.gravityMapping,
+    columnMapping: pending.parameters.gravityMapping,
+    columnMappingReviewed: pending.parameters.columnMappingReviewed,
     steps: pending.steps,
     runId: pending.runId,
     parentRunId: pending.parentRunId,
@@ -334,13 +342,14 @@ export function streamPlanDecision(
         const projectFilesUpdates: ProjectFileUpdate[] = [];
         let ranOk = true;
         const mag = magneticStepsEnabled(frozen.steps);
+        const grav = gravityStepsEnabled(frozen.steps);
 
-        if (!mag) {
+        if (!mag && !grav) {
           ranOk = false;
-          enqueue("- ❌ **No magnetic steps to execute.** Gravity, ERT, seismic, GPR, and radiometrics are not in this release.\n");
+          enqueue("- ❌ **No registered steps to execute.** ERT, seismic, GPR, and radiometrics are not in this release.\n");
         } else if (!(frozen.inputs || []).length) {
           ranOk = false;
-          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow and GSM-19 catalog IDs first.\n");
+          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow/GSM-19 and/or gravity-contract catalog IDs first.\n");
         } else {
           const created = await runDiurnalPipeline(frozen, enqueue, onTasks, tasksContent);
           projectFilesUpdates.push(...created.files);

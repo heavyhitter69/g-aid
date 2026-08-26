@@ -88,6 +88,19 @@ export interface CatalogRecord {
   timeRange?: CatalogTimeRange;
   recordCount?: number;
   parseErrors?: string[];
+  columnMapping?: {
+    x: string;
+    y: string;
+    gObs: string;
+    elevation?: string;
+    stationId?: string;
+    datetime?: string;
+    latitude?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  elevationDatum?: string;
+  gravityDatum?: string;
   provenance: CatalogProvenance;
 }
 

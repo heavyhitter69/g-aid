@@ -35,8 +35,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
   const runId = plan.runId || generateRunId();
   const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
   const notes = [...(plan.notes || [])];
-  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "none") {
-    notes.push("That method is not in this release. I did not add a magnetic checklist.");
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic or gravity checklist.");
   }
   const next: AgentPlan = {
     ...plan,
@@ -66,6 +66,10 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     reviewDecisions: next.reviewDecisions,
     inclination: next.parameters.inclination,
     declination: next.parameters.declination,
+    density: next.parameters.density,
+    surveyLatitude: next.parameters.surveyLatitude,
+    elevationDatum: next.parameters.elevationDatum,
+    applyBullardB: next.parameters.applyBullardB,
   });
   return next;
 }
@@ -120,7 +124,7 @@ export function upsertAgentPlan(options: {
       rev: (existing.rev || 1) + 1,
       status: "draft",
     };
-    if (detected && detected !== "diurnal" && detected !== "rtp" && detected !== "magnetic") {
+    if (detected && detected !== "diurnal" && detected !== "rtp" && detected !== "magnetic" && detected !== "gravity") {
       draft.steps = intentToSteps(intent, options.userText);
     }
     draft = applyEditorAndChat(draft, options.editorMarkdown, options.userText);

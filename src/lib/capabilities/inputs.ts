@@ -84,5 +84,9 @@ export function catalogInputsPayload(workspaceRoot: string, inputs: BoundInput[]
     checksum: item.checksum,
     size: item.size,
     absPath: path.isAbsolute(item.path) ? item.path : path.join(workspaceRoot, item.path),
+    columnMapping: item.columnMapping,
+    elevationDatum: item.elevationDatum,
+    units: item.units,
+    crs: item.crs,
   }));
 }

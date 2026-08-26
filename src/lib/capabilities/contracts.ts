@@ -36,7 +36,18 @@ export function unsupportedBoundInputs(inputs: BoundInput[], catalog?: ProjectCa
 export function validateCapabilityContracts(options: {
   capabilityIds: string[];
   inputs: BoundInput[];
-  parameters: { inclination?: number; declination?: number; surveyDate?: string; baseReference?: string };
+  parameters: {
+    inclination?: number;
+    declination?: number;
+    surveyDate?: string;
+    baseReference?: string;
+    density?: number;
+    surveyLatitude?: number;
+    elevationDatum?: string;
+    gravityUnits?: string;
+    applyBullardB?: boolean;
+    columnMappingReviewed?: boolean;
+  };
   catalog?: ProjectCatalog | null;
   dag?: CompiledDag | null;
 }): ContractIssue[] {
@@ -48,7 +59,7 @@ export function validateCapabilityContracts(options: {
       issues.push({
         level: "blocker",
         code: "unregistered_capability",
-        message: `${id} is not a registered capability. Gravity, ERT, seismic, GPR, GIS processing, and other packs are not in this release.`,
+        message: `${id} is not a registered capability. ERT, seismic, GPR, GIS processing, and other unregistered packs are not in this release.`,
       });
     }
   }
@@ -59,7 +70,7 @@ export function validateCapabilityContracts(options: {
       level: "blocker",
       code: "unsupported_catalog_input",
       message:
-        "Recognised-unsupported and unknown catalog records cannot bind to a capability. Bind supported MagArrow and GSM-19 records only.",
+        "Recognised-unsupported and unknown catalog records cannot bind to a capability.",
     });
   }
 
@@ -103,6 +114,89 @@ export function validateCapabilityContracts(options: {
       code: "grid_needs_corrected_spatial",
       message: "Gridding needs diurnally corrected MagArrow spatial data. I will not grid raw or unsupported tables.",
     });
+  }
+
+  const gravityInputs = [
+    ...boundSupported(options.inputs, "gravity-xyz"),
+    ...boundSupported(options.inputs, "gravity-csv"),
+  ];
+  const needsGravity = expanded.some((id) => id.startsWith("grav."));
+  if (needsGravity && options.inputs.length && gravityInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_gravity_files",
+      message:
+        "Gravity processing needs a supported gravity-contract catalog record (named X/Y/Gravity plus documented CRS and units). I will not take the first .xyz file.",
+    });
+  }
+
+  if (expanded.includes("grav.bouguer")) {
+    const density = options.parameters.density;
+    if (typeof density !== "number" || !Number.isFinite(density)) {
+      issues.push({
+        level: "blocker",
+        code: "density_required",
+        message: "Bouguer correction needs a user density in g/cm³. I will not assume 2.67.",
+      });
+    }
+  }
+
+  if (expanded.includes("grav.freeair")) {
+    const records = catalogRecordsForInputs(gravityInputs, options.catalog || null);
+    const datum =
+      options.parameters.elevationDatum ||
+      records.find((record) => record.elevationDatum)?.elevationDatum;
+    const hasElevation = records.some(
+      (record) =>
+        Boolean(record.columnMapping?.elevation) ||
+        (record.columns || []).some((col) => /^(elevation|elev|height|z|h)$/i.test(col.trim()))
+    );
+    if (!hasElevation && records.length) {
+      issues.push({
+        level: "blocker",
+        code: "elevation_required",
+        message:
+          "Free-air correction needs an elevation/height column. I will not invent station heights.",
+      });
+    }
+    if (!datum) {
+      issues.push({
+        level: "blocker",
+        code: "elevation_datum_required",
+        message:
+          "Free-air correction needs a documented elevation datum (orthometric or ellipsoidal). I will not assume one.",
+      });
+    }
+    const geographic = records.some((record) => record.crs === "EPSG:4326" || /4326/.test(record.crs || ""));
+    if (!geographic && typeof options.parameters.surveyLatitude !== "number") {
+      const hasLatColumn = records.some((record) => record.columnMapping?.latitude);
+      if (!hasLatColumn) {
+        issues.push({
+          level: "blocker",
+          code: "latitude_required",
+          message:
+            "Somigliana normal gravity needs geodetic latitude. Supply surveyLatitude or a geographic CRS. Easting/northing is not latitude.",
+        });
+      }
+    }
+  }
+
+  if (expanded.includes("grav.ingest") && gravityInputs.some((item) => item.adapterId === "gravity-csv")) {
+    const records = catalogRecordsForInputs(gravityInputs, options.catalog || null);
+    const unreviewed = records.filter((record) => {
+      const mapping = record.columnMapping;
+      if (!mapping || mapping.reviewed || options.parameters.columnMappingReviewed) return false;
+      const canonical = mapping.x === "X" && mapping.y === "Y" && mapping.gObs === "Gravity";
+      return !canonical;
+    });
+    if (unreviewed.length) {
+      issues.push({
+        level: "blocker",
+        code: "mapping_review_required",
+        message:
+          "CSV column names differ from X, Y, Gravity. Confirm a column mapping before Proceed. I will not guess columns.",
+      });
+    }
   }
 
   return issues;

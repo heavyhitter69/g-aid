@@ -71,6 +71,20 @@ export interface PlanInput {
   supportStatus?: SupportStatus;
   adapterId?: string | null;
   formatId?: string;
+  columnMapping?: {
+    x: string;
+    y: string;
+    gObs: string;
+    elevation?: string;
+    stationId?: string;
+    datetime?: string;
+    latitude?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  elevationDatum?: string;
+  units?: string;
+  crs?: string;
 }
 
 export interface AgentPlan {
@@ -90,6 +104,23 @@ export interface AgentPlan {
     inclination?: number;
     declination?: number;
     inputPath?: string;
+    surveyLatitude?: number;
+    elevationDatum?: "orthometric" | "ellipsoidal" | string;
+    gravityUnits?: "mGal" | "m/s2" | string;
+    crsEpsg?: number;
+    applyBullardB?: boolean;
+    gravityMapping?: {
+      x: string;
+      y: string;
+      gObs: string;
+      elevation?: string;
+      stationId?: string;
+      datetime?: string;
+      latitude?: string;
+      reviewed: boolean;
+      reviewedAt?: string;
+    };
+    columnMappingReviewed?: boolean;
   };
   workspaceBrief: string;
   rev?: number;
@@ -185,9 +216,9 @@ export const MAGNETIC_STEP_KEYS = [
   "gis",
 ] as const satisfies readonly StepKey[];
 
+export const GRAVITY_STEP_KEYS = ["gravity", "residual"] as const satisfies readonly StepKey[];
+
 export const UNSUPPORTED_STEP_KEYS = [
-  "gravity",
-  "residual",
   "ert",
   "ertInvert",
   "seismic",
@@ -205,7 +236,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   derivatives: ["fft_derivatives", "euler_deconvolution"],
   lineaments: ["lineament_extractor"],
   gis: ["gis_export", "excel_export_adapter", "report_export_adapter"],
-  gravity: ["xyz_ingest", "gravity_reduce"],
+  gravity: ["gravity_ingest", "gravity_freeair", "gravity_bouguer", "grav_gridder", "grav_gis_export", "grav_interpret"],
   residual: ["regional_residual"],
   ert: ["ert_pseudosection"],
   ertInvert: ["ert_invert"],
@@ -216,6 +247,10 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
 
 export function magneticStepsEnabled(steps: PlanSteps): boolean {
   return MAGNETIC_STEP_KEYS.some((key) => steps[key]);
+}
+
+export function gravityStepsEnabled(steps: PlanSteps): boolean {
+  return GRAVITY_STEP_KEYS.some((key) => steps[key]);
 }
 
 export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
@@ -330,6 +365,10 @@ export function renderImplementationPlan(opts: {
   reviewDecisions?: ReviewDecision[];
   inclination?: number;
   declination?: number;
+  density?: number;
+  surveyLatitude?: number;
+  elevationDatum?: string;
+  applyBullardB?: boolean;
 }): string {
   const target = opts.targetFolder || "(opened folder)";
   const capabilityIds = opts.capabilities?.length
@@ -350,10 +389,20 @@ export function renderImplementationPlan(opts: {
     .slice(-6)
     .map((decision) => `- **${decision.status}** ${decision.capabilityId || ""}: ${decision.reason}`);
   const dagLines = dag.nodes.map((node) => `- \`${node.id}\` ${node.label}`);
+  const magInputs = (opts.inputs || []).some((item) => item.adapterId === "magarrow" || item.adapterId === "gsm19");
+  const gravInputs = (opts.inputs || []).some((item) => item.adapterId === "gravity-xyz" || item.adapterId === "gravity-csv");
+  const mixed = magInputs && gravInputs;
   const field = [
     typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
     typeof opts.declination === "number" ? `Declination: ${opts.declination}°` : "",
+    typeof opts.density === "number" ? `Bouguer density: ${opts.density} g/cm³ (user-confirmed, not assumed)` : "",
+    typeof opts.surveyLatitude === "number" ? `Survey latitude: ${opts.surveyLatitude}° (Somigliana; easting/northing is not latitude)` : "",
+    opts.elevationDatum ? `Elevation datum: ${opts.elevationDatum}` : "",
+    opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
   ].filter(Boolean);
+  const thisRunFallback = gravityStepsEnabled(opts.steps)
+    ? "- Ask for a gravity or magnetic method I can run. ERT, seismic, GPR, and radiometrics are not in this release."
+    : "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP) or a gravity reduction. Other methods are not in this release.";
 
   return `# Implementation Plan
 
@@ -362,10 +411,10 @@ export function renderImplementationPlan(opts: {
 **Products:** \`${products}/\`
 
 ## This run
-${items.join("\n") || "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP). Other methods are not in this release."}
+${items.join("\n") || thisRunFallback}
 
 ## Bound inputs
-${bound.length ? bound.join("\n") : "- No supported catalog records bound. Magnetic work cannot Proceed until MagArrow and GSM-19 catalog IDs are bound."}
+${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19 and/or gravity-contract catalog IDs before Proceed."}
 
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
@@ -375,17 +424,17 @@ ${field.map((line) => `- ${line}`).join("\n")}
 ${dagLines.join("\n") || "- (none)"}
 
 ## Expected artifacts
-${artifacts.length ? [...new Set(artifacts)].join("\n") : "- None until a registered magnetic capability is approved."}
+${artifacts.length ? [...new Set(artifacts)].join("\n") : "- None until a registered capability is approved."}
 
 ## Assumptions and limits
-${limits.length ? [...new Set(limits)].join("\n") : "- Magnetic products only. Other methods are not registered."}
-${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
+${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic and gravity capabilities run."}
+${mixed ? "- Magnetic and gravity products may display together. Joint inversion and combined interpretation are not registered capabilities.\n" : ""}${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
 
 ## Review record
 ${reviews.length ? reviews.join("\n") : "- No review comments recorded yet."}
 
 ## After you click Proceed
-Only this hash-frozen DAG runs, against the bound catalog IDs. A rerun always creates a new run folder. Unrelated magnetic nodes are not registered.
+Only this hash-frozen DAG runs, against the bound catalog IDs. A rerun always creates a new run folder. Unrelated nodes are not registered.
 `;
 }
 
@@ -529,6 +578,28 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const parameters = { ...plan.parameters };
   const notes = [...(plan.notes || [])];
 
+  const ref = parseBaseReference(m);
+  if (ref) parameters.baseReference = ref;
+  const date = raw.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+  if (date) parameters.surveyDate = date[1];
+  const dens = raw.match(/\b(\d(?:\.\d+)?)\s*g\s*\/?\s*c(?:c|m3)\b/i) || raw.match(/\bdensity[:\s=]+(\d(?:\.\d+)?)/i);
+  if (dens) parameters.density = parseFloat(dens[1]);
+  const lat = raw.match(/\bsurvey\s*lat(?:itude)?[:\s=]+(-?\d+(?:\.\d+)?)/i);
+  if (lat) parameters.surveyLatitude = parseFloat(lat[1]);
+  const datum = raw.match(/\belevation\s*datum[:\s=]+(orthometric|ellipsoidal)/i);
+  if (datum) parameters.elevationDatum = datum[1].toLowerCase();
+  if (/\bbullard\s*b\b/i.test(raw) && !/\b(skip|omit|without|no)\b.{0,20}\bbullard/i.test(raw)) {
+    parameters.applyBullardB = true;
+  }
+  if (/\b(mapping (reviewed|confirmed|accepted)|confirm(?:ed)? (?:the )?column mapping)\b/i.test(raw)) {
+    parameters.columnMappingReviewed = true;
+    if (parameters.gravityMapping) parameters.gravityMapping = { ...parameters.gravityMapping, reviewed: true };
+  }
+  const inc = raw.match(/\binclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+  const dec = raw.match(/\bdeclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+  if (inc) parameters.inclination = parseFloat(inc[1]);
+  if (dec) parameters.declination = parseFloat(dec[1]);
+
   const previousSet = new Set(previous);
   const nextSet = new Set(proposed);
 
@@ -553,14 +624,17 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
         id === "mag.rtp" &&
         !nextSet.has("mag.igrf") &&
         !(typeof parameters.inclination === "number" && typeof parameters.declination === "number");
+      const needsDensity = id === "grav.bouguer" && !(typeof parameters.density === "number" && Number.isFinite(parameters.density));
       decisions.push({
         at: now,
         message: raw,
-        status: needsRtpParams ? "needs-data" : "accepted",
+        status: needsRtpParams || needsDensity ? "needs-data" : "accepted",
         capabilityId: id,
         reason: needsRtpParams
           ? "RTP was requested. It needs mag.igrf or explicit inclination/declination before Proceed."
-          : `Accepted ${capability?.title || id}. Only the registry can run it.`,
+          : needsDensity
+            ? "Bouguer correction was requested. Supply a density in g/cm³. I will not assume 2.67."
+            : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
   }
@@ -576,9 +650,7 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
     });
   }
 
-  const ref = parseBaseReference(m);
   if (ref) {
-    parameters.baseReference = ref;
     decisions.push({
       at: now,
       message: raw,
@@ -587,16 +659,6 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
     });
   }
 
-  const date = raw.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
-  if (date) parameters.surveyDate = date[1];
-
-  const dens = raw.match(/\b(\d(?:\.\d+)?)\s*g\s*\/?\s*c(?:c|m3)\b/i);
-  if (dens) parameters.density = parseFloat(dens[1]);
-
-  const inc = raw.match(/\binclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
-  const dec = raw.match(/\bdeclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
-  if (inc) parameters.inclination = parseFloat(inc[1]);
-  if (dec) parameters.declination = parseFloat(dec[1]);
   if (inc && dec) {
     decisions.push({
       at: now,
@@ -608,11 +670,15 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   }
 
   const projected = stepsFromCapabilities(proposed);
-  const steps = cloneSteps({ ...EMPTY_STEPS, ...projected, gravity: plan.steps.gravity, residual: plan.steps.residual, ert: plan.steps.ert, ertInvert: plan.steps.ertInvert, seismic: plan.steps.seismic, radiometrics: plan.steps.radiometrics, gpr: plan.steps.gpr });
-  if (unsupported === "gravity") {
-    steps.gravity = false;
-    steps.residual = false;
-  }
+  const steps = cloneSteps({
+    ...EMPTY_STEPS,
+    ...projected,
+    ert: plan.steps.ert,
+    ertInvert: plan.steps.ertInvert,
+    seismic: plan.steps.seismic,
+    radiometrics: plan.steps.radiometrics,
+    gpr: plan.steps.gpr,
+  });
   if (unsupported === "ert") {
     steps.ert = false;
     steps.ertInvert = false;
@@ -653,8 +719,13 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
     ...projected,
   });
   const notes = [...(plan.notes || [])];
-  if (plan.steps.gravity || plan.steps.ert || plan.steps.seismic || plan.steps.radiometrics || plan.steps.gpr) {
-    notes.push("Unsupported methods stay listed as refused. They are not compiled into the magnetic DAG.");
+  if (plan.steps.ert || plan.steps.seismic || plan.steps.radiometrics || plan.steps.gpr) {
+    notes.push("Unsupported methods stay listed as refused. They are not compiled into the DAG.");
+  }
+  if (magneticStepsEnabled(steps) && gravityStepsEnabled(steps)) {
+    notes.push(
+      "Magnetic and gravity products may display together. Joint inversion and combined interpretation are not registered capabilities."
+    );
   }
   const dag = compileCapabilityDag(capabilities);
   return {
@@ -727,7 +798,7 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
       level: "blocker",
       code: "unsupported_catalog_input",
       message:
-        "Recognised-unsupported and unknown files cannot be processing inputs. Bind supported MagArrow and GSM-19 catalog records only.",
+        "Recognised-unsupported and unknown files cannot be processing inputs. Bind supported MagArrow, GSM-19, or gravity-contract catalog records only.",
     });
   }
   if (magneticStepsEnabled(plan.steps) && inputs.length && inputs.some((item) => !item.catalogId)) {
@@ -797,19 +868,40 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
     });
   }
 
-  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps)) {
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps)) {
     blockers.push({
       level: "blocker",
       code: "unsupported_method",
       message:
-        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics after you click Proceed. Gravity, ERT, seismic, GPR, and radiometrics are not available yet.",
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics or a gravity-contract pack after you click Proceed. ERT, seismic, GPR, and radiometrics are not available yet.",
     });
   } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({
       level: "warning",
       code: "unsupported_method",
-      message: "Extra non-magnetic methods in this plan will not run. Only the magnetic checklist is executed.",
+      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity DAG is executed.",
     });
+  }
+
+  if (gravityStepsEnabled(plan.steps)) {
+    const gravityFiles = inputs.filter(
+      (item) => item.adapterId === "gravity-xyz" || item.adapterId === "gravity-csv" || item.kind === "gravity-xyz" || item.kind === "gravity-csv"
+    );
+    if (catalog && inputs.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_gravity_files",
+        message:
+          "Gravity processing needs a supported gravity-contract catalog record (named X/Y/Gravity plus documented CRS and units). I will not take the first .xyz file.",
+      });
+    } else if (inputs.length && gravityFiles.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_gravity_files",
+        message:
+          "Gravity processing needs a supported gravity-xyz or gravity-csv catalog record. I will not take the first .xyz or .dat file.",
+      });
+    }
   }
 
   const capabilityIds = plan.capabilities?.length

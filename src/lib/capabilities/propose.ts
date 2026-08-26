@@ -13,11 +13,22 @@ const STEP_TO_CAPABILITY: Record<string, UserCapabilityId> = {
   gis: "mag.gis",
 };
 
+const GRAVITY_DEFAULT: UserCapabilityId[] = [
+  "grav.ingest",
+  "grav.freeair",
+  "grav.bouguer",
+  "grav.grid",
+  "grav.gis",
+  "grav.interpret",
+];
+
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
 }
 
 export function stepKeyFromCapability(id: UserCapabilityId): string {
+  if (id === "grav.residual") return "residual";
+  if (id.startsWith("grav.")) return "gravity";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
   return found?.[0] || id;
 }
@@ -29,14 +40,32 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
     const id = STEP_TO_CAPABILITY[key];
     if (id) ids.push(id);
   }
+  if (steps.gravity) {
+    for (const id of GRAVITY_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
+  if (steps.residual) {
+    if (!ids.includes("grav.residual")) ids.push("grav.residual");
+  }
   return ids;
 }
 
 export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   const steps: Record<string, boolean> = {};
   for (const key of Object.keys(STEP_TO_CAPABILITY)) steps[key] = false;
+  steps.gravity = false;
+  steps.residual = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
+    if (id === "grav.residual") {
+      steps.residual = true;
+      continue;
+    }
+    if (id.startsWith("grav.")) {
+      steps.gravity = true;
+      continue;
+    }
     steps[stepKeyFromCapability(id)] = true;
   }
   return steps;
@@ -79,15 +108,26 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
   if (/\bdiurnal\b/.test(m) && !/skip|omit|without|no diurnal/.test(m)) next.add("mag.diurnal");
   if (/\bigrf\b/.test(m) && !/skip|omit|without/.test(m)) next.add("mag.igrf");
 
+  const gravityAsk = /\b(gravity|bouguer|free[\s-]?air|mgal)\b/.test(m);
+  const gravityDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(gravity|bouguer)\b/.test(m);
+  if (gravityAsk && !gravityDeny) {
+    for (const id of GRAVITY_DEFAULT) next.add(id);
+    if (/\bregional\b|\bresidual\b/.test(m)) next.add("grav.residual");
+  }
+  if (/\bresidual gravity\b|\bregional[\s-].*residual/.test(m) && !gravityDeny) {
+    next.add("grav.residual");
+    for (const id of GRAVITY_DEFAULT) next.add(id);
+  }
+
   return USER_CAPABILITY_IDS.filter((id) => next.has(id));
 }
 
 export function unregisteredProposal(message: string): string | undefined {
   const m = message.toLowerCase();
-  if (/\b(gravity|bouguer|free[\s-]?air|mgal)\b/.test(m)) return "gravity";
   if (/\b(ert|resistivity|pseudosection)\b/.test(m)) return "ert";
   if (/\b(seismic|segy|nmo)\b/.test(m)) return "seismic";
   if (/\b(gpr|ground[\s-]?penetrating)\b/.test(m)) return "gpr";
   if (/\bradiometr/.test(m)) return "radiometrics";
+  if (/\bjoint inversion\b/.test(m)) return "joint-inversion";
   return undefined;
 }

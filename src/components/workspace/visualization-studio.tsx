@@ -11,6 +11,7 @@ import {
   compareRunLayers,
   crsFromPrj,
   linesFromVector,
+  mapValueUnits,
   overlayDecision,
   parseGeojson,
   pointsFromVector,
@@ -277,12 +278,7 @@ export function VisualizationStudio() {
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
   ].filter(Boolean);
 
-  const units =
-    active?.formatId === "dem-ascii" || /dem/i.test(active?.path || "")
-      ? "m"
-      : activeCrs?.units === "degrees"
-        ? "degrees"
-        : active?.units || (active?.formatId === "geojson" ? "coordinate" : "nT");
+  const units = mapValueUnits(active?.path || "", active?.formatId, active?.units);
 
   function moveLayer(id: string, dir: -1 | 1) {
     setLayerOrder((current) => {

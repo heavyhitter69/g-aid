@@ -15,6 +15,12 @@ export {
 export { catalogRecordId } from "./ids.ts";
 export { adapterRegistry, getAdapter, supportedAdapterIds } from "./registry.ts";
 export { classifyPeek, isSupportedProcessingRecord } from "./classify.ts";
+export { applyReviewedGravityMapping } from "./gravity-mapping.ts";
+export {
+  GRAVITY_ADAPTER_IDS,
+  inspectGravityText,
+  isGravityAdapterId,
+} from "./gravity-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";
 export {

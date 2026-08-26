@@ -1,6 +1,5 @@
 /**
- * Live scientific capability model. Magnetic operations are the only
- * registered, executable capabilities in this release.
+ * Live scientific capability model. Magnetics and gravity are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -13,6 +12,13 @@ export const USER_CAPABILITY_IDS = [
   "mag.derivatives",
   "mag.lineaments",
   "mag.gis",
+  "grav.ingest",
+  "grav.freeair",
+  "grav.bouguer",
+  "grav.grid",
+  "grav.residual",
+  "grav.gis",
+  "grav.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -28,7 +34,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -46,7 +52,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics";
+  domain: "magnetics" | "gravity";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -62,7 +68,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -91,4 +97,18 @@ export interface BoundInput {
   supportStatus?: string;
   adapterId?: string | null;
   formatId?: string;
+  columnMapping?: {
+    x: string;
+    y: string;
+    gObs: string;
+    elevation?: string;
+    stationId?: string;
+    datetime?: string;
+    latitude?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  elevationDatum?: string;
+  units?: string;
+  crs?: string;
 }

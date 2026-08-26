@@ -51,7 +51,7 @@ export function generateTasksMarkdown(plan: {
   ].filter((line, i, arr) => line !== "" || arr[i - 1] !== "");
 
   if (!dag.nodes.length) {
-    lines.push(`- [ ] No registered magnetic nodes to execute`, ``);
+    lines.push(`- [ ] No registered processing nodes to execute`, ``);
   } else {
     for (const node of dag.nodes) {
       lines.push(`- [ ] ${node.label} ${nodeTag(node.id)}`);

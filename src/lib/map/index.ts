@@ -26,6 +26,7 @@ export {
   buildMapLayers,
   layerSpecFromArtifact,
   layerSpecFromCatalogRecord,
+  mapValueUnits,
   runArtifactsFromPaths,
   runIdFromPath,
   selectLayerById,

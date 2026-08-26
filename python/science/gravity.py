@@ -37,8 +37,10 @@ def free_air_correction(height_m) -> np.ndarray:
     return FREE_AIR_MGAL_PER_M * np.asarray(height_m, float)
 
 
-def bouguer_slab_correction(height_m, density_gcc: float = 2.67) -> np.ndarray:
-    """Simple Bouguer (infinite slab): 2πGρh."""
+def bouguer_slab_correction(height_m, density_gcc: float) -> np.ndarray:
+    """Simple Bouguer (infinite slab): 2πGρh. density_gcc is required."""
+    if density_gcc is None:
+        raise ValueError("Bouguer slab density is required. I will not assume 2.67 g/cm³.")
     return TWO_PI_G_MGAL * float(density_gcc) * np.asarray(height_m, float)
 
 
@@ -55,9 +57,11 @@ def latitude_free_air_bouguer(
     g_obs_mgal,
     lat_deg,
     height_m,
-    density_gcc: float = 2.67,
-    apply_bullard_b: bool = True,
+    density_gcc: float,
+    apply_bullard_b: bool = False,
 ) -> dict[str, np.ndarray]:
+    if density_gcc is None:
+        raise ValueError("Bouguer density is required. I will not assume 2.67 g/cm³.")
     g = np.asarray(g_obs_mgal, float)
     lat = np.asarray(lat_deg, float)
     h = np.asarray(height_m, float)

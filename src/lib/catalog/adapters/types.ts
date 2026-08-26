@@ -34,6 +34,10 @@ export interface CatalogInspection {
   timeRange?: CatalogTimeRange;
   recordCount?: number;
   parseErrors?: string[];
+  supportStatus?: SupportStatus;
+  columnMapping?: CatalogRecord["columnMapping"];
+  elevationDatum?: string;
+  gravityDatum?: string;
 }
 
 export interface AdapterValidation {
