@@ -1,5 +1,6 @@
 import { ScientificArtifact } from './interfaces';
 import { PipelineEngine, PipelineNode, ChildProcessRuntime, NodeResult } from './PipelineEngine';
+import { MAGNETIC_NODE_DEPS, MAGNETIC_NODE_ORDER } from "@/lib/capabilities/compile";
 
 class PythonNode extends PipelineNode {
   scriptPath: string;
@@ -16,73 +17,85 @@ class PythonNode extends PipelineNode {
 
 const SCIENCE = "python/nodes/science_node.py";
 
+const NODE_SCRIPTS: Record<string, string> = {
+  file_discovery: "python/nodes/file_discovery.py",
+  flight_path_cleaner: "python/nodes/flight_path_cleaner.py",
+  time_synchronizer: "python/nodes/time_synchronizer.py",
+  diurnal_corrector: "python/nodes/diurnal_corrector.py",
+  qc_engine: "python/nodes/qc_engine.py",
+  excel_export_adapter: "python/adapters/excel_export_adapter.py",
+  report_export_adapter: "python/adapters/report_export_adapter.py",
+  igrf_corrector: SCIENCE,
+  heading_lag_corrector: SCIENCE,
+  tie_line_leveler: SCIENCE,
+  microleveller: SCIENCE,
+  mag_gridder: SCIENCE,
+  rtp_filter: SCIENCE,
+  fft_derivatives: SCIENCE,
+  lineament_extractor: SCIENCE,
+  euler_deconvolution: SCIENCE,
+  gis_export: SCIENCE,
+};
+
+function remapDeps(nodeId: string, compiled: Set<string>): string[] {
+  const original = MAGNETIC_NODE_DEPS[nodeId] || [];
+  const present = original.filter((dep) => compiled.has(dep));
+  if (present.length) return present;
+  const order = MAGNETIC_NODE_ORDER as unknown as string[];
+  const index = order.indexOf(nodeId);
+  for (let i = index - 1; i >= 0; i--) {
+    if (compiled.has(order[i])) return [order[i]];
+  }
+  return [];
+}
+
 export class MagneticPreprocessingPipeline extends PipelineEngine {
-  constructor() {
+  constructor(nodeIds?: string[]) {
     super();
-
-    this.registerNode(new PythonNode("file_discovery", "python/nodes/file_discovery.py", []));
-    this.registerNode(new PythonNode("flight_path_cleaner", "python/nodes/flight_path_cleaner.py", ["file_discovery"]));
-    this.registerNode(new PythonNode("time_synchronizer", "python/nodes/time_synchronizer.py", ["flight_path_cleaner"]));
-    this.registerNode(new PythonNode("diurnal_corrector", "python/nodes/diurnal_corrector.py", ["time_synchronizer"]));
-    this.registerNode(new PythonNode("qc_engine", "python/nodes/qc_engine.py", ["diurnal_corrector"]));
-    this.registerNode(new PythonNode("excel_export_adapter", "python/adapters/excel_export_adapter.py", ["qc_engine"]));
-    this.registerNode(new PythonNode("report_export_adapter", "python/adapters/report_export_adapter.py", ["qc_engine"]));
-
-    this.registerNode(new PythonNode("igrf_corrector", SCIENCE, ["diurnal_corrector"]));
-    this.registerNode(new PythonNode("heading_lag_corrector", SCIENCE, ["igrf_corrector"]));
-    this.registerNode(new PythonNode("tie_line_leveler", SCIENCE, ["heading_lag_corrector"]));
-    this.registerNode(new PythonNode("microleveller", SCIENCE, ["tie_line_leveler"]));
-    this.registerNode(new PythonNode("mag_gridder", SCIENCE, ["microleveller"]));
-    this.registerNode(new PythonNode("rtp_filter", SCIENCE, ["mag_gridder"]));
-    this.registerNode(new PythonNode("fft_derivatives", SCIENCE, ["rtp_filter"]));
-    this.registerNode(new PythonNode("lineament_extractor", SCIENCE, ["fft_derivatives"]));
-    this.registerNode(new PythonNode("euler_deconvolution", SCIENCE, ["fft_derivatives"]));
-    this.registerNode(new PythonNode("gis_export", SCIENCE, ["fft_derivatives"]));
+    // Live path must pass compiled DAG node ids. An empty list registers nothing.
+    const requested = nodeIds?.length ? nodeIds : [];
+    const compiled = new Set(requested);
+    for (const id of MAGNETIC_NODE_ORDER) {
+      if (!compiled.has(id)) continue;
+      const script = NODE_SCRIPTS[id];
+      if (!script) continue;
+      this.registerNode(new PythonNode(id, script, remapDeps(id, compiled)));
+    }
   }
 }
 
 export class GravityPipeline extends PipelineEngine {
   constructor() {
     super();
-    this.registerNode(new PythonNode("xyz_ingest", SCIENCE, []));
-    this.registerNode(new PythonNode("gravity_reduce", SCIENCE, ["xyz_ingest"]));
-    this.registerNode(new PythonNode("regional_residual", SCIENCE, ["gravity_reduce"]));
-    this.registerNode(new PythonNode("gis_export", SCIENCE, ["regional_residual"]));
   }
 }
 
 export class ResistivityPipeline extends PipelineEngine {
   constructor() {
     super();
-    this.registerNode(new PythonNode("ert_pseudosection", SCIENCE, []));
-    this.registerNode(new PythonNode("ert_invert", SCIENCE, ["ert_pseudosection"]));
   }
 }
 
 export class SeismicPipeline extends PipelineEngine {
   constructor() {
     super();
-    this.registerNode(new PythonNode("seismic_process", SCIENCE, []));
   }
 }
 
 export class GprPipeline extends PipelineEngine {
   constructor() {
     super();
-    this.registerNode(new PythonNode("gpr_process", SCIENCE, []));
   }
 }
 
 export class RadiometricPipeline extends PipelineEngine {
   constructor() {
     super();
-    this.registerNode(new PythonNode("radiometric_correct", SCIENCE, []));
   }
 }
 
 export class WellLogPipeline extends PipelineEngine {
   constructor() {
     super();
-    this.registerNode(new PythonNode("las_ingest", SCIENCE, []));
   }
 }

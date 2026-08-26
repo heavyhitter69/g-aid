@@ -3,6 +3,7 @@ import { streamPlanDecision } from "../execute-plan";
 import { syncPendingFromEditor } from "../orchestrate/agent-plan";
 import { getPendingPlan } from "../orchestrate/implementation-plan";
 import { validatePlan } from "@/lib/plan-spec";
+import { loadProjectCatalog } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (decision === "approve") {
     const pending = syncPendingFromEditor(sessionId, implementationPlanContent) || getPendingPlan(sessionId, root);
     if (pending) {
-      const check = validatePlan(pending);
+      const check = validatePlan(pending, loadProjectCatalog(pending.workspaceRoot));
       if (!check.ok) {
         return streamMessage(
           `I can't start yet. ${check.blockers.map((issue) => issue.message).join(" ")} Edit the plan or tell me what to change.`,

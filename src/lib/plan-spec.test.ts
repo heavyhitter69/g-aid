@@ -102,14 +102,17 @@ test("only diurnal patch disables later mag products", () => {
   assert.equal(patched.steps.grid, false);
 });
 
-test("scientist restores IGRF when RTP is requested without it", () => {
+test("RTP without IGRF or field parameters is a Proceed blocker, not a silent repair", () => {
   const next = normalizePlan(
     plan({
       steps: { ...EMPTY_STEPS, diurnal: true, rtp: true, grid: true },
     })
   );
-  assert.equal(next.steps.igrf, true);
-  assert.ok((next.notes || []).some((note) => /IGRF/i.test(note)));
+  assert.equal(next.steps.igrf, false);
+  assert.equal((next.notes || []).some((note) => /restor/i.test(note)), false);
+  const check = validatePlan(next);
+  assert.equal(check.ok, false);
+  assert.equal(check.blockers.some((issue) => issue.code === "rtp_needs_field_params"), true);
 });
 
 test("Proceed is blocked when This run is empty", () => {

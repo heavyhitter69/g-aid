@@ -98,13 +98,26 @@ export function allocateApprovedRun(plan: AgentPlan): AgentPlan {
   };
 }
 
-export function hashPlan(plan: Pick<AgentPlan, "steps" | "parameters" | "targetFolder" | "intent" | "workspaceRoot">): string {
+export function planHashMatches(
+  plan: Pick<AgentPlan, "steps" | "parameters" | "targetFolder" | "intent" | "workspaceRoot" | "capabilities" | "inputs" | "dag" | "planHash">
+): boolean {
+  return Boolean(plan.planHash) && plan.planHash === hashPlan(plan);
+}
+
+export function hashPlan(plan: Pick<AgentPlan, "steps" | "parameters" | "targetFolder" | "intent" | "workspaceRoot" | "capabilities" | "inputs" | "dag">): string {
   const canonical = JSON.stringify({
     intent: plan.intent,
     steps: plan.steps,
     parameters: plan.parameters,
     targetFolder: plan.targetFolder,
     workspaceRoot: plan.workspaceRoot,
+    capabilities: plan.capabilities || [],
+    inputs: (plan.inputs || []).map((item) => ({
+      catalogId: item.catalogId,
+      path: item.path,
+      checksum: item.checksum,
+    })),
+    dag: (plan.dag?.nodes || []).map((node) => node.id),
   });
   return createHash("sha256").update(canonical).digest("hex");
 }

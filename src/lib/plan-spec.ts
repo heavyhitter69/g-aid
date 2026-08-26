@@ -6,6 +6,19 @@
 import type { AnalysisIntent } from "@/lib/workspace-index";
 import type { ProjectCatalog, SupportStatus } from "./catalog/types.ts";
 import { findRecord, recordsInTarget } from "./catalog/summarize.ts";
+import {
+  compileCapabilityDag,
+  capabilitiesFromSteps,
+  getCapability,
+  isRegisteredCapability,
+  proposeCapabilitiesFromMessage,
+  stepsFromCapabilities,
+  unregisteredProposal,
+  validateCapabilityContracts,
+  type CompiledDag,
+  type ReviewDecision,
+  type UserCapabilityId,
+} from "./capabilities/index.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -88,6 +101,9 @@ export interface AgentPlan {
   approvedAt?: string;
   inputs?: PlanInput[];
   lineage?: { products?: string[] };
+  capabilities?: UserCapabilityId[];
+  dag?: CompiledDag;
+  reviewDecisions?: ReviewDecision[];
 }
 
 export interface PlanIssue {
@@ -207,18 +223,8 @@ export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
 }
 
 export function registeredNodesForSteps(steps: PlanSteps): string[] {
-  const registered = new Set<string>(REGISTERED_MAG_NODE_IDS);
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (const key of MAGNETIC_STEP_KEYS) {
-    if (!steps[key]) continue;
-    for (const id of STEP_NODE_IDS[key]) {
-      if (!registered.has(id) || seen.has(id)) continue;
-      seen.add(id);
-      ids.push(id);
-    }
-  }
-  return ids;
+  const ids = capabilitiesFromSteps(steps as unknown as Record<string, boolean>);
+  return compileCapabilityDag(ids).nodes.map((node) => node.id);
 }
 
 const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
@@ -318,11 +324,37 @@ export function renderImplementationPlan(opts: {
   steps: PlanSteps;
   baseReference: string;
   notes?: string[];
+  capabilities?: UserCapabilityId[];
+  inputs?: PlanInput[];
+  dag?: CompiledDag;
+  reviewDecisions?: ReviewDecision[];
+  inclination?: number;
+  declination?: number;
 }): string {
   const target = opts.targetFolder || "(opened folder)";
+  const capabilityIds = opts.capabilities?.length
+    ? opts.capabilities
+    : capabilitiesFromSteps(opts.steps as unknown as Record<string, boolean>);
+  const dag = opts.dag || compileCapabilityDag(capabilityIds);
   const items = workItems(opts.steps, target, opts.baseReference);
   const products = opts.productsRel || `G-AID Output/${opts.taskFolder}`;
   const notes = (opts.notes || []).filter(Boolean);
+  const bound = (opts.inputs || []).map((item) => `- \`${item.catalogId}\` ${item.path} (${item.adapterId || item.kind || "bound"})`);
+  const artifacts = dag.requestedCapabilityIds.flatMap((id) =>
+    (getCapability(id)?.expectedArtifacts || []).map((name) => `- ${name}`)
+  );
+  const limits = dag.requestedCapabilityIds.flatMap((id) =>
+    (getCapability(id)?.interpretationLimits || []).map((line) => `- ${line}`)
+  );
+  const reviews = (opts.reviewDecisions || [])
+    .slice(-6)
+    .map((decision) => `- **${decision.status}** ${decision.capabilityId || ""}: ${decision.reason}`);
+  const dagLines = dag.nodes.map((node) => `- \`${node.id}\` ${node.label}`);
+  const field = [
+    typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
+    typeof opts.declination === "number" ? `Declination: ${opts.declination}°` : "",
+  ].filter(Boolean);
+
   return `# Implementation Plan
 
 **Survey:** ${opts.projectName}
@@ -332,14 +364,28 @@ export function renderImplementationPlan(opts: {
 ## This run
 ${items.join("\n") || "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP). Other methods are not in this release."}
 
+## Bound inputs
+${bound.length ? bound.join("\n") : "- No supported catalog records bound. Magnetic work cannot Proceed until MagArrow and GSM-19 catalog IDs are bound."}
+
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
+${field.map((line) => `- ${line}`).join("\n")}
 
-## Risks and limits
-${notes.length ? notes.map((note) => `- ${note}`).join("\n") : "- None flagged before Proceed."}
+## Compiled DAG
+${dagLines.join("\n") || "- (none)"}
+
+## Expected artifacts
+${artifacts.length ? [...new Set(artifacts)].join("\n") : "- None until a registered magnetic capability is approved."}
+
+## Assumptions and limits
+${limits.length ? [...new Set(limits)].join("\n") : "- Magnetic products only. Other methods are not registered."}
+${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
+
+## Review record
+${reviews.length ? reviews.join("\n") : "- No review comments recorded yet."}
 
 ## After you click Proceed
-Products, the frozen plan, tasks, and logs are written under \`${products}/\`. A rerun always creates a new run folder. Edits in this file are what G-AID will run.
+Only this hash-frozen DAG runs, against the bound catalog IDs. A rerun always creates a new run folder. Unrelated magnetic nodes are not registered.
 `;
 }
 
@@ -436,6 +482,10 @@ export function mergePlanMarkdown(plan: AgentPlan, markdown: string): AgentPlan 
     next.parameters.density = parsed.density;
   }
   next.notes = uniqueNotes(notes);
+  if (parsed.thisRunFound && anyStepEnabled(next.steps)) {
+    next.capabilities = capabilitiesFromSteps(next.steps as unknown as Record<string, boolean>);
+    next.dag = compileCapabilityDag(next.capabilities);
+  }
   return next;
 }
 
@@ -465,92 +515,77 @@ function grant(re: RegExp, message: string): boolean {
 
 /**
  * Patch an existing plan from chat / Review text.
- * Does not rebuild a full magnetic suite unless the user clearly asked for one.
+ * Proposals are recorded; only registered capabilities can be enabled.
  */
 export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const raw = stripReviewPrefix(message);
   const m = raw.toLowerCase();
-  const steps = cloneSteps(plan.steps);
+  const previous = plan.capabilities?.length
+    ? plan.capabilities
+    : capabilitiesFromSteps(plan.steps as unknown as Record<string, boolean>);
+  const proposed = proposeCapabilitiesFromMessage(raw, previous);
+  const decisions: ReviewDecision[] = [...(plan.reviewDecisions || [])];
+  const now = new Date().toISOString();
   const parameters = { ...plan.parameters };
   const notes = [...(plan.notes || [])];
-  let targetFolder = plan.targetFolder;
 
-  const onlyDiurnal = /\b(only|just)\s+diurnal\b|\bdiurnal\s+only\b/.test(m);
-  if (onlyDiurnal) {
-    steps.diurnal = true;
-    steps.igrf = false;
-    steps.headingLag = false;
-    steps.level = false;
-    steps.grid = false;
-    steps.rtp = false;
-    steps.derivatives = false;
-    steps.lineaments = false;
-    steps.gis = false;
+  const previousSet = new Set(previous);
+  const nextSet = new Set(proposed);
+
+  for (const id of previous) {
+    if (!nextSet.has(id)) {
+      const capability = getCapability(id);
+      decisions.push({
+        at: now,
+        message: raw,
+        status: "refused",
+        capabilityId: id,
+        reason: capability
+          ? `Removed ${capability.title} from this run. ${capability.scientificConstraints[0] || ""}`.trim()
+          : `Refused ${id}.`,
+      });
+    }
   }
-
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(rtp|reduction to (the )?pole)\b|\b(rtp|reduction to (the )?pole)\s+(off|out)\b/, m)) {
-    steps.rtp = false;
-  } else if (grant(/\b(also|include|add|enable|keep|with|plus)\b.{0,24}\b(rtp|reduction to (the )?pole)\b/, m) || /\bdo rtp\b/.test(m)) {
-    steps.rtp = true;
-    steps.grid = true;
-  }
-
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(igrf|main field)\b/, m)) {
-    steps.igrf = false;
-  } else if (grant(/\b(also|include|add|enable|keep|with|plus)\b.{0,24}\bigrf\b/, m)) {
-    steps.igrf = true;
-  }
-
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(levell?ing|tie[ -]?lines?|microlevell?ing)\b/, m)) {
-    steps.level = false;
-  } else if (grant(/\b(also|include|add|enable|keep|with|plus)\b.{0,24}\b(levell?ing|tie[ -]?lines?)\b/, m)) {
-    steps.level = true;
-  }
-
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(heading|lag)\b/, m)) {
-    steps.headingLag = false;
-  }
-
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(grid(?:ding)?)\b/, m)) {
-    steps.grid = false;
-    steps.rtp = false;
-    steps.derivatives = false;
-    steps.lineaments = false;
-    steps.gis = false;
-  } else if (grant(/\b(also|include|add|enable|keep|with|plus)\b.{0,24}\bgrid/, m)) {
-    steps.grid = true;
+  for (const id of proposed) {
+    if (!previousSet.has(id) && isRegisteredCapability(id)) {
+      const capability = getCapability(id);
+      const needsRtpParams =
+        id === "mag.rtp" &&
+        !nextSet.has("mag.igrf") &&
+        !(typeof parameters.inclination === "number" && typeof parameters.declination === "number");
+      decisions.push({
+        at: now,
+        message: raw,
+        status: needsRtpParams ? "needs-data" : "accepted",
+        capabilityId: id,
+        reason: needsRtpParams
+          ? "RTP was requested. It needs mag.igrf or explicit inclination/declination before Proceed."
+          : `Accepted ${capability?.title || id}. Only the registry can run it.`,
+      });
+    }
   }
 
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(derivative|magmap|analytic signal|lineament)\b/, m)) {
-    steps.derivatives = false;
-    steps.lineaments = false;
-  }
-
-  if (deny(/\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(diurnal)\b/, m) && !onlyDiurnal) {
-    steps.diurnal = false;
-  }
-
-  if (/\b(also|include|add|enable|keep|with|plus)\b.{0,24}\b(gravity|bouguer)\b/.test(m) || /\bbouguer\b/.test(m) && /\b(also|add|include)\b/.test(m)) {
-    steps.gravity = true;
-    steps.residual = true;
-    steps.gis = true;
-  }
-  if (deny(/\b(skip|omit|without|exclude|disable|no)\b.{0,40}\b(gravity|bouguer)\b/, m)) {
-    steps.gravity = false;
-    steps.residual = false;
-  }
-
-  if (/\b(also|include|add|enable|keep|with|plus)\b.{0,24}\b(ert|resistivity|pseudosection)\b/.test(m)) {
-    steps.ert = true;
-    if (/\binvert/.test(m)) steps.ertInvert = true;
-  }
-  if (/\bpseudosection only\b/.test(m)) {
-    steps.ert = true;
-    steps.ertInvert = false;
+  const unsupported = unregisteredProposal(raw);
+  if (unsupported) {
+    decisions.push({
+      at: now,
+      message: raw,
+      status: "refused",
+      capabilityId: unsupported,
+      reason: `${unsupported} is not a registered capability in this release. I will not enable it or silently substitute magnetics.`,
+    });
   }
 
   const ref = parseBaseReference(m);
-  if (ref) parameters.baseReference = ref;
+  if (ref) {
+    parameters.baseReference = ref;
+    decisions.push({
+      at: now,
+      message: raw,
+      status: "accepted",
+      reason: `Base reference set to ${ref}.`,
+    });
+  }
 
   const date = raw.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (date) parameters.surveyDate = date[1];
@@ -558,51 +593,77 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const dens = raw.match(/\b(\d(?:\.\d+)?)\s*g\s*\/?\s*c(?:c|m3)\b/i);
   if (dens) parameters.density = parseFloat(dens[1]);
 
+  const inc = raw.match(/\binclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+  const dec = raw.match(/\bdeclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
+  if (inc) parameters.inclination = parseFloat(inc[1]);
+  if (dec) parameters.declination = parseFloat(dec[1]);
+  if (inc && dec) {
+    decisions.push({
+      at: now,
+      message: raw,
+      status: "accepted",
+      capabilityId: "mag.rtp",
+      reason: `Documented field parameters I=${parameters.inclination}°, D=${parameters.declination}° accepted as the RTP fallback.`,
+    });
+  }
+
+  const projected = stepsFromCapabilities(proposed);
+  const steps = cloneSteps({ ...EMPTY_STEPS, ...projected, gravity: plan.steps.gravity, residual: plan.steps.residual, ert: plan.steps.ert, ertInvert: plan.steps.ertInvert, seismic: plan.steps.seismic, radiometrics: plan.steps.radiometrics, gpr: plan.steps.gpr });
+  if (unsupported === "gravity") {
+    steps.gravity = false;
+    steps.residual = false;
+  }
+  if (unsupported === "ert") {
+    steps.ert = false;
+    steps.ertInvert = false;
+  }
+
+  const dag = compileCapabilityDag(proposed);
   return {
     ...plan,
     steps,
     parameters,
-    targetFolder,
+    targetFolder: plan.targetFolder,
+    capabilities: proposed,
+    dag,
+    reviewDecisions: uniqueDecisions(decisions),
     notes: uniqueNotes(notes),
   };
 }
 
+function uniqueDecisions(decisions: ReviewDecision[]): ReviewDecision[] {
+  const seen = new Set<string>();
+  const out: ReviewDecision[] = [];
+  for (const decision of decisions) {
+    const key = `${decision.status}|${decision.capabilityId || ""}|${decision.reason}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(decision);
+  }
+  return out;
+}
+
 export function normalizePlan(plan: AgentPlan): AgentPlan {
-  const steps = cloneSteps(plan.steps);
+  const capabilities = plan.capabilities?.length
+    ? plan.capabilities.filter(isRegisteredCapability)
+    : capabilitiesFromSteps(plan.steps as unknown as Record<string, boolean>);
+  const projected = stepsFromCapabilities(capabilities);
+  const steps = cloneSteps({
+    ...plan.steps,
+    ...projected,
+  });
   const notes = [...(plan.notes || [])];
-  const mag = steps.diurnal || steps.igrf || steps.headingLag || steps.level || steps.grid || steps.rtp || steps.derivatives;
-
-  if (steps.rtp && !steps.grid) {
-    steps.grid = true;
-    notes.push("RTP needs a grid, so I kept minimum-curvature gridding.");
+  if (plan.steps.gravity || plan.steps.ert || plan.steps.seismic || plan.steps.radiometrics || plan.steps.gpr) {
+    notes.push("Unsupported methods stay listed as refused. They are not compiled into the magnetic DAG.");
   }
-  if (steps.rtp && !steps.igrf) {
-    steps.igrf = true;
-    notes.push("RTP on uncorrected TMI is not standard; I kept IGRF removal.");
-  }
-  if ((steps.igrf || steps.rtp || steps.grid || steps.headingLag || steps.level) && !steps.diurnal) {
-    steps.diurnal = true;
-    notes.push("Later magnetic products need a diurnally corrected TMI, so I kept the diurnal correction.");
-  }
-  if (steps.derivatives && !steps.grid) {
-    steps.grid = true;
-    notes.push("MAGMAP products need a grid, so I kept gridding.");
-  }
-  if (steps.lineaments && !steps.derivatives) {
-    steps.derivatives = true;
-    notes.push("Lineaments are picked from derivative maps, so I kept MAGMAP.");
-  }
-  if (steps.gis && mag && !steps.grid) {
-    steps.grid = true;
-  }
-  if (steps.ertInvert && !steps.ert) {
-    steps.ert = true;
-  }
-  if (steps.residual && !steps.gravity) {
-    steps.gravity = true;
-  }
-
-  return { ...plan, steps, notes: uniqueNotes(notes) };
+  const dag = compileCapabilityDag(capabilities);
+  return {
+    ...plan,
+    capabilities,
+    dag,
+    steps,
+    notes: uniqueNotes(notes),
+  };
 }
 
 function countFromBrief(brief: string, label: string): number | null {
@@ -676,6 +737,13 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
       message: "Magnetic plans must bind catalog record IDs, not raw file paths or extension searches.",
     });
   }
+  if (catalog && magneticStepsEnabled(plan.steps) && inputs.length === 0) {
+    blockers.push({
+      level: "blocker",
+      code: "missing_catalog_id",
+      message: "Magnetic plans must bind catalog record IDs from the project catalog. I will not search the folder by extension.",
+    });
+  }
   if (catalog && inputs.length) {
     for (const item of inputs) {
       if (!item.catalogId) continue;
@@ -742,6 +810,24 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
       code: "unsupported_method",
       message: "Extra non-magnetic methods in this plan will not run. Only the magnetic checklist is executed.",
     });
+  }
+
+  const capabilityIds = plan.capabilities?.length
+    ? plan.capabilities
+    : capabilitiesFromSteps(plan.steps as unknown as Record<string, boolean>);
+  const contractIssues = validateCapabilityContracts({
+    capabilityIds,
+    inputs: plan.inputs || [],
+    parameters: plan.parameters,
+    catalog,
+    dag: plan.dag,
+  });
+  for (const issue of contractIssues) {
+    const already = [...blockers, ...warnings].some((item) => item.code === issue.code);
+    if (already) continue;
+    if (issue.level === "blocker") blockers.push({ level: "blocker", code: issue.code, message: issue.message });
+    else if (issue.level === "warning") warnings.push({ level: "warning", code: issue.code, message: issue.message });
+    else notes.push({ level: "note", code: issue.code, message: issue.message });
   }
 
   return {

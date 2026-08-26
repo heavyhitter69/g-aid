@@ -26,6 +26,7 @@ import {
   workItems,
 } from "@/lib/plan-spec";
 import { collectPlanInputs, inferIntentFromFiles, intentToSteps } from "@/lib/plan-intent";
+import { capabilitiesFromSteps, compileCapabilityDag } from "@/lib/capabilities";
 
 export { intentToSteps };
 
@@ -47,6 +48,10 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     rev: plan.rev ?? 1,
     notes,
   };
+  next.capabilities = next.capabilities?.length
+    ? next.capabilities
+    : capabilitiesFromSteps(next.steps as unknown as Record<string, boolean>);
+  next.dag = next.dag?.nodes?.length ? next.dag : compileCapabilityDag(next.capabilities);
   next.plan = renderImplementationPlan({
     projectName,
     targetFolder: next.targetFolder,
@@ -55,6 +60,12 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     steps: next.steps,
     baseReference: next.parameters.baseReference,
     notes: next.notes,
+    capabilities: next.capabilities,
+    inputs: next.inputs,
+    dag: next.dag,
+    reviewDecisions: next.reviewDecisions,
+    inclination: next.parameters.inclination,
+    declination: next.parameters.declination,
   });
   return next;
 }

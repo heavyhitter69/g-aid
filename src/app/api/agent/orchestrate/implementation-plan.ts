@@ -1,11 +1,12 @@
 import fs from "fs";
 import path from "path";
 import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
-import { EMPTY_STEPS, MAGNETIC_STEP_KEYS, REGISTERED_MAG_NODE_IDS, STEP_NODE_IDS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
+import { EMPTY_STEPS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
 import { pendingPlansPath } from "@/lib/run-layout";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
+import { generateTasksMarkdown } from "@/lib/capabilities/tasks";
 
-export { EMPTY_STEPS, type AgentPlan, type PlanSteps, checkNodeInTasks };
+export { EMPTY_STEPS, type AgentPlan, type PlanSteps, checkNodeInTasks, generateTasksMarkdown };
 
 const globalAny = global as any;
 if (!globalAny.PENDING_APPROVAL) {
@@ -132,106 +133,6 @@ function nextTaskFolder(outputDir: string): string {
   return `task ${next}`;
 }
 
-const generateTasksMarkdown = (plan: {
-  projectName: string;
-  taskFolder: string;
-  productsRel?: string;
-  targetFolder?: string;
-  steps: PlanSteps;
-  parameters?: { baseReference?: string };
-  runId?: string;
-}): string => {
-  const target = plan.targetFolder || plan.projectName;
-  const registered = new Set<string>(REGISTERED_MAG_NODE_IDS);
-  const nodeTag = (ids: string[]): string =>
-    ids
-      .filter((id) => registered.has(id))
-      .map((id) => `<!-- node:${id} -->`)
-      .join(" ");
-
-  const lines = [
-    `# Tasks`,
-    ``,
-    `**Project:** ${plan.projectName}`,
-    `**Target:** ${target}`,
-    `**Products:** \`${plan.productsRel || `${GAID_OUTPUT_DIR}/runs/${plan.taskFolder}`}/\``,
-    plan.runId ? `**Run:** \`${plan.runId}\`` : "",
-    plan.parameters?.baseReference ? `**Base reference:** \`${plan.parameters.baseReference}\`` : "",
-    ``,
-    `This file is the working checklist. Items are checked off as G-AID finishes each registered step.`,
-    ``,
-    `## Tasks`,
-    ``,
-  ].filter((line, i, arr) => line !== "" || arr[i - 1] !== "");
-
-  if (plan.steps.diurnal) {
-    lines.push(
-      `- [ ] Phase 1: Data Discovery ${nodeTag(STEP_NODE_IDS.diurnal.slice(0, 1))}`,
-      `  - [ ] Scan ${target} for MagArrow and GSM-19 files`,
-      `  - [ ] Classify airborne vs base station data`,
-      `  - [ ] Generate canonical CSV outputs`,
-      ``,
-      `- [ ] Phase 2: Flight Path Cleaning ${nodeTag(["flight_path_cleaner"])}`,
-      `  - [ ] Filter spurious readings`,
-      `  - [ ] Apply altitude thresholds`,
-      `  - [ ] Remove noise outliers`,
-      ``,
-      `- [ ] Phase 3: Time Synchronization ${nodeTag(["time_synchronizer"])}`,
-      `  - [ ] Align timestamps`,
-      `  - [ ] Interpolate base readings`,
-      `  - [ ] Validate temporal alignment`,
-      ``,
-      `- [ ] Phase 4: Diurnal Correction ${nodeTag(["diurnal_corrector"])}`,
-      `  - [ ] Compute reference value`,
-      `  - [ ] Apply correction formula`,
-      `  - [ ] Generate corrected dataset`,
-      ``,
-      `- [ ] Phase 5: Quality Control ${nodeTag(["qc_engine", "excel_export_adapter", "report_export_adapter"])}`,
-      `  - [ ] Statistical validation`,
-      `  - [ ] Generate QC report`,
-      `  - [ ] Export maps and tables`,
-      ``
-    );
-  }
-
-  if (plan.steps.igrf) lines.push(`- [ ] IGRF removal ${nodeTag(STEP_NODE_IDS.igrf)}`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
-  if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction ${nodeTag(STEP_NODE_IDS.headingLag)}`, ``);
-  if (plan.steps.level) {
-    lines.push(
-      `- [ ] Tie-line levelling ${nodeTag(STEP_NODE_IDS.level)}`,
-      `  - [ ] Classify traverse vs tie`,
-      `  - [ ] Hold ties, shift traverses`,
-      ``
-    );
-  }
-  if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding ${nodeTag(STEP_NODE_IDS.grid)}`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
-  if (plan.steps.rtp) lines.push(`- [ ] RTP ${nodeTag(STEP_NODE_IDS.rtp)}`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
-  if (plan.steps.derivatives) {
-    lines.push(
-      `- [ ] MAGMAP ${nodeTag(["fft_derivatives"])}`,
-      `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`,
-      `- [ ] Euler deconvolution ${nodeTag(["euler_deconvolution"])}`,
-      ``
-    );
-  }
-  if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction ${nodeTag(STEP_NODE_IDS.lineaments)}`, ``);
-  if (plan.steps.gis) lines.push(`- [ ] GIS export ${nodeTag(["gis_export"])}`, ``);
-
-  const magAsked = MAGNETIC_STEP_KEYS.some((key) => plan.steps[key]);
-  if (!magAsked) {
-    lines.push(`- [ ] No registered magnetic nodes to execute`, ``);
-  }
-
-  lines.push(
-    `- [ ] Write products to ${GAID_OUTPUT_DIR}/runs <!-- node:write_products -->`,
-    ``,
-    `---`,
-    ``,
-    `*Execution started: ${new Date().toISOString()}*`
-  );
-  return lines.join("\n");
-};
-
 /** Check a top-level task and its nested items. */
 const checkPhaseInTasks = (content: string, phaseHeading: string): string => {
   const lines = content.split("\n");
@@ -272,4 +173,4 @@ const updateTaskProgress = (tasksPath: string, completedPhase: string, status: "
 };
 
 // Export for external use
-export { generateImplementationPlan, generateTasksMarkdown, updateTaskProgress, checkPhaseInTasks, PENDING_APPROVAL, nextTaskFolder };
+export { generateImplementationPlan, updateTaskProgress, checkPhaseInTasks, PENDING_APPROVAL, nextTaskFolder };

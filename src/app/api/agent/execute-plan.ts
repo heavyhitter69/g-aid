@@ -3,17 +3,22 @@ import path from "path";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
 import { workStepFromEvent } from "@/lib/work-steps";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
-import { magneticStepsEnabled } from "@/lib/plan-spec";
+import { magneticStepsEnabled, validatePlan } from "@/lib/plan-spec";
 import {
   allocateApprovedRun,
   appendRunLog,
   checksumPlanInputs,
   hashPlan,
+  planHashMatches,
   RUN_PLAN_MD,
   RUN_TASKS_MD,
   writeFrozenPlanJson,
   writeRunFile,
 } from "@/lib/run-layout";
+import { loadProjectCatalog } from "@/lib/catalog";
+import { compiledNodeIds } from "@/lib/capabilities/compile";
+import { catalogInputsPayload, verifyBoundInputIdentity } from "@/lib/capabilities/inputs";
+import { dagForPlan } from "@/lib/capabilities";
 import {
   generateTasksMarkdown,
   getPendingPlan,
@@ -142,7 +147,13 @@ async function runDiurnalPipeline(
   tasksContent: { current: string }
 ): Promise<{ files: ProjectFileUpdate[]; ok: boolean }> {
   const { MagneticPreprocessingPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
-  const pipeline = new MagneticPreprocessingPipeline();
+  const dag = dagForPlan(pending);
+  const nodeIds = compiledNodeIds(dag);
+  if (!nodeIds.length) {
+    enqueue("- ❌ **No compiled magnetic nodes.** Unregistered methods are not executed.\n");
+    return { files: [], ok: false };
+  }
+  const pipeline = new MagneticPreprocessingPipeline(nodeIds);
   const pipelineParams = {
     projectName: pending.projectName,
     targetFolder: pending.targetFolder || "",
@@ -156,6 +167,12 @@ async function runDiurnalPipeline(
     declination: pending.parameters.declination,
     inputPath: pending.parameters.inputPath,
     steps: pending.steps,
+    runId: pending.runId,
+    parentRunId: pending.parentRunId,
+    planHash: pending.planHash,
+    capabilities: pending.capabilities,
+    dagNodeIds: nodeIds,
+    catalogInputs: catalogInputsPayload(pending.workspaceRoot, pending.inputs || []),
   };
 
   const checked = new Set<string>();
@@ -199,15 +216,21 @@ async function runDiurnalPipeline(
 }
 
 function freezeApprovedPlan(pending: AgentPlan): AgentPlan {
-  const allocated = allocateApprovedRun(pending);
+  const dag = dagForPlan(pending);
+  const withDag: AgentPlan = {
+    ...pending,
+    dag,
+    capabilities: dag.requestedCapabilityIds,
+  };
+  const allocated = allocateApprovedRun(withDag);
   const approvedAt = new Date().toISOString();
   const withHash: AgentPlan = {
     ...allocated,
     status: "approved",
     approvedAt,
-    planHash: hashPlan(allocated),
     inputs: checksumPlanInputs(allocated),
   };
+  withHash.planHash = hashPlan(withHash);
   fs.mkdirSync(path.join(withHash.outputDir, withHash.taskFolder), { recursive: true });
   persistRunDocs(withHash, generateTasksMarkdown(withHash));
   return withHash;
@@ -241,7 +264,46 @@ export function streamPlanDecision(
           return;
         }
 
+        const catalog = loadProjectCatalog(pending.workspaceRoot);
+        const check = validatePlan(pending, catalog);
+        if (!check.ok) {
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
+          enqueue(
+            `I can't start yet. ${check.blockers.map((issue) => issue.message).join(" ")} Edit the plan or tell me what to change.`
+          );
+          enqueue(`\n\x02${JSON.stringify({
+            type: "execution_failed",
+            awaitingApproval: true,
+            taskFolder: pending.taskFolder,
+            blockers: check.blockers,
+          })}\n`);
+          controller.close();
+          return;
+        }
+
+        const identity = verifyBoundInputIdentity(pending.workspaceRoot, pending.inputs || []);
+        if (!identity.ok) {
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
+          enqueue(
+            `Bound catalog data changed or is missing. ${identity.issues.map((issue) => issue.message).join(" ")} Create a revision after re-cataloguing.`
+          );
+          enqueue(`\n\x02${JSON.stringify({
+            type: "execution_failed",
+            awaitingApproval: true,
+            identityIssues: identity.issues,
+          })}\n`);
+          controller.close();
+          return;
+        }
+
         const frozen = freezeApprovedPlan(pending);
+        if (!planHashMatches(frozen)) {
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
+          enqueue("Proceed can only execute a hash-frozen plan. The plan hash did not match; I will not run.");
+          enqueue(`\n\x02${JSON.stringify({ type: "execution_failed", awaitingApproval: true })}\n`);
+          controller.close();
+          return;
+        }
         frozen.status = "executing";
         setPendingPlan(sessionId, frozen);
 
@@ -276,6 +338,9 @@ export function streamPlanDecision(
         if (!mag) {
           ranOk = false;
           enqueue("- ❌ **No magnetic steps to execute.** Gravity, ERT, seismic, GPR, and radiometrics are not in this release.\n");
+        } else if (!(frozen.inputs || []).length) {
+          ranOk = false;
+          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow and GSM-19 catalog IDs first.\n");
         } else {
           const created = await runDiurnalPipeline(frozen, enqueue, onTasks, tasksContent);
           projectFilesUpdates.push(...created.files);
