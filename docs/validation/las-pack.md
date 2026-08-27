@@ -70,6 +70,9 @@ TVD conversion, directional trajectories.
 4. Proceed. Inspect the log viewer (depth down, null gaps, selectable curves)
    and, when CRS is valid, the mapped collar and overlapping same-CRS layers.
 
+Desktop click-through of `/workspace/verify-las` is recorded in
+`docs/validation/results/las_desktop_ui.json`.
+
 ## Next recommended pack
 
 Additional **field-instrument contracts** that broaden real survey coverage
