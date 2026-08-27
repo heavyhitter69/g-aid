@@ -49,7 +49,7 @@ Critical constraints:
 - NEVER confirm groundwater, lithology, ore, or drill targets from ERT
 - NEVER generate affirmative interpretation language from a failed or poorly resolved invert
 - Do not quote a production depth of investigation; experimental invert depth is poorly constrained
-- Your output: structured markdown with confidence provenance displayed`
+- Your output: structured markdown with confidence provenance displayed`,
 
   "gravity-agent": `You are the Gravity Agent — specialist in ground and airborne gravimetry.
 
@@ -103,6 +103,8 @@ Critical constraints:
 - You do not override specialist domain conclusions
 - You always identify when models are underconstrained
 - Competing interpretations are preserved as epistemic branches, not discarded
+- Radiometric maps, ratios, and ternaries are not mineralisation, lithology, alteration, or drill targets
+- G-AID does not apply height, stripping, NASVD, or concentration conversion
 - Your output: geological synthesis in structured markdown`,
 
   "workflow-agent": `You are the Workflow Agent — scientific workflow planning and coordination.
@@ -612,8 +614,8 @@ function formatGeologicalSynthesis(
     ``,
     `**Cross-Method Assessment**`,
     interpretations.length >= 2
-      ? `${interpretations.length} independent geophysical methods provide convergent evidence. Multi-method agreement increases confidence in the interpreted geological framework.`
-      : `Single-method interpretation. Additional independent geophysical constraints are recommended to reduce interpretive ambiguity.`,
+      ? `${interpretations.length} independent geophysical methods provide convergent evidence. Multi-method agreement increases confidence in the interpreted geological framework. Radiometric colour composites and ratios are not lithology or mineralisation.`
+      : `Single-method interpretation. Additional independent geophysical constraints are recommended to reduce interpretive ambiguity. Radiometric maps do not establish lithology, alteration, mineralisation, or drill targets.`,
     ``,
     ...(models.length > 0 ? [
       `**Conceptual Geological Model**`,

@@ -16,11 +16,19 @@ export { catalogRecordId } from "./ids.ts";
 export { adapterRegistry, getAdapter, supportedAdapterIds } from "./registry.ts";
 export { classifyPeek, isSupportedProcessingRecord } from "./classify.ts";
 export { applyReviewedGravityMapping } from "./gravity-mapping.ts";
+export { applyReviewedRadioMapping } from "./radio-mapping.ts";
 export {
   GRAVITY_ADAPTER_IDS,
   inspectGravityText,
   isGravityAdapterId,
 } from "./gravity-contract.ts";
+export {
+  RADIO_ADAPTER_IDS,
+  inspectRadiometricText,
+  isRadioAdapterId,
+  ternaryJustified,
+  ratioJustified,
+} from "./radio-contract.ts";
 export { inspectDemText, demReadyForSupport, DEM_ASCII_FORMAT } from "./dem-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";

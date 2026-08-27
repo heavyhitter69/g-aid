@@ -70,6 +70,12 @@ def get_handler(node_id: str):
         "ert_invert": ert_invert,
         "ert_gis_export": ert_gis_export,
         "ert_interpret": ert_interpret,
+        "rad_ingest": rad_ingest,
+        "rad_grid": rad_grid,
+        "rad_ternary": rad_ternary,
+        "rad_ratios": rad_ratios,
+        "rad_gis_export": rad_gis_export,
+        "rad_interpret": rad_interpret,
         "seismic_process": seismic_process,
         "radiometric_correct": radiometric_correct,
         "gpr_process": gpr_process,
@@ -789,6 +795,44 @@ def ert_interpret(payload: dict) -> dict:
     return impl(payload)
 
 
+def rad_ingest(payload: dict) -> dict:
+    from kernels.radiometrics import rad_ingest as impl
+    return impl(payload)
+
+
+def rad_grid(payload: dict) -> dict:
+    from kernels.radiometrics import rad_grid as impl
+    return impl(payload)
+
+
+def rad_ternary(payload: dict) -> dict:
+    from kernels.radiometrics import rad_ternary as impl
+    return impl(payload)
+
+
+def rad_ratios(payload: dict) -> dict:
+    from kernels.radiometrics import rad_ratios as impl
+    return impl(payload)
+
+
+def rad_gis_export(payload: dict) -> dict:
+    from kernels.radiometrics import rad_gis_export as impl
+    return impl(payload)
+
+
+def rad_interpret(payload: dict) -> dict:
+    from kernels.radiometrics import rad_interpret as impl
+    return impl(payload)
+
+
+def radiometric_correct(payload: dict) -> dict:
+    raise ValueError(
+        "radiometric_correct is not a live capability. Height correction, stripping, NASVD, "
+        "dead-time, background, and concentration conversion are not implemented as a supported "
+        "pack. Use rad.ingest for already-corrected G-AID RAD 1.0 tables."
+    )
+
+
 def seismic_process(payload: dict) -> dict:
     if not step_enabled(payload, "seismic", default=True):
         return skipped("seismic_process", "not in plan")
@@ -844,38 +888,6 @@ def seismic_process(payload: dict) -> dict:
     }
     path = write_json(os.path.join(out, "seismic_qc.json"), qc)
     return {"artifacts": [make_artifact("artifact-segy", "seismic", "json", path, node_id, [src], qc)], "events": events}
-
-
-def radiometric_correct(payload: dict) -> dict:
-    if not step_enabled(payload, "radiometrics", default=True):
-        return skipped("radiometric_correct", "not in plan")
-    from science.radiometrics import MU_K, MU_TC, MU_TH, MU_U, height_correct, nasvd, strip_windows
-
-    node_id = "radiometric_correct"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath") or _find(out, "radiometric_canonical.csv")
-    df = pd.read_csv(src)
-    h = df["z"] if "z" in df.columns else df.get("height", 0)
-    href = float(_params(payload).get("hRefM") or 0.0)
-    events = []
-    if "tc" in df.columns:
-        df["tc_hc"] = height_correct(df["tc"], h, MU_TC, href)
-    for col, mu in (("k", MU_K), ("u", MU_U), ("th", MU_TH)):
-        if col in df.columns:
-            df[f"{col}_hc"] = height_correct(df[col], h, mu, href)
-    if all(c in df.columns for c in ("k", "u", "th")):
-        stripped = strip_windows(df.get("k_hc", df["k"]), df.get("u_hc", df["u"]), df.get("th_hc", df["th"]))
-        df["k_stripped"] = stripped["k"]
-        df["u_stripped"] = stripped["u"]
-        df["th_stripped"] = stripped["th"]
-    spec_cols = [c for c in df.columns if str(c).startswith("ch")]
-    if len(spec_cols) >= 16:
-        result = nasvd(df[spec_cols].to_numpy(), int(_params(payload).get("nasvdComponents") or 8))
-        write_json(os.path.join(out, "nasvd_qc.json"), {k: v for k, v in result.items() if k != "reconstructed"})
-        events.append({"type": "NODE_PROGRESS", "message": "NASVD reconstruction written."})
-    path = os.path.join(out, "radiometric_corrected.csv")
-    df.to_csv(path, index=False)
-    return {"artifacts": [make_artifact("artifact-rad-1", "processed_dataset", "csv", path, node_id, [src])], "events": events + [{"type": "NODE_PROGRESS", "message": "Radiometric height correction (IAEA TECDOC-1363)."}]}
 
 
 def gpr_process(payload: dict) -> dict:

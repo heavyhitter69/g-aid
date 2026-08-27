@@ -48,6 +48,12 @@ const NODE_SCRIPTS: Record<string, string> = {
   ert_invert: SCIENCE,
   ert_gis_export: SCIENCE,
   ert_interpret: SCIENCE,
+  rad_ingest: SCIENCE,
+  rad_grid: SCIENCE,
+  rad_ternary: SCIENCE,
+  rad_ratios: SCIENCE,
+  rad_gis_export: SCIENCE,
+  rad_interpret: SCIENCE,
 };
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
@@ -56,6 +62,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     // Live path must pass compiled DAG node ids. An empty list registers nothing.
     // Gravity uses this same engine. Do not add a GravityPipeline execution route.
     // ERT uses this same engine. Do not add a ResistivityPipeline execution route.
+    // Radiometrics uses this same engine. Do not add a RadiometricsPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
     for (const id of KERNEL_NODE_ORDER) {

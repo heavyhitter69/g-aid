@@ -41,7 +41,21 @@ export const ERT_NODE_ORDER = [
   "ert_interpret",
 ] as const;
 
-export const KERNEL_NODE_ORDER = [...MAGNETIC_NODE_ORDER, ...GRAVITY_NODE_ORDER, ...ERT_NODE_ORDER] as const;
+export const RADIO_NODE_ORDER = [
+  "rad_ingest",
+  "rad_grid",
+  "rad_ternary",
+  "rad_ratios",
+  "rad_gis_export",
+  "rad_interpret",
+] as const;
+
+export const KERNEL_NODE_ORDER = [
+  ...MAGNETIC_NODE_ORDER,
+  ...GRAVITY_NODE_ORDER,
+  ...ERT_NODE_ORDER,
+  ...RADIO_NODE_ORDER,
+] as const;
 
 export const MAGNETIC_NODE_DEPS: Record<string, string[]> = {
   file_discovery: [],
@@ -82,10 +96,20 @@ export const ERT_NODE_DEPS: Record<string, string[]> = {
   ert_interpret: ["ert_pseudosection"],
 };
 
+export const RADIO_NODE_DEPS: Record<string, string[]> = {
+  rad_ingest: [],
+  rad_grid: ["rad_ingest"],
+  rad_ternary: ["rad_grid"],
+  rad_ratios: ["rad_ingest"],
+  rad_gis_export: ["rad_ingest"],
+  rad_interpret: ["rad_ingest"],
+};
+
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...MAGNETIC_NODE_DEPS,
   ...GRAVITY_NODE_DEPS,
   ...ERT_NODE_DEPS,
+  ...RADIO_NODE_DEPS,
 };
 
 const NODE_LABELS: Record<string, string> = {
@@ -119,6 +143,12 @@ const NODE_LABELS: Record<string, string> = {
   ert_invert: "Experimental ERT 2-D invert (not production)",
   ert_gis_export: "ERT electrode GIS export",
   ert_interpret: "ERT interpretation limits",
+  rad_ingest: "Read bound radiometric catalog records",
+  rad_grid: "Radiometric channel grids",
+  rad_ternary: "K-eTh-eU ternary (concentrations only)",
+  rad_ratios: "Radiometric concentration ratios",
+  rad_gis_export: "Radiometric GIS export",
+  rad_interpret: "Radiometric interpretation limits",
 };
 
 export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
@@ -139,23 +169,25 @@ export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
 function ownerCapability(
   nodeId: string,
   expanded: UserCapabilityId[]
-): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" {
+): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" {
   for (const id of expanded) {
     const capability = getCapability(id);
     if (capability?.kernelNodeIds.includes(nodeId)) return id;
   }
+  if (nodeFamily(nodeId) === "rad") return "rad.prereq";
   if (nodeFamily(nodeId) === "ert") return "ert.prereq";
   if (nodeFamily(nodeId) === "grav") return "grav.prereq";
   return "mag.prereq";
 }
 
-function nodeFamily(nodeId: string): "mag" | "grav" | "ert" {
+function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" {
+  if ((RADIO_NODE_ORDER as readonly string[]).includes(nodeId)) return "rad";
   if ((ERT_NODE_ORDER as readonly string[]).includes(nodeId)) return "ert";
   if ((GRAVITY_NODE_ORDER as readonly string[]).includes(nodeId)) return "grav";
   return "mag";
 }
 
-/** Remap declared deps onto the compiled subset. Mag, gravity, and ERT never wait on each other. */
+/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, and radiometrics never wait on each other. */
 export function remapKernelDeps(nodeId: string, compiled: Set<string>): string[] {
   const original = KERNEL_NODE_DEPS[nodeId] || [];
   const present = original.filter((dep) => compiled.has(dep));
@@ -191,7 +223,10 @@ export function compileCapabilityDag(requested: string[]): CompiledDag {
     if (!nodeSet.has(nodeId)) continue;
     const capabilityId = ownerCapability(nodeId, expanded);
     const capability =
-      capabilityId === "mag.prereq" || capabilityId === "grav.prereq" || capabilityId === "ert.prereq"
+      capabilityId === "mag.prereq" ||
+      capabilityId === "grav.prereq" ||
+      capabilityId === "ert.prereq" ||
+      capabilityId === "rad.prereq"
         ? undefined
         : getCapability(capabilityId);
     nodes.push({

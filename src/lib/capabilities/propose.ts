@@ -25,6 +25,15 @@ const GRAVITY_DEFAULT: UserCapabilityId[] = [
 const ERT_DEFAULT: UserCapabilityId[] = ["ert.ingest", "ert.pseudosection", "ert.interpret"];
 const ERT_INVERT_EXPERIMENTAL: UserCapabilityId = "ert.invert2d";
 
+export const RADIO_DEFAULT: UserCapabilityId[] = [
+  "rad.ingest",
+  "rad.grid",
+  "rad.ternary",
+  "rad.ratios",
+  "rad.gis",
+  "rad.interpret",
+];
+
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
 }
@@ -35,6 +44,7 @@ export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id.startsWith("grav.")) return "gravity";
   if (id === "ert.invert2d") return "ertInvert";
   if (id.startsWith("ert.")) return "ert";
+  if (id.startsWith("rad.")) return "radiometrics";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
   return found?.[0] || id;
 }
@@ -71,6 +81,11 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
     }
     if (!ids.includes(ERT_INVERT_EXPERIMENTAL)) ids.push(ERT_INVERT_EXPERIMENTAL);
   }
+  if (steps.radiometrics) {
+    for (const id of RADIO_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
   return ids;
 }
 
@@ -82,6 +97,7 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.nearZoneTerrain = false;
   steps.ert = false;
   steps.ertInvert = false;
+  steps.radiometrics = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
     if (id === "grav.residual") {
@@ -104,6 +120,10 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
     }
     if (id.startsWith("ert.")) {
       steps.ert = true;
+      continue;
+    }
+    if (id.startsWith("rad.")) {
+      steps.radiometrics = true;
       continue;
     }
     steps[stepKeyFromCapability(id)] = true;
@@ -181,6 +201,14 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     if (/\bcatalog\b.{0,20}\bcrs\b|\bgeojson\b|\bmap the electrodes\b/.test(m)) next.add("ert.gis");
   }
 
+  const radioDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(radiometr|spectrometer)/.test(m);
+  const radioAsk =
+    /\b(radiometr|spectrometer|airborne gamma)/.test(m) ||
+    (/\bternary\b/.test(m) && /\b(radiometr|gamma|e[u]|eth)\b/.test(m));
+  if (radioAsk && !radioDeny) {
+    for (const id of RADIO_DEFAULT) next.add(id);
+  }
+
   return USER_CAPABILITY_IDS.filter((id) => next.has(id));
 }
 
@@ -188,7 +216,13 @@ export function unregisteredProposal(message: string): string | undefined {
   const m = message.toLowerCase();
   if (/\b(seismic|segy|nmo)\b/.test(m)) return "seismic";
   if (/\b(gpr|ground[\s-]?penetrating)\b/.test(m)) return "gpr";
-  if (/\bradiometr/.test(m)) return "radiometrics";
+  if (
+    /\b(nasvd|stripp(?:ing|ed)|height[\s-]?correct|dead[\s-]?time|background[\s-]?correct|concentration conversion|window[\s-]?strip)\b/.test(
+      m
+    )
+  ) {
+    return "rad.correct";
+  }
   if (/\bjoint inversion\b/.test(m)) return "joint-inversion";
   if (/\b3d\s+(ert|invers)/.test(m) || /\bert\s+3d\b/.test(m)) return "ert-3d";
   if (/\b(hayford|bowie|167\s*km|far[\s-]?zone\s+terrain|intermediate[\s-]?zone\s+terrain)\b/.test(m)) {

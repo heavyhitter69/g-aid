@@ -29,6 +29,9 @@ import { cn } from "@/lib/utils";
 import { isErtSectionPath, parseSectionCsv } from "@/lib/section/parse";
 import { SectionView } from "@/components/workspace/section-view";
 import { gravityProductWarnings } from "@/lib/gravity-product";
+import { radioProductWarnings } from "@/lib/radio-product";
+import { isRadioTernaryPath, parseRadioTernaryJson } from "@/lib/radio/ternary";
+import { TernaryView } from "@/components/workspace/ternary-view";
 
 interface LayerUiState {
   visible: boolean;
@@ -77,20 +80,22 @@ export function VisualizationStudio() {
 
   const layers = useMemo(() => {
     const mapped = buildMapLayers({ catalog: projectCatalog, files: allPaths });
-    const extras = allPaths.filter(isErtSectionPath).filter((path) => !mapped.some((layer) => layer.path === path));
-    const sectionLayers: MapLayerSpec[] = extras.map((path) => ({
-      id: `section:${path}`,
+    const extras = allPaths
+      .filter((path) => isErtSectionPath(path) || isRadioTernaryPath(path))
+      .filter((path) => !mapped.some((layer) => layer.path === path));
+    const extraLayers: MapLayerSpec[] = extras.map((path) => ({
+      id: `${isRadioTernaryPath(path) ? "ternary" : "section"}:${path}`,
       path,
       label: path.replace(/\\/g, "/").split("/").pop() || path,
       origin: "derived-run",
       displayStatus: "viewable",
-      formatId: "ert-section",
+      formatId: isRadioTernaryPath(path) ? "rad-ternary" : "ert-section",
       mediaClass: "section",
       runId: runIdFromPath(path),
-      units: "ohm.m",
+      units: isRadioTernaryPath(path) ? "RGB stretch" : "ohm.m",
       representation: "full",
     }));
-    return [...mapped, ...sectionLayers];
+    return [...mapped, ...extraLayers];
   }, [projectCatalog, allPaths]);
 
   useEffect(() => {
@@ -292,6 +297,7 @@ export function VisualizationStudio() {
     geojsonExtentNote,
     raster?.preview || vector?.data.preview ? "This view is a preview/overview — not the full dataset." : "",
     ...(active ? gravityProductWarnings({ path: active.path }) : []),
+    ...(active ? radioProductWarnings({ path: active.path }) : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
   ].filter(Boolean);
@@ -301,6 +307,15 @@ export function VisualizationStudio() {
   const section = useMemo(() => {
     if (!active || !text || !isErtSectionPath(active.path)) return null;
     return parseSectionCsv(text, active.path);
+  }, [active, text]);
+
+  const ternary = useMemo(() => {
+    if (!active || !text || !isRadioTernaryPath(active.path)) return null;
+    try {
+      return parseRadioTernaryJson(text, active.path);
+    } catch {
+      return null;
+    }
   }, [active, text]);
 
   function moveLayer(id: string, dir: -1 | 1) {
@@ -455,7 +470,9 @@ export function VisualizationStudio() {
             <span className="text-xs">Loading {active?.label}…</span>
           </div>
         ) : null}
-        {section ? (
+        {ternary ? (
+          <TernaryView ternary={ternary} />
+        ) : section ? (
           <SectionView section={section} />
         ) : active?.formatId === "geojson" && vector ? (
           <GridMapView

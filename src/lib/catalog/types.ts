@@ -100,6 +100,21 @@ export interface CatalogRecord {
     reviewed: boolean;
     reviewedAt?: string;
   };
+  radioMapping?: {
+    x: string;
+    y: string;
+    line: string;
+    k?: string;
+    eu?: string;
+    eth?: string;
+    tc?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  radioQuantity?: string;
+  correctionHistory?: string;
+  acquisitionPlatform?: string;
+  instrument?: string;
   elevationDatum?: string;
   gravityDatum?: string;
   provenance: CatalogProvenance;

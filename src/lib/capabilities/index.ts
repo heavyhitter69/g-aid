@@ -12,10 +12,18 @@ export {
   GRAVITY_NODE_ORDER,
   ERT_NODE_DEPS,
   ERT_NODE_ORDER,
+  RADIO_NODE_DEPS,
+  RADIO_NODE_ORDER,
   KERNEL_NODE_DEPS,
   KERNEL_NODE_ORDER,
 } from "./compile.ts";
 export { validateCapabilityContracts, unsupportedBoundInputs } from "./contracts.ts";
-export { capabilitiesFromSteps, proposeCapabilitiesFromMessage, stepsFromCapabilities, unregisteredProposal } from "./propose.ts";
+export {
+  capabilitiesFromSteps,
+  proposeCapabilitiesFromMessage,
+  stepsFromCapabilities,
+  unregisteredProposal,
+  RADIO_DEFAULT,
+} from "./propose.ts";
 export { catalogInputsPayload, verifyBoundInputIdentity } from "./inputs.ts";
 export { dagForPlan, generateTasksMarkdown, taskNodeIdsFromMarkdown } from "./tasks.ts";

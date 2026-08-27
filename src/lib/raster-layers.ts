@@ -53,7 +53,7 @@ function layerOrder(base: string): number {
   if (base.includes("1vd") || base.includes("vertical")) return 5;
   if (base.includes("pseudo_gravity")) return 6;
   if (base.includes("2vd")) return 7;
-  if (base.includes("section") || base.includes("pseudosection")) return 80;
+  if (base.includes("section") || base.includes("pseudosection") || base.includes("rad_ternary")) return 80;
   return 40;
 }
 
@@ -78,6 +78,11 @@ export function layerLabel(pathOrStem: string): string {
   if (base.includes("seismic")) return "Seismic section";
   if (base.includes("gpr")) return "GPR section";
   if (base.includes("pseudosection") || base.includes("pseudo")) return "Pseudosection";
+  if (base.includes("rad_k_grid")) return "Potassium (%K)";
+  if (base.includes("rad_eu_grid")) return "Equivalent uranium (ppm eU)";
+  if (base.includes("rad_eth_grid")) return "Equivalent thorium (ppm eTh)";
+  if (base.includes("rad_tc_grid")) return "Total count";
+  if (base.includes("rad_ternary")) return "K-eTh-eU ternary (not lithology)";
   return base.replace(/_/g, " ");
 }
 

@@ -49,6 +49,16 @@ export function validateCapabilityContracts(options: {
     columnMappingReviewed?: boolean;
     terrainRadiusM?: number;
     useDemExtent?: boolean;
+    radioMapping?: {
+      x: string;
+      y: string;
+      line: string;
+      k?: string;
+      eu?: string;
+      eth?: string;
+      tc?: string;
+      reviewed: boolean;
+    };
   };
   catalog?: ProjectCatalog | null;
   dag?: CompiledDag | null;
@@ -61,7 +71,7 @@ export function validateCapabilityContracts(options: {
       issues.push({
         level: "blocker",
         code: "unregistered_capability",
-        message: `${id} is not a registered capability. Seismic, GPR, radiometrics, GIS processing, and other unregistered packs are not in this release.`,
+        message: `${id} is not a registered capability. Seismic, GPR, GIS processing, and other unregistered packs are not in this release. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities.`,
       });
     }
   }
@@ -247,6 +257,64 @@ export function validateCapabilityContracts(options: {
         message:
           "Experimental 2-D inversion needs at least 8 measurements. A smaller set can still build a labelled pseudosection. Invert is not in the default ERT workflow.",
       });
+    }
+  }
+
+  const radioInputs = [
+    ...boundSupported(options.inputs, "radiometric-csv"),
+    ...boundSupported(options.inputs, "radiometric-xyz"),
+  ];
+  const needsRadio = expanded.some((id) => id.startsWith("rad."));
+  if (needsRadio && options.inputs.length && radioInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_radio_files",
+      message:
+        "Radiometric processing needs a supported RAD-contract catalog record (documented already-corrected K/eU/eTh/TC). Assay tables and raw spectrometer files are not processing inputs.",
+    });
+  }
+  if (needsRadio && radioInputs.length) {
+    const records = catalogRecordsForInputs(radioInputs, options.catalog || null);
+    const unreviewed = records.filter((record) => {
+      const mapping = record.radioMapping || options.parameters.radioMapping;
+      if (!mapping || mapping.reviewed || options.parameters.columnMappingReviewed) return false;
+      const canonical =
+        mapping.x === "X" &&
+        mapping.y === "Y" &&
+        mapping.line === "Line" &&
+        (!mapping.k || mapping.k === "K") &&
+        (!mapping.eu || mapping.eu === "eU") &&
+        (!mapping.eth || mapping.eth === "eTh") &&
+        (!mapping.tc || mapping.tc === "TC");
+      return !canonical;
+    });
+    if (unreviewed.length) {
+      issues.push({
+        level: "blocker",
+        code: "mapping_review_required",
+        message:
+          "Radiometric column names differ from X, Y, Line, K, eU, eTh, TC. Confirm a column mapping before Proceed. I will not guess columns.",
+      });
+    }
+    if (expanded.includes("rad.ternary")) {
+      const quantity = records.find((record) => record.radioQuantity)?.radioQuantity;
+      const mapping = records.find((record) => record.radioMapping)?.radioMapping;
+      const hasKuth = Boolean(mapping?.k && mapping?.eu && mapping?.eth);
+      if (quantity && quantity !== "concentration") {
+        issues.push({
+          level: "warning",
+          code: "ternary_not_justified",
+          message:
+            "Ternary K-eTh-eU display needs Quantity=concentration. Count-rate ternary will be skipped. I will not treat cps as concentrations.",
+        });
+      } else if (mapping && !hasKuth) {
+        issues.push({
+          level: "warning",
+          code: "ternary_not_justified",
+          message:
+            "Ternary needs concentration K, eU, and eTh. Incomplete channel sets skip the ternary. I will not invent a missing window.",
+        });
+      }
     }
   }
 

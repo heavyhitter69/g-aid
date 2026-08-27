@@ -20,6 +20,7 @@ import {
   type UserCapabilityId,
 } from "./capabilities/index.ts";
 import { NEAR_ZONE_STATEMENTS } from "./gravity-product.ts";
+import { RADIO_STATEMENTS } from "./radio-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -94,6 +95,21 @@ export interface PlanInput {
     maxX: number;
     maxY: number;
   };
+  radioMapping?: {
+    x: string;
+    y: string;
+    line: string;
+    k?: string;
+    eu?: string;
+    eth?: string;
+    tc?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  radioQuantity?: string;
+  correctionHistory?: string;
+  acquisitionPlatform?: string;
+  instrument?: string;
   cellSizeM?: number;
 }
 
@@ -133,6 +149,17 @@ export interface AgentPlan {
       reviewedAt?: string;
     };
     columnMappingReviewed?: boolean;
+    radioMapping?: {
+      x: string;
+      y: string;
+      line: string;
+      k?: string;
+      eu?: string;
+      eth?: string;
+      tc?: string;
+      reviewed: boolean;
+      reviewedAt?: string;
+    };
   };
   workspaceBrief: string;
   rev?: number;
@@ -233,11 +260,9 @@ export const GRAVITY_STEP_KEYS = ["gravity", "residual", "nearZoneTerrain"] as c
 
 export const ERT_STEP_KEYS = ["ert", "ertInvert"] as const satisfies readonly StepKey[];
 
-export const UNSUPPORTED_STEP_KEYS = [
-  "seismic",
-  "radiometrics",
-  "gpr",
-] as const satisfies readonly StepKey[];
+export const RADIO_STEP_KEYS = ["radiometrics"] as const satisfies readonly StepKey[];
+
+export const UNSUPPORTED_STEP_KEYS = ["seismic", "gpr"] as const satisfies readonly StepKey[];
 
 export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   diurnal: ["file_discovery", "flight_path_cleaner", "time_synchronizer", "diurnal_corrector", "qc_engine"],
@@ -255,7 +280,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   ert: ["ert_ingest", "ert_pseudosection", "ert_gis_export", "ert_interpret"],
   ertInvert: ["ert_invert"],
   seismic: ["seismic_process"],
-  radiometrics: ["radiometric_correct"],
+  radiometrics: ["rad_ingest", "rad_grid", "rad_ternary", "rad_ratios", "rad_gis_export", "rad_interpret"],
   gpr: ["gpr_process"],
 };
 
@@ -269,6 +294,10 @@ export function gravityStepsEnabled(steps: PlanSteps): boolean {
 
 export function ertStepsEnabled(steps: PlanSteps): boolean {
   return ERT_STEP_KEYS.some((key) => steps[key]);
+}
+
+export function radiometricsStepsEnabled(steps: PlanSteps): boolean {
+  return RADIO_STEP_KEYS.some((key) => steps[key]);
 }
 
 export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
@@ -360,7 +389,7 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
     case "seismic":
       return "Process the SEG-Y (filter, gain, spectrum)";
     case "radiometrics":
-      return "Apply height, stripping, and spectral corrections to the radiometric data";
+      return "Ingest already-corrected radiometric K/eU/eTh/TC, grid, and evidence-bound maps (not height/stripping/NASVD)";
     case "gpr":
       return "Process the GPR (dewow, gain, bandpass)";
   }
@@ -410,6 +439,11 @@ export function renderImplementationPlan(opts: {
       : "Bullard B / spherical-cap curvature: off unless requested.";
     if (!notes.includes(bullard)) notes.push(bullard);
   }
+  if (radiometricsStepsEnabled(opts.steps)) {
+    for (const line of RADIO_STATEMENTS) {
+      if (!notes.includes(line)) notes.push(line);
+    }
+  }
   const bound = (opts.inputs || []).map((item) => `- \`${item.catalogId}\` ${item.path} (${item.adapterId || item.kind || "bound"})`);
   const artifacts = dag.requestedCapabilityIds.flatMap((id) =>
     (getCapability(id)?.expectedArtifacts || []).map((name) => `- ${name}`)
@@ -423,7 +457,12 @@ export function renderImplementationPlan(opts: {
   const dagLines = dag.nodes.map((node) => `- \`${node.id}\` ${node.label}`);
   const magInputs = (opts.inputs || []).some((item) => item.adapterId === "magarrow" || item.adapterId === "gsm19");
   const gravInputs = (opts.inputs || []).some((item) => item.adapterId === "gravity-xyz" || item.adapterId === "gravity-csv");
-  const mixed = magInputs && gravInputs;
+  const ertInputs = (opts.inputs || []).some((item) => item.adapterId === "ert-dat" || item.adapterId === "ert-csv");
+  const radioInputs = (opts.inputs || []).some(
+    (item) => item.adapterId === "radiometric-csv" || item.adapterId === "radiometric-xyz"
+  );
+  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs].filter(Boolean).length;
+  const mixed = mixedCount > 1;
   const field = [
     typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
     typeof opts.declination === "number" ? `Declination: ${opts.declination}°` : "",
@@ -441,11 +480,13 @@ export function renderImplementationPlan(opts: {
         ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless grav.terrain_near_zone is approved. Neither product is a Complete Bouguer Anomaly."
         : "",
   ].filter(Boolean);
-  const thisRunFallback = ertStepsEnabled(opts.steps)
-    ? "- Ask for a registered ERT, gravity, or magnetic method I can run. Seismic, GPR, and radiometrics are not in this release."
+  const thisRunFallback = radiometricsStepsEnabled(opts.steps)
+    ? "- Ask for a registered radiometric, ERT, gravity, or magnetic method I can run. Seismic and GPR are not in this release."
+    : ertStepsEnabled(opts.steps)
+    ? "- Ask for a registered ERT, gravity, magnetic, or radiometric method I can run. Seismic and GPR are not in this release."
     : gravityStepsEnabled(opts.steps)
-    ? "- Ask for a gravity or magnetic method I can run. Seismic, GPR, and radiometrics are not in this release."
-    : "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP), a gravity reduction, or ERT. Other methods are not in this release.";
+    ? "- Ask for a gravity, magnetic, ERT, or radiometric method I can run. Seismic and GPR are not in this release."
+    : "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP), a gravity reduction, ERT, or already-corrected radiometrics. Seismic and GPR are not in this release.";
 
   return `# Implementation Plan
 
@@ -457,7 +498,7 @@ export function renderImplementationPlan(opts: {
 ${items.join("\n") || thisRunFallback}
 
 ## Bound inputs
-${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, and/or ERT-contract catalog IDs before Proceed."}
+${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, and/or RAD-contract catalog IDs before Proceed."}
 
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
@@ -470,8 +511,8 @@ ${dagLines.join("\n") || "- (none)"}
 ${artifacts.length ? [...new Set(artifacts)].join("\n") : "- None until a registered capability is approved."}
 
 ## Assumptions and limits
-${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic, gravity, and ERT capabilities run."}
-${mixed ? "- Magnetic and gravity products may display together. Joint inversion and combined interpretation are not registered capabilities.\n" : ""}${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
+${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic, gravity, ERT, and radiometric capabilities run."}
+${mixed ? "- Products from different methods may display together. Joint inversion and combined interpretation are not registered capabilities.\n" : ""}${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
 
 ## Review record
 ${reviews.length ? reviews.join("\n") : "- No review comments recorded yet."}
@@ -647,6 +688,7 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   if (/\b(mapping (reviewed|confirmed|accepted)|confirm(?:ed)? (?:the )?column mapping)\b/i.test(raw)) {
     parameters.columnMappingReviewed = true;
     if (parameters.gravityMapping) parameters.gravityMapping = { ...parameters.gravityMapping, reviewed: true };
+    if (parameters.radioMapping) parameters.radioMapping = { ...parameters.radioMapping, reviewed: true };
   }
   const inc = raw.match(/\binclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
   const dec = raw.match(/\bdeclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
@@ -700,6 +742,8 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
                 ? "Accepted grav.terrain_near_zone as a near-zone terrain-corrected Bouguer anomaly. G-AID does not produce a Complete Bouguer Anomaly: far-zone and intermediate-zone terrain are not included, and this is not equivalent to a commercial complete Bouguer product."
                 : id === "ert.invert2d"
                   ? "Accepted experimental ert.invert2d. This is not a production inversion pack. Independent two-layer true resistivities are not recovered. Not Res2DInv. Default ERT work is ingest and pseudosection only."
+                : id === "rad.ingest"
+                  ? "Accepted radiometric ingest of already-corrected G-AID RAD 1.0 tables. Height correction, stripping, NASVD, dead-time, background, and concentration conversion are not live capabilities."
                 : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
@@ -740,7 +784,6 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
     ...EMPTY_STEPS,
     ...projected,
     seismic: plan.steps.seismic,
-    radiometrics: plan.steps.radiometrics,
     gpr: plan.steps.gpr,
   });
 
@@ -779,7 +822,7 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
     ...projected,
   });
   const notes = [...(plan.notes || [])];
-  if (plan.steps.seismic || plan.steps.radiometrics || plan.steps.gpr) {
+  if (plan.steps.seismic || plan.steps.gpr) {
     notes.push("Unsupported methods stay listed as refused. They are not compiled into the DAG.");
   }
   if (magneticStepsEnabled(steps) && gravityStepsEnabled(steps)) {
@@ -790,6 +833,11 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
   if (ertStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps))) {
     notes.push(
       "ERT products may display with magnetic or gravity maps. Joint inversion is not a registered capability."
+    );
+  }
+  if (radiometricsStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps))) {
+    notes.push(
+      "Radiometric products may display with magnetic, gravity, or ERT maps. Joint inversion is not a registered capability."
     );
   }
   const dag = compileCapabilityDag(capabilities);
@@ -863,7 +911,7 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
       level: "blocker",
       code: "unsupported_catalog_input",
       message:
-        "Recognised-unsupported and unknown files cannot be processing inputs. Bind supported MagArrow, GSM-19, gravity-contract, dem-ascii, or ERT-contract catalog records only.",
+        "Recognised-unsupported and unknown files cannot be processing inputs. Bind supported MagArrow, GSM-19, gravity-contract, dem-ascii, ERT-contract, or RAD-contract catalog records only.",
     });
   }
   if (magneticStepsEnabled(plan.steps) && inputs.length && inputs.some((item) => !item.catalogId)) {
@@ -933,18 +981,18 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
     });
   }
 
-  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps)) {
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps)) {
     blockers.push({
       level: "blocker",
       code: "unsupported_method",
       message:
-        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, or supported ERT ingest and a labelled pseudosection after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic, GPR, and radiometrics are not available yet.",
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, or already-corrected radiometric ingest after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic and GPR are not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities.",
     });
   } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({
       level: "warning",
       code: "unsupported_method",
-      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT DAG is executed.",
+      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric DAG is executed.",
     });
   }
 
@@ -990,6 +1038,31 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
         code: "no_ert_files",
         message:
           "ERT processing needs a supported ert-dat or ert-csv catalog record. An arbitrary .dat file is not ERT data.",
+      });
+    }
+  }
+
+  if (radiometricsStepsEnabled(plan.steps)) {
+    const radioFiles = inputs.filter(
+      (item) =>
+        item.adapterId === "radiometric-csv" ||
+        item.adapterId === "radiometric-xyz" ||
+        item.kind === "radiometric-csv" ||
+        item.kind === "radiometric-xyz"
+    );
+    if (inputs.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_radio_files",
+        message:
+          "Radiometric processing needs a supported RAD-contract catalog record (documented already-corrected K/eU/eTh/TC with CRS, units, Line, acquisition metadata, and CorrectionHistory). I will not take a file because it has K, U, or Th columns.",
+      });
+    } else if (radioFiles.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_radio_files",
+        message:
+          "Radiometric processing needs a supported radiometric-csv or radiometric-xyz catalog record. Assay tables and raw spectrometer files are not processing inputs.",
       });
     }
   }

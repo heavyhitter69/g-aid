@@ -41,13 +41,18 @@ export function summarizeCatalog(catalog: ProjectCatalog | null, maxRecords = 80
   const ert = catalog.records.filter(
     (record) => (record.adapterId === "ert-dat" || record.adapterId === "ert-csv") && record.supportStatus === "supported"
   );
+  const radio = catalog.records.filter(
+    (record) =>
+      (record.adapterId === "radiometric-csv" || record.adapterId === "radiometric-xyz") &&
+      record.supportStatus === "supported"
+  );
   const lines = [
     `Project catalog (${catalog.records.length} source files; G-AID Output skipped)`,
     `Support: supported ${counts.supported}, recognised-unsupported ${counts["recognised-unsupported"]}, unknown ${counts.unknown}`,
-    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}`,
+    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}, radiometrics ${radio.length}`,
     catalog.truncated ? `Truncated: ${catalog.truncationReason || "file-count limit reached"}` : "",
     catalog.runs.length ? `Prior runs preserved: ${catalog.runs.map((run) => run.runId).join(", ")}` : "Prior runs preserved: (none)",
-    "This catalog does not imply a magnetic, gravity, or ERT workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, and ERT-contract records can be processing inputs.",
+    "This catalog does not imply a magnetic, gravity, ERT, or radiometric workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, ERT-contract, and RAD-contract records can be processing inputs.",
   ].filter(Boolean);
 
   const shown = catalog.records.slice(0, maxRecords);
@@ -77,6 +82,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
   const ert = catalog.records.filter(
     (r) => (r.adapterId === "ert-dat" || r.adapterId === "ert-csv") && r.supportStatus === "supported"
   ).length;
+  const radio = catalog.records.filter(
+    (r) => (r.adapterId === "radiometric-csv" || r.adapterId === "radiometric-xyz") && r.supportStatus === "supported"
+  ).length;
   const formats = new Map<string, number>();
   for (const record of catalog.records) {
     formats.set(record.formatId, (formats.get(record.formatId) || 0) + 1);
@@ -88,7 +96,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     .join(", ");
   const lines = [
     `This folder has **${catalog.records.length}** source files in the project catalog (G-AID Output was skipped).`,
-    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}`,
+    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}, radiometrics ${radio}`,
     `- **recognised-unsupported** (identified, not processed in this release): ${counts["recognised-unsupported"]}`,
     `- **unknown** (not identified reliably): ${counts.unknown}`,
     formatList ? `Formats: ${formatList}.` : "",
@@ -108,6 +116,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     ert
       ? "I can plan ERT ingest/QC and a labelled pseudosection if you ask. 2-D inversion is experimental and is not in the default ERT workflow."
       : "ERT processing needs a documented Res2DInv-style .dat or reviewed ERT CSV, not the first .dat file.",
+    radio
+      ? "I can plan already-corrected radiometric ingest, grids, ternary (concentrations only), ratios, and GIS if you ask. Height correction, stripping, NASVD, and concentration conversion are not live capabilities."
+      : "Radiometric processing needs a documented G-AID RAD 1.0 table (CRS, quantity, units, Line, acquisition metadata, CorrectionHistory), not a K/U/Th assay or a file with a familiar extension.",
     "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
   ].filter(Boolean);
   return lines.join("\n");

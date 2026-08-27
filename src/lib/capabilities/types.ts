@@ -1,5 +1,5 @@
 /**
- * Live scientific capability model. Magnetics, gravity, and ERT are the registered packs.
+ * Live scientific capability model. Magnetics, gravity, ERT, and radiometrics are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -25,6 +25,12 @@ export const USER_CAPABILITY_IDS = [
   "ert.invert2d",
   "ert.gis",
   "ert.interpret",
+  "rad.ingest",
+  "rad.grid",
+  "rad.ternary",
+  "rad.ratios",
+  "rad.gis",
+  "rad.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -40,7 +46,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -58,7 +64,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics" | "gravity" | "resistivity";
+  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -76,7 +82,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -116,6 +122,21 @@ export interface BoundInput {
     reviewed: boolean;
     reviewedAt?: string;
   };
+  radioMapping?: {
+    x: string;
+    y: string;
+    line: string;
+    k?: string;
+    eu?: string;
+    eth?: string;
+    tc?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  radioQuantity?: string;
+  correctionHistory?: string;
+  acquisitionPlatform?: string;
+  instrument?: string;
   elevationDatum?: string;
   units?: string;
   crs?: string;

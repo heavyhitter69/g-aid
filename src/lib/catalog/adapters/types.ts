@@ -37,6 +37,11 @@ export interface CatalogInspection {
   parseErrors?: string[];
   supportStatus?: SupportStatus;
   columnMapping?: CatalogRecord["columnMapping"];
+  radioMapping?: CatalogRecord["radioMapping"];
+  radioQuantity?: string;
+  correctionHistory?: string;
+  acquisitionPlatform?: string;
+  instrument?: string;
   elevationDatum?: string;
   gravityDatum?: string;
 }

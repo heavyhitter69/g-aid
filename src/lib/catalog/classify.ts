@@ -56,6 +56,8 @@ const SUPPORTED_ADAPTER_IDS = new Set([
   "dem-ascii",
   "ert-dat",
   "ert-csv",
+  "radiometric-csv",
+  "radiometric-xyz",
 ]);
 
 export function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {

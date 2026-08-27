@@ -10,16 +10,22 @@ function posix(path: string): string {
   return path.replace(/\\/g, "/");
 }
 
-/** Value units for a map layer. Gravity grids are mGal; magnetics stay nT unless the catalog says otherwise. */
+/** Value units for a map layer. Gravity grids are mGal; radiometric channels keep declared units; magnetics stay nT unless the catalog says otherwise. */
 export function mapValueUnits(path: string, formatId?: string, recorded?: string): string {
   if (recorded) return recorded;
   const n = posix(path).toLowerCase();
   if (formatId === "dem-ascii" || /\bdem\b/.test(n)) return "m";
   if (formatId === "geojson" || n.endsWith(".geojson")) {
     if (/gravity|bouguer|free_air|free-air/.test(n)) return "mGal";
+    if (/rad_|radiometr/.test(n)) return "survey";
     return "coordinate";
   }
   if (/near_zone_terrain_corrected_bouguer|bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
+  if (/rad_k_grid/.test(n)) return "%K";
+  if (/rad_eu_grid/.test(n)) return "ppm eU";
+  if (/rad_eth_grid/.test(n)) return "ppm eTh";
+  if (/rad_tc_grid/.test(n)) return "nGy/h";
+  if (/rad_.*_grid/.test(n) || /rad_ternary/.test(n)) return "cps";
   return "nT";
 }
 

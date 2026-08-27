@@ -1,6 +1,7 @@
 /**
  * ScientificTool registry — kernel bindings from the live capability registry.
- * ERT, seismic, GPR, and radiometrics are not registered for execution.
+ * Seismic and GPR are not registered for execution. Radiometrics uses the same
+ * engine as magnetics/gravity/ERT. Do not add a RadiometricsPipeline.
  */
 
 import crypto from "crypto";
@@ -49,6 +50,12 @@ const NODE_SCRIPTS: Record<string, string> = {
   ert_invert: SCIENCE,
   ert_gis_export: SCIENCE,
   ert_interpret: SCIENCE,
+  rad_ingest: SCIENCE,
+  rad_grid: SCIENCE,
+  rad_ternary: SCIENCE,
+  rad_ratios: SCIENCE,
+  rad_gis_export: SCIENCE,
+  rad_interpret: SCIENCE,
 };
 
 function toolsFromLiveRegistry(): ScientificTool[] {
@@ -63,7 +70,13 @@ function toolsFromLiveRegistry(): ScientificTool[] {
         name: capability.title,
         version: capability.version,
         domain:
-          capability.domain === "gravity" ? "gravity" : capability.domain === "resistivity" ? "resistivity" : "magnetic",
+          capability.domain === "gravity"
+            ? "gravity"
+            : capability.domain === "resistivity"
+              ? "resistivity"
+              : capability.domain === "radiometrics"
+                ? "spatial"
+                : "magnetic",
         description: `${capability.description} (kernel ${nodeId})`,
         inputs: Object.fromEntries(
           Object.entries(capability.parameters).map(([key, parameter]) => [

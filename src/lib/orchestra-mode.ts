@@ -20,9 +20,9 @@ export function pickerLabel(choice: OrchestraChoice, preview: OrchestraSpeed): s
 
 export function looksAnalytical(userText: string): boolean {
   if (detectAnalysisIntent(userText)) return true;
-  return /\b(rtp|igrf|diurnal|bouguer|invert|lineament|proceed|pseudosection|residual|heading|lag|tie[\s-]?line)\b/i.test(
+  return /\b(rtp|igrf|diurnal|bouguer|invert|lineament|proceed|pseudosection|residual|heading|lag|tie[\s-]?line|radiometr|ternary)\b/i.test(
     userText
-  ) || /\b(process|analyse|analyze|correct|reduce|grid)\b.+\b(mag|magnetic|survey|gravity|ert|seismic)\b/i.test(
+  ) || /\b(process|analyse|analyze|correct|reduce|grid)\b.+\b(mag|magnetic|survey|gravity|ert|seismic|radiometr)\b/i.test(
     userText
   );
 }

@@ -17,6 +17,7 @@ import { isGaidOutputPath, GAID_OUTPUT_DIR } from "../workspace-index.ts";
 import { RUNS_SUBDIR } from "../run-layout.ts";
 import type { SniffContext } from "./adapters/types.ts";
 import { mergeGravityMappingFromPrevious } from "./gravity-mapping.ts";
+import { mergeRadioMappingFromPrevious } from "./radio-mapping.ts";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -116,6 +117,11 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     recordCount,
     parseErrors: parseErrors.length ? parseErrors : undefined,
     columnMapping: classified.inspect.columnMapping,
+    radioMapping: classified.inspect.radioMapping,
+    radioQuantity: classified.inspect.radioQuantity,
+    correctionHistory: classified.inspect.correctionHistory,
+    acquisitionPlatform: classified.inspect.acquisitionPlatform,
+    instrument: classified.inspect.instrument,
     elevationDatum: classified.inspect.elevationDatum,
     gravityDatum: classified.inspect.gravityDatum,
     provenance: {
@@ -258,7 +264,9 @@ export function buildProjectCatalog(root: string, options: BuildCatalogOptions =
 
   walk(resolvedRoot);
   records.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  const merged = records.map((record) => mergeGravityMappingFromPrevious(record, options.previous));
+  const merged = records.map((record) =>
+    mergeRadioMappingFromPrevious(mergeGravityMappingFromPrevious(record, options.previous), options.previous)
+  );
 
   return {
     schemaVersion: CATALOG_SCHEMA_VERSION,

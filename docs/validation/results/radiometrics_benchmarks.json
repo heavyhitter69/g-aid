@@ -1,0 +1,31 @@
+{
+  "pack": "radiometrics",
+  "contract": "G-AID RAD 1.0 already-corrected",
+  "live_capabilities": [
+    "rad.ingest",
+    "rad.grid",
+    "rad.ternary",
+    "rad.ratios",
+    "rad.gis",
+    "rad.interpret"
+  ],
+  "not_live": [
+    "height_correct",
+    "strip_windows",
+    "nasvd",
+    "dead_time",
+    "background",
+    "concentration_conversion"
+  ],
+  "formula_checks": {
+    "eu_eth": "3/6 = 0.5",
+    "height_correct": "N = N0 exp(\u03bc \u0394h) library only",
+    "strip_windows": "known 3x3 inverse recovers windows"
+  },
+  "interpretation_limits": [
+    "not mineralisation",
+    "not lithology",
+    "not alteration",
+    "not drill targets"
+  ]
+}
