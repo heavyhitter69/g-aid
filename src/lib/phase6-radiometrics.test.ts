@@ -632,6 +632,15 @@ test("validation-ui radiometric fixtures keep metadata units and skip ternary on
   assert.equal(layerLabel("rad_k_grid.asc"), "K channel");
   assert.equal(mapValueUnits("G-AID Output/runs/r-verify-rad-conc/rad_k_grid.asc"), "unknown");
   assert.equal(mapValueUnits("G-AID Output/runs/r-verify-rad-conc/rad_k_grid.asc", "esri-ascii-grid", concMeta.units), "%K");
+  const ui = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "docs/validation/results/radiometrics_desktop_ui.json"), "utf8")
+  );
+  assert.equal(ui.passed, true);
+  assert.equal(ui.units_from_filename, false);
+  assert.equal(ui.tabs.grid.units, "%K");
+  assert.equal(ui.tabs.count_rate.ternary_available, false);
+  assert.equal(ui.tabs.unknown_units.units, "unknown");
+  assert.equal(ui.tabs.provenance.unknown_interpretation_blocked, true);
 });
 
 if (failed) {
