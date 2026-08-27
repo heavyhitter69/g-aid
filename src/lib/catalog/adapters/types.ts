@@ -14,6 +14,7 @@ export interface SniffContext {
   size: number;
   peek: Buffer;
   peekText: string;
+  absPath?: string;
 }
 
 export interface AdapterSniff {
@@ -48,6 +49,23 @@ export interface CatalogInspection {
   dxM?: number;
   antennaMHz?: number;
   velocityMs?: number;
+  wellId?: string;
+  curves?: string[];
+  curveUnits?: string[];
+  nullValue?: number;
+  startDepth?: number;
+  stopDepth?: number;
+  step?: number;
+  wrap?: string;
+  lasVersion?: string;
+  depthIndex?: string;
+  depthUnits?: string;
+  collarX?: number;
+  collarY?: number;
+  collarZ?: number;
+  coordinateKind?: "geographic" | "easting-northing" | "unknown";
+  locationQuality?: "documented" | "user-confirmed" | "missing";
+  collarMappable?: boolean;
 }
 
 export interface AdapterValidation {

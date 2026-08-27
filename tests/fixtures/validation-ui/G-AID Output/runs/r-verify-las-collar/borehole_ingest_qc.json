@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "product_name": "G-AID LAS 2.0 canonical log",
+      "las_standard": "CWLS LAS 2.0 WRAP.NO",
+      "las_version": "2.0",
+      "wrap": "NO",
+      "well_id": "COLLAR-1",
+      "null_value": -999.25,
+      "null_assumed": false,
+      "strt": 0.0,
+      "stop": 10.0,
+      "step": 2.0,
+      "depth_index": "DEPT",
+      "depth_units": "M",
+      "depth_reference": "measured depth",
+      "n_rows": 6,
+      "curves": [
+        {
+          "mnemonic": "DEPT",
+          "unit": "M",
+          "description": "1  DEPTH",
+          "semantics": "unknown"
+        },
+        {
+          "mnemonic": "GR",
+          "unit": "GAPI",
+          "description": "2  GAMMA RAY",
+          "semantics": "unknown"
+        },
+        {
+          "mnemonic": "RHOB",
+          "unit": "G/C3",
+          "description": "3  BULK DENSITY",
+          "semantics": "unknown"
+        }
+      ],
+      "collar_x": 18.4241,
+      "collar_y": -33.9249,
+      "collar_z": 102.0,
+      "collar_z_mnemonic": "ELEV",
+      "coordinate_kind": "geographic",
+      "crs_epsg": 4326,
+      "elevation_datum": "orthometric",
+      "location_quality": "documented",
+      "collar_mappable": true,
+      "trajectory_computed": false,
+      "catalog_id": "cat-r-verify-las-collar",
+      "checksum": "fixture",
+      "header_provenance": {
+        "VERS": "2.0",
+        "WRAP": "NO",
+        "WELL": "COLLAR-1",
+        "source": "/workspace/tests/fixtures/las-project/valid-collar/well.las",
+        "banner": "G-AID WELL 1.0"
+      },
+      "warnings": [],
+      "formula": "CWLS LAS 2.0 WRAP.NO ASCII well log. Measured depth is not TVD or a trajectory."
+    }
+  ],
+  "n_rows": 6,
+  "depth_reference": "measured depth",
+  "trajectory_computed": false
+}

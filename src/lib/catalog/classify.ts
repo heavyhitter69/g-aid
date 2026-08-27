@@ -59,6 +59,7 @@ const SUPPORTED_ADAPTER_IDS = new Set([
   "radiometric-csv",
   "radiometric-xyz",
   "gpr-csv",
+  "las-well",
 ]);
 
 export function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {

@@ -148,21 +148,6 @@ function sniffLasPointCloud(ctx: SniffContext): AdapterSniff | null {
   };
 }
 
-function sniffLasBorehole(ctx: SniffContext): AdapterSniff | null {
-  if (ctx.peek.toString("ascii", 0, 4) === "LASF") return null;
-  if (!looksMostlyText(ctx.peek)) return null;
-  if (!/~(?:V|VERSION|W|WELL|C|CURVE)\b/i.test(ctx.peekText) && !/~VERSION INFORMATION/i.test(ctx.peekText)) {
-    return null;
-  }
-  return {
-    confidence: 0.9,
-    formatId: "las-borehole",
-    mediaClass: "borehole-log",
-    domainHint: "geology",
-    notes: ["ASCII LAS well-log section markers. Curves were not ingested."],
-  };
-}
-
 function sniffSegy(ctx: SniffContext): AdapterSniff | null {
   if (ctx.peek.length < 4) return null;
   const ascii = ctx.peekText.startsWith("C 1") || /^C {1,2}\d/.test(ctx.peekText.slice(0, 80));
@@ -260,9 +245,6 @@ function sniffDelimitedTable(ctx: SniffContext): AdapterSniff | null {
 export const recognisedAdapters: CatalogAdapter[] = [
   makeAdapter("las-point-cloud", "las-point-cloud", sniffLasPointCloud, () => ({
     parseErrors: undefined,
-  })),
-  makeAdapter("las-borehole", "las-borehole", sniffLasBorehole, (ctx) => ({
-    headerSummary: headerSummaryFromText(ctx.peekText),
   })),
   makeAdapter("geotiff", "geotiff", sniffGeotiff),
   makeAdapter("shapefile", "shapefile", sniffShapefile),

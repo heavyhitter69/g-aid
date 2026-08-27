@@ -1,0 +1,11 @@
+~VERSION INFORMATION
+VERS.                 3.0         : CWLS LOG ASCII STANDARD - VERSION 3.0
+WRAP.                 NO
+~WELL INFORMATION
+WELL.                LAS3         : WELL
+~CURVE INFORMATION
+DEPT.M
+GR.GAPI
+~ASCII
+0.0 1
+1.0 2

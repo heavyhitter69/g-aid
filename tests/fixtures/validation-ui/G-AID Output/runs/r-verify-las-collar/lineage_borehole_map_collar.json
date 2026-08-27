@@ -1,0 +1,24 @@
+{
+  "node_id": "borehole_map_collar",
+  "formula": "Collar GeoJSON from documented or user-confirmed CRS",
+  "parameters": {
+    "skipped": false,
+    "collar_mapped": true,
+    "crs_epsg": 4326,
+    "coordinate_kind": "geographic",
+    "location_quality": "documented",
+    "x": 18.4241,
+    "y": -33.9249,
+    "z": 102.0,
+    "trajectory_computed": false
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-las-collar/borehole_ingest_qc.json"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-las-collar/borehole_collar.geojson",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-las-collar/borehole_collar.meta.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-las-collar/borehole_collar_qc.json"
+  ],
+  "created_at": "2026-08-27T15:46:40.304887Z"
+}

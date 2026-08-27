@@ -1,0 +1,131 @@
+{
+  "product_name": "G-AID LAS 2.0 measured-depth log",
+  "observations": [
+    "LAS 2.0 WRAP.NO curves were ingested as measured-depth samples.",
+    "Well identifier: DEMO-1.",
+    "Observed curves: DEPT [M] (semantics unknown), GR [GAPI] (semantics unknown), RHOB [G/C3] (semantics unknown), NPHI [V/V] (semantics unknown).",
+    "Collar mapped: False.",
+    "Depth reference recorded as measured depth."
+  ],
+  "user_supplied_curve_meaning": [
+    "No user-supplied curve meanings were provided."
+  ],
+  "assumptions": [
+    "NULL substitution uses the documented ~Well NULL, or the conventional -999.25 when NULL was missing (flagged assumed).",
+    "WRAP.NO one-line-per-depth ASCII was required.",
+    "A mapped collar uses only documented or explicitly user-confirmed CRS. Geographic vs easting-northing is distinguished in QC."
+  ],
+  "uncertainty": [
+    "Measured depth is not true vertical depth.",
+    "A collar point is not a well trajectory.",
+    "Unknown curve semantics remain unknown even when the mnemonic is familiar (GR, RHOB, NPHI, resistivity, sonic).",
+    "Overlapping map layers at a collar are geometric coincidence, not a joint geological proof."
+  ],
+  "recommendations": [
+    "Do not classify lithology, pick aquifers, or claim mineralisation from these curves without a declared validated capability and independent evidence.",
+    "Supply a documented CRS before mapping a collar.",
+    "Keep deviation surveys out of this pack until a tested survey contract exists."
+  ],
+  "not_established": [
+    "Lithology is not established.",
+    "Aquifer identification is not established.",
+    "Mineralisation is not established.",
+    "Water, ore, or reservoir is not established.",
+    "Well-to-well correlation is not established.",
+    "Resource estimation is not established.",
+    "Drill targeting is not established.",
+    "True vertical depth is not established.",
+    "A 3-D well trajectory is not established."
+  ],
+  "geological_certainty_improved": false,
+  "qc": {
+    "borehole_ingest_qc.json": {
+      "files": [
+        {
+          "product_name": "G-AID LAS 2.0 canonical log",
+          "las_standard": "CWLS LAS 2.0 WRAP.NO",
+          "las_version": "2.0",
+          "wrap": "NO",
+          "well_id": "DEMO-1",
+          "null_value": -999.25,
+          "null_assumed": false,
+          "strt": 0.0,
+          "stop": 20.0,
+          "step": 2.0,
+          "depth_index": "DEPT",
+          "depth_units": "M",
+          "depth_reference": "measured depth",
+          "n_rows": 11,
+          "curves": [
+            {
+              "mnemonic": "DEPT",
+              "unit": "M",
+              "description": "1  DEPTH",
+              "semantics": "unknown"
+            },
+            {
+              "mnemonic": "GR",
+              "unit": "GAPI",
+              "description": "2  GAMMA RAY",
+              "semantics": "unknown"
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "G/C3",
+              "description": "3  BULK DENSITY",
+              "semantics": "unknown"
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "V/V",
+              "description": "4  NEUTRON POROSITY",
+              "semantics": "unknown"
+            }
+          ],
+          "collar_x": null,
+          "collar_y": null,
+          "collar_z": null,
+          "collar_z_mnemonic": null,
+          "coordinate_kind": "unknown",
+          "crs_epsg": null,
+          "elevation_datum": null,
+          "location_quality": "missing",
+          "collar_mappable": false,
+          "trajectory_computed": false,
+          "catalog_id": "cat-r-verify-las",
+          "checksum": "fixture",
+          "header_provenance": {
+            "VERS": "2.0",
+            "WRAP": "NO",
+            "WELL": "DEMO-1",
+            "source": "/workspace/tests/fixtures/las-project/valid/well.las",
+            "banner": "G-AID WELL 1.0"
+          },
+          "warnings": [
+            "No well location documented. No map position is invented."
+          ],
+          "formula": "CWLS LAS 2.0 WRAP.NO ASCII well log. Measured depth is not TVD or a trajectory."
+        }
+      ],
+      "n_rows": 11,
+      "depth_reference": "measured depth",
+      "trajectory_computed": false
+    },
+    "borehole_tracks.meta.json": {
+      "kind": "borehole-log",
+      "vertical_axis": "measured depth",
+      "depth_reference": "measured depth",
+      "trajectory_computed": false
+    },
+    "borehole_collar_qc.json": {
+      "skipped": true,
+      "reason": "borehole_collar_xy_required",
+      "coordinate_kind": "unknown",
+      "location_quality": "missing",
+      "collar_mapped": false,
+      "trajectory_computed": false,
+      "message": "Collar mapping needs coordinates and a documented CRS (or an explicit user-confirmed CRS). A vertical log is still viewable. No map position was invented."
+    }
+  },
+  "interpretation_limit": "Observed curves are measurements at measured depth. Overlay and mnemonic names do not prove geology."
+}

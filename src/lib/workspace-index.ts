@@ -101,7 +101,8 @@ export type AnalysisIntent =
   | "resistivity"
   | "seismic"
   | "radiometrics"
-  | "gpr";
+  | "gpr"
+  | "borehole";
 
 export function splitUserAndContext(message: string): { userText: string; context: string } {
   const match = message.match(/\n\n--- (?:Workspace|File Context) ---/);
@@ -118,6 +119,8 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
     /\b(do|run|perform|apply|start|process|correct|execute|analyse|analyze|plan|invert|grid|reduce)\b/.test(m) ||
     /\bday\s*\d+\b/.test(m);
   if (/\b(gpr|ground[\s-]?penetrating|radargram)\b/.test(m)) return "gpr";
+  const lidar = /\b(lidar|point[\s-]?cloud|\blaz\b)\b/.test(m);
+  if (/\b(borehole|well[\s-]?log|cwls)\b/.test(m) || (/\blas\b/.test(m) && !lidar)) return "borehole";
   if (/\b(segy|seismic|nmo|stack|kirchhoff)\b/.test(m)) return "seismic";
   if (/\b(ert|resistivity|wenner|schlumberger|dipole[\s-]?dipole|pseudosection)\b/.test(m)) return "resistivity";
   if (/\b(bouguer|free[\s-]?air|gravity|mgal)\b/.test(m)) return "gravity";

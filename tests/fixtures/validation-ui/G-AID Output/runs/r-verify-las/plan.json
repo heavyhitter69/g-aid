@@ -1,0 +1,13 @@
+{
+  "runId": "r-verify-las",
+  "planHash": "fixture-r-verify-las",
+  "intent": "borehole",
+  "status": "complete",
+  "capabilities": [
+    "borehole.ingest_las",
+    "borehole.view_logs",
+    "borehole.interpret"
+  ],
+  "product": "G-AID LAS 2.0 measured-depth log",
+  "parameters": {}
+}

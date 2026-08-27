@@ -270,6 +270,7 @@ export async function autoIngestFile(
 
   text = text.replace(/^\uFEFF/, "").trim();
   if (!text) return null;
+  if (ext === "las" && (text.startsWith("LASF") || text.includes("LASzip"))) return null;
 
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return null; // need at least header + 1 data row

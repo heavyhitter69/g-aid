@@ -77,6 +77,7 @@ export interface MapLayerSpec {
   parentRunId?: string;
   planHash?: string;
   crs?: CrsInfo;
+  bbox?: { minX: number; minY: number; maxX: number; maxY: number };
   units?: string;
   reason?: string;
   representation: "full" | "preview" | "undecoded";

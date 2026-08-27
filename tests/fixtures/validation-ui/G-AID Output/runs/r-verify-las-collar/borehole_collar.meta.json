@@ -1,0 +1,9 @@
+{
+  "kind": "borehole-collar",
+  "crs_epsg": 4326,
+  "coordinate_kind": "geographic",
+  "location_quality": "documented",
+  "collar_mapped": true,
+  "trajectory_computed": false,
+  "note": "Point is a collar, not a well path. Elevation is a datum reference, not a 3-D trajectory."
+}

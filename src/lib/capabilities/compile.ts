@@ -58,12 +58,20 @@ export const GPR_NODE_ORDER = [
   "gpr_interpret",
 ] as const;
 
+export const LAS_NODE_ORDER = [
+  "las_ingest",
+  "borehole_view",
+  "borehole_map_collar",
+  "borehole_interpret",
+] as const;
+
 export const KERNEL_NODE_ORDER = [
   ...MAGNETIC_NODE_ORDER,
   ...GRAVITY_NODE_ORDER,
   ...ERT_NODE_ORDER,
   ...RADIO_NODE_ORDER,
   ...GPR_NODE_ORDER,
+  ...LAS_NODE_ORDER,
 ] as const;
 
 export const MAGNETIC_NODE_DEPS: Record<string, string[]> = {
@@ -122,12 +130,20 @@ export const GPR_NODE_DEPS: Record<string, string[]> = {
   gpr_interpret: ["gpr_process", "gpr_migrate"],
 };
 
+export const LAS_NODE_DEPS: Record<string, string[]> = {
+  las_ingest: [],
+  borehole_view: ["las_ingest"],
+  borehole_map_collar: ["las_ingest"],
+  borehole_interpret: ["las_ingest", "borehole_view", "borehole_map_collar"],
+};
+
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...MAGNETIC_NODE_DEPS,
   ...GRAVITY_NODE_DEPS,
   ...ERT_NODE_DEPS,
   ...RADIO_NODE_DEPS,
   ...GPR_NODE_DEPS,
+  ...LAS_NODE_DEPS,
 };
 
 const NODE_LABELS: Record<string, string> = {
@@ -172,6 +188,10 @@ const NODE_LABELS: Record<string, string> = {
   gpr_migrate: "Kirchhoff time migration (user velocity only)",
   gpr_gis_export: "GPR trace GIS export",
   gpr_interpret: "GPR interpretation limits",
+  las_ingest: "Read bound CWLS LAS 2.0 WRAP.NO catalog records",
+  borehole_view: "Build measured-depth log tracks",
+  borehole_map_collar: "Map borehole collar when coordinates and CRS are documented",
+  borehole_interpret: "Borehole interpretation limits",
 };
 
 export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
@@ -192,11 +212,12 @@ export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
 function ownerCapability(
   nodeId: string,
   expanded: UserCapabilityId[]
-): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" {
+): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" {
   for (const id of expanded) {
     const capability = getCapability(id);
     if (capability?.kernelNodeIds.includes(nodeId)) return id;
   }
+  if (nodeFamily(nodeId) === "borehole") return "borehole.prereq";
   if (nodeFamily(nodeId) === "gpr") return "gpr.prereq";
   if (nodeFamily(nodeId) === "rad") return "rad.prereq";
   if (nodeFamily(nodeId) === "ert") return "ert.prereq";
@@ -204,7 +225,8 @@ function ownerCapability(
   return "mag.prereq";
 }
 
-function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" {
+function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "borehole" {
+  if ((LAS_NODE_ORDER as readonly string[]).includes(nodeId)) return "borehole";
   if ((GPR_NODE_ORDER as readonly string[]).includes(nodeId)) return "gpr";
   if ((RADIO_NODE_ORDER as readonly string[]).includes(nodeId)) return "rad";
   if ((ERT_NODE_ORDER as readonly string[]).includes(nodeId)) return "ert";
@@ -212,7 +234,7 @@ function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" {
   return "mag";
 }
 
-/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, and GPR never wait on each other. */
+/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, GPR, and borehole never wait on each other. */
 export function remapKernelDeps(nodeId: string, compiled: Set<string>): string[] {
   const original = KERNEL_NODE_DEPS[nodeId] || [];
   const present = original.filter((dep) => compiled.has(dep));
@@ -252,7 +274,8 @@ export function compileCapabilityDag(requested: string[]): CompiledDag {
       capabilityId === "grav.prereq" ||
       capabilityId === "ert.prereq" ||
       capabilityId === "rad.prereq" ||
-      capabilityId === "gpr.prereq"
+      capabilityId === "gpr.prereq" ||
+      capabilityId === "borehole.prereq"
         ? undefined
         : getCapability(capabilityId);
     nodes.push({

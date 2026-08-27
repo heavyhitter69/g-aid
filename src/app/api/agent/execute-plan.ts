@@ -196,6 +196,8 @@ async function runDiurnalPipeline(
     secExp: pending.parameters.secExp,
     applyBandpass: pending.parameters.applyBandpass,
     filterOrder: pending.parameters.filterOrder,
+    selectedCurves: pending.parameters.selectedCurves,
+    collarCrsConfirmed: pending.parameters.collarCrsConfirmed,
     steps: pending.steps,
     runId: pending.runId,
     parentRunId: pending.parentRunId,

@@ -1,7 +1,7 @@
 /**
  * ScientificTool registry — kernel bindings from the live capability registry.
  * Seismic is not registered for execution. Radiometrics and GPR use the same
- * engine as magnetics/gravity/ERT. Do not add a RadiometricsPipeline or GprPipeline.
+ * engine as magnetics/gravity/ERT. Do not add a RadiometricsPipeline, GprPipeline, or BoreholePipeline.
  */
 
 import crypto from "crypto";
@@ -61,6 +61,10 @@ const NODE_SCRIPTS: Record<string, string> = {
   gpr_migrate: SCIENCE,
   gpr_gis_export: SCIENCE,
   gpr_interpret: SCIENCE,
+  las_ingest: SCIENCE,
+  borehole_view: SCIENCE,
+  borehole_map_collar: SCIENCE,
+  borehole_interpret: SCIENCE,
 };
 
 function toolsFromLiveRegistry(): ScientificTool[] {
@@ -81,7 +85,7 @@ function toolsFromLiveRegistry(): ScientificTool[] {
               ? "resistivity"
               : capability.domain === "radiometrics"
                 ? "spatial"
-                : capability.domain === "gpr"
+                : capability.domain === "gpr" || capability.domain === "borehole"
                   ? "spatial"
                 : "magnetic",
         description: `${capability.description} (kernel ${nodeId})`,

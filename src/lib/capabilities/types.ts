@@ -1,5 +1,5 @@
 /**
- * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, and GPR are the registered packs.
+ * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, GPR, and LAS borehole are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -38,6 +38,10 @@ export const USER_CAPABILITY_IDS = [
   "gpr.migrate",
   "gpr.gis",
   "gpr.interpret",
+  "borehole.ingest_las",
+  "borehole.view_logs",
+  "borehole.map_collar",
+  "borehole.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -53,7 +57,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -71,7 +75,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr";
+  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr" | "borehole";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -89,7 +93,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -158,4 +162,21 @@ export interface BoundInput {
   dxM?: number;
   antennaMHz?: number;
   velocityMs?: number;
+  wellId?: string;
+  curves?: string[];
+  curveUnits?: string[];
+  nullValue?: number;
+  startDepth?: number;
+  stopDepth?: number;
+  step?: number;
+  wrap?: string;
+  lasVersion?: string;
+  depthIndex?: string;
+  depthUnits?: string;
+  collarX?: number;
+  collarY?: number;
+  collarZ?: number;
+  coordinateKind?: "geographic" | "easting-northing" | "unknown";
+  locationQuality?: "documented" | "user-confirmed" | "missing";
+  collarMappable?: boolean;
 }

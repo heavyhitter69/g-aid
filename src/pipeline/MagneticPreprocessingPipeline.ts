@@ -59,6 +59,10 @@ const NODE_SCRIPTS: Record<string, string> = {
   gpr_migrate: SCIENCE,
   gpr_gis_export: SCIENCE,
   gpr_interpret: SCIENCE,
+  las_ingest: SCIENCE,
+  borehole_view: SCIENCE,
+  borehole_map_collar: SCIENCE,
+  borehole_interpret: SCIENCE,
 };
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
@@ -69,6 +73,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     // ERT uses this same engine. Do not add a ResistivityPipeline execution route.
     // Radiometrics uses this same engine. Do not add a RadiometricsPipeline execution route.
     // GPR uses this same engine. Do not add a GprPipeline execution route.
+    // LAS borehole uses this same engine. Do not add a WellLogPipeline / BoreholePipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
     for (const id of KERNEL_NODE_ORDER) {
@@ -113,6 +118,7 @@ export class RadiometricPipeline extends PipelineEngine {
   }
 }
 
+/** Unused stub. LAS borehole executes through MagneticPreprocessingPipeline + compileCapabilityDag. */
 export class WellLogPipeline extends PipelineEngine {
   constructor() {
     super();

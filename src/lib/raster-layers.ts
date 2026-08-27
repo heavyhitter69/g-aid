@@ -79,6 +79,8 @@ export function layerLabel(pathOrStem: string): string {
   if (base.includes("1vd")) return "1VD";
   if (base.includes("seismic")) return "Seismic section";
   if (base.includes("gpr")) return "GPR section";
+  if (base.includes("borehole_tracks")) return "Borehole log (measured depth)";
+  if (base.includes("borehole_collar")) return "Borehole collar";
   if (base.includes("pseudosection") || base.includes("pseudo")) return "Pseudosection";
   if (base.includes("rad_k_grid")) return "K channel";
   if (base.includes("rad_eu_grid")) return "eU channel";

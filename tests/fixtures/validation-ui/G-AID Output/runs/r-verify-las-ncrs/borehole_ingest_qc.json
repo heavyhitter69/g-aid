@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "product_name": "G-AID LAS 2.0 canonical log",
+      "las_standard": "CWLS LAS 2.0 WRAP.NO",
+      "las_version": "2.0",
+      "wrap": "NO",
+      "well_id": "NOCRS",
+      "null_value": -999.25,
+      "null_assumed": false,
+      "strt": 0.0,
+      "stop": 4.0,
+      "step": 2.0,
+      "depth_index": "DEPT",
+      "depth_units": "M",
+      "depth_reference": "measured depth",
+      "n_rows": 3,
+      "curves": [
+        {
+          "mnemonic": "DEPT",
+          "unit": "M",
+          "description": "",
+          "semantics": "unknown"
+        },
+        {
+          "mnemonic": "GR",
+          "unit": "GAPI",
+          "description": "",
+          "semantics": "unknown"
+        }
+      ],
+      "collar_x": 28.04,
+      "collar_y": -26.2,
+      "collar_z": null,
+      "collar_z_mnemonic": null,
+      "coordinate_kind": "geographic",
+      "crs_epsg": null,
+      "elevation_datum": null,
+      "location_quality": "missing",
+      "collar_mappable": false,
+      "trajectory_computed": false,
+      "catalog_id": "cat-r-verify-las-ncrs",
+      "checksum": "fixture",
+      "header_provenance": {
+        "VERS": "2.0",
+        "WRAP": "NO",
+        "WELL": "NOCRS",
+        "source": "/workspace/tests/fixtures/las-project/missing-crs/well.las"
+      },
+      "warnings": [
+        "Collar coordinates are present without a documented CRS."
+      ],
+      "formula": "CWLS LAS 2.0 WRAP.NO ASCII well log. Measured depth is not TVD or a trajectory."
+    }
+  ],
+  "n_rows": 3,
+  "depth_reference": "measured depth",
+  "trajectory_computed": false
+}

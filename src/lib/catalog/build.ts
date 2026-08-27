@@ -71,6 +71,7 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     size: stat.size,
     peek,
     peekText: peekText(peek),
+    absPath,
   };
   const classified = classifyPeek(ctx);
   if (classified.sniff?.parseErrors) parseErrors.push(...classified.sniff.parseErrors);
@@ -128,6 +129,23 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     dxM: classified.inspect.dxM,
     antennaMHz: classified.inspect.antennaMHz,
     velocityMs: classified.inspect.velocityMs,
+    wellId: classified.inspect.wellId,
+    curves: classified.inspect.curves,
+    curveUnits: classified.inspect.curveUnits,
+    nullValue: classified.inspect.nullValue,
+    startDepth: classified.inspect.startDepth,
+    stopDepth: classified.inspect.stopDepth,
+    step: classified.inspect.step,
+    wrap: classified.inspect.wrap,
+    lasVersion: classified.inspect.lasVersion,
+    depthIndex: classified.inspect.depthIndex,
+    depthUnits: classified.inspect.depthUnits,
+    collarX: classified.inspect.collarX,
+    collarY: classified.inspect.collarY,
+    collarZ: classified.inspect.collarZ,
+    coordinateKind: classified.inspect.coordinateKind,
+    locationQuality: classified.inspect.locationQuality,
+    collarMappable: classified.inspect.collarMappable,
     provenance: {
       method: classified.method,
       adapterId: classified.adapterId || undefined,

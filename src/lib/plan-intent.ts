@@ -62,6 +62,7 @@ export function intentToSteps(
   if (intent === "seismic") next.seismic = true;
   if (intent === "radiometrics") next.radiometrics = true;
   if (intent === "gpr") next.gpr = true;
+  if (intent === "borehole") next.borehole = true;
 
   const mag =
     intent === "diurnal" ||
@@ -91,7 +92,7 @@ export function inferIntentFromFiles(
 ): AnalysisIntent | "none" {
   if (detected) return detected;
   const m = message.toLowerCase();
-  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr)\b/.test(m)) {
+  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b)\b/.test(m)) {
     return detectAnalysisIntent(message) || "none";
   }
   void index;
@@ -135,6 +136,23 @@ export function collectPlanInputs(
       dxM: record.dxM,
       antennaMHz: record.antennaMHz,
       velocityMs: record.velocityMs,
+      wellId: record.wellId,
+      curves: record.curves,
+      curveUnits: record.curveUnits,
+      nullValue: record.nullValue,
+      startDepth: record.startDepth,
+      stopDepth: record.stopDepth,
+      step: record.step,
+      wrap: record.wrap,
+      lasVersion: record.lasVersion,
+      depthIndex: record.depthIndex,
+      depthUnits: record.depthUnits,
+      collarX: record.collarX,
+      collarY: record.collarY,
+      collarZ: record.collarZ,
+      coordinateKind: record.coordinateKind,
+      locationQuality: record.locationQuality,
+      collarMappable: record.collarMappable,
     }));
   }
   void index;

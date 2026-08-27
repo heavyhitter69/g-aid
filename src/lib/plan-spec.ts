@@ -24,6 +24,7 @@ import {
 import { NEAR_ZONE_STATEMENTS, ZONED_PLANAR_OFFER, ZONED_PLANAR_PRODUCT_NAME, ZONED_TERRAIN_STATEMENTS, COMPLETE_BOUGUER_REFUSAL, isCompleteBouguerRequest, isZonedPlanarApproval } from "./gravity-product.ts";
 import { RADIO_STATEMENTS } from "./radio-product.ts";
 import { GPR_STATEMENTS, GPR_MIGRATION_BENCHMARK_PASSED, DEFAULT_DEWOW_WINDOW, DEFAULT_FILTER_ORDER, DEFAULT_SEC_POWER, gprFrozenNyquistLine } from "./gpr-product.ts";
+import { BOREHOLE_STATEMENTS } from "./borehole-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -47,6 +48,7 @@ export type PlanSteps = {
   seismic: boolean;
   radiometrics: boolean;
   gpr: boolean;
+  borehole: boolean;
 };
 
 export const EMPTY_STEPS: PlanSteps = {
@@ -69,6 +71,7 @@ export const EMPTY_STEPS: PlanSteps = {
   seismic: false,
   radiometrics: false,
   gpr: false,
+  borehole: false,
 };
 
 export type PlanIntent = AnalysisIntent | "none";
@@ -122,6 +125,23 @@ export interface PlanInput {
   dxM?: number;
   antennaMHz?: number;
   velocityMs?: number;
+  wellId?: string;
+  curves?: string[];
+  curveUnits?: string[];
+  nullValue?: number;
+  startDepth?: number;
+  stopDepth?: number;
+  step?: number;
+  wrap?: string;
+  lasVersion?: string;
+  depthIndex?: string;
+  depthUnits?: string;
+  collarX?: number;
+  collarY?: number;
+  collarZ?: number;
+  coordinateKind?: "geographic" | "easting-northing" | "unknown";
+  locationQuality?: "documented" | "user-confirmed" | "missing";
+  collarMappable?: boolean;
 }
 
 export interface AgentPlan {
@@ -169,6 +189,8 @@ export interface AgentPlan {
     secExp?: number;
     applyBandpass?: boolean;
     filterOrder?: number;
+    selectedCurves?: string;
+    collarCrsConfirmed?: boolean;
     gravityMapping?: {
       x: string;
       y: string;
@@ -253,6 +275,7 @@ export const STEP_KEYS = [
   "seismic",
   "radiometrics",
   "gpr",
+  "borehole",
 ] as const satisfies readonly (keyof PlanSteps)[];
 
 type StepKey = (typeof STEP_KEYS)[number];
@@ -304,6 +327,8 @@ export const RADIO_STEP_KEYS = ["radiometrics"] as const satisfies readonly Step
 
 export const GPR_STEP_KEYS = ["gpr"] as const satisfies readonly StepKey[];
 
+export const BOREHOLE_STEP_KEYS = ["borehole"] as const satisfies readonly StepKey[];
+
 export const UNSUPPORTED_STEP_KEYS = ["seismic"] as const satisfies readonly StepKey[];
 
 export const STEP_NODE_IDS: Record<StepKey, string[]> = {
@@ -326,6 +351,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   seismic: ["seismic_process"],
   radiometrics: ["rad_ingest", "rad_grid", "rad_ternary", "rad_ratios", "rad_gis_export", "rad_interpret"],
   gpr: ["gpr_ingest", "gpr_process", "gpr_interpret"],
+  borehole: ["las_ingest", "borehole_view", "borehole_interpret"],
 };
 
 export function magneticStepsEnabled(steps: PlanSteps): boolean {
@@ -346,6 +372,10 @@ export function radiometricsStepsEnabled(steps: PlanSteps): boolean {
 
 export function gprStepsEnabled(steps: PlanSteps): boolean {
   return GPR_STEP_KEYS.some((key) => steps[key]);
+}
+
+export function boreholeStepsEnabled(steps: PlanSteps): boolean {
+  return BOREHOLE_STEP_KEYS.some((key) => steps[key]);
 }
 
 export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
@@ -377,6 +407,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "seismic", re: /\bseg-?y\b|\bseismic\b/i },
   { key: "radiometrics", re: /\bradiometr/i },
   { key: "gpr", re: /\bgpr\b|ground[ -]?penetrating/i },
+  { key: "borehole", re: /\bborehole\b|\bwell[ -]?log\b|\blas\b|cwls/i },
 ];
 
 export function cloneSteps(steps: PlanSteps = EMPTY_STEPS): PlanSteps {
@@ -446,6 +477,8 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
       return "Ingest already-corrected radiometric K/eU/eTh/TC, grid, and evidence-bound maps (not height/stripping/NASVD)";
     case "gpr":
       return "Ingest G-AID GPR 1.0, dewow/time-zero/SEC/bandpass, and write a two-way-time radargram (not depth, not utilities)";
+    case "borehole":
+      return "Ingest CWLS LAS 2.0 WRAP.NO, view measured-depth logs, and write evidence-bound interpretation limits (not lithology or a well path)";
   }
 }
 
@@ -520,6 +553,11 @@ export function renderImplementationPlan(opts: {
       if (!notes.includes(line)) notes.push(line);
     }
   }
+  if (boreholeStepsEnabled(opts.steps)) {
+    for (const line of BOREHOLE_STATEMENTS) {
+      if (!notes.includes(line)) notes.push(line);
+    }
+  }
   const bound = (opts.inputs || []).map((item) => `- \`${item.catalogId}\` ${item.path} (${item.adapterId || item.kind || "bound"})`);
   const artifacts = dag.requestedCapabilityIds.flatMap((id) =>
     (getCapability(id)?.expectedArtifacts || []).map((name) => `- ${name}`)
@@ -538,7 +576,8 @@ export function renderImplementationPlan(opts: {
     (item) => item.adapterId === "radiometric-csv" || item.adapterId === "radiometric-xyz"
   );
   const gprInputs = (opts.inputs || []).some((item) => item.adapterId === "gpr-csv");
-  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs].filter(Boolean).length;
+  const lasInputs = (opts.inputs || []).some((item) => item.adapterId === "las-well");
+  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs].filter(Boolean).length;
   const mixed = mixedCount > 1;
   const field = [
     typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
@@ -558,6 +597,9 @@ export function renderImplementationPlan(opts: {
           fHighHz: opts.fHighHz,
           applyBandpass: opts.applyBandpass,
         })
+        : "",
+    boreholeStepsEnabled(opts.steps)
+      ? "Borehole product: CWLS LAS 2.0 WRAP.NO measured-depth log. Depth is not TVD. A collar is mapped only with coordinates and CRS."
       : "",
     opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
     opts.requestIntent ? `Frozen request intent: ${opts.requestIntent}` : "",
@@ -577,15 +619,17 @@ export function renderImplementationPlan(opts: {
         ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless a named terrain plan is approved."
         : "",
   ].filter(Boolean);
-  const thisRunFallback = gprStepsEnabled(opts.steps)
-    ? "- Ask for a registered GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
+  const thisRunFallback = boreholeStepsEnabled(opts.steps)
+    ? "- Ask for a registered borehole, GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
+    : gprStepsEnabled(opts.steps)
+    ? "- Ask for a registered GPR, borehole, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
     : radiometricsStepsEnabled(opts.steps)
-    ? "- Ask for a registered radiometric, ERT, gravity, magnetic, or GPR method I can run. Seismic is not in this release."
+    ? "- Ask for a registered radiometric, ERT, gravity, magnetic, GPR, or borehole method I can run. Seismic is not in this release."
     : ertStepsEnabled(opts.steps)
-    ? "- Ask for a registered ERT, gravity, magnetic, radiometric, or GPR method I can run. Seismic is not in this release."
+    ? "- Ask for a registered ERT, gravity, magnetic, radiometric, GPR, or borehole method I can run. Seismic is not in this release."
     : gravityStepsEnabled(opts.steps)
-    ? "- Ask for a gravity, magnetic, ERT, radiometric, or GPR method I can run. Seismic is not in this release."
-    : "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP), a gravity reduction, ERT, already-corrected radiometrics, or G-AID GPR 1.0. Seismic is not in this release.";
+    ? "- Ask for a gravity, magnetic, ERT, radiometric, GPR, or borehole method I can run. Seismic is not in this release."
+    : "- Ask for a magnetic method I can run (diurnal, IGRF, grid, RTP), a gravity reduction, ERT, already-corrected radiometrics, G-AID GPR 1.0, or a CWLS LAS 2.0 well log. Seismic is not in this release.";
 
   return `# Implementation Plan
 
@@ -597,7 +641,7 @@ export function renderImplementationPlan(opts: {
 ${items.join("\n") || thisRunFallback}
 
 ## Bound inputs
-${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, and/or RAD-contract catalog IDs before Proceed."}
+${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, and/or LAS 2.0 catalog IDs before Proceed."}
 
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
@@ -763,6 +807,13 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
     ? plan.capabilities
     : capabilitiesFromSteps(plan.steps as unknown as Record<string, boolean>);
   let proposed = proposeCapabilitiesFromMessage(raw, previous);
+  if (
+    proposed.includes("borehole.ingest_las") &&
+    !proposed.includes("borehole.map_collar") &&
+    (plan.inputs || []).some((item) => item.adapterId === "las-well" && (item.crs || item.collarMappable))
+  ) {
+    proposed = [...proposed, "borehole.map_collar"];
+  }
   const decisions: ReviewDecision[] = [...(plan.reviewDecisions || [])];
   const now = new Date().toISOString();
   const parameters = { ...plan.parameters };
@@ -827,6 +878,11 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   if (/\b(skip|omit|without|no)\b.{0,24}\b(band[\s-]?pass|bandpass|filter)\b/.test(m)) parameters.applyBandpass = false;
   const dewowWin = raw.match(/\bdewow window[:\s=]+(\d+)/i);
   if (dewowWin) parameters.dewowWindow = parseInt(dewowWin[1], 10);
+  if (/\b(confirm(?:ed)? (?:the )?collar crs|collar crs confirmed|treat (?:lat|long|location).{0,40}epsg:?\s*4326)\b/i.test(raw)) {
+    parameters.collarCrsConfirmed = true;
+  }
+  const selected = raw.match(/\bselect(?:ed)? curves?[:\s]+([A-Za-z0-9_,\s]+)/i);
+  if (selected) parameters.selectedCurves = selected[1].trim();
   const ford = raw.match(/\bfilter order[:\s=]+(\d+)/i);
   if (ford) parameters.filterOrder = parseInt(ford[1], 10);
   const tzTh = raw.match(/\btime[\s-]?zero threshold[:\s=]+(\d+(?:\.\d+)?)/i);
@@ -934,6 +990,14 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
                     : "Kirchhoff time migration is unavailable until the documented diffraction benchmark passes."
                 : id === "gpr.process"
                   ? "Accepted GPR process. Dewow, time-zero, SEC, and band-pass are optional frozen parameters. Band-pass corners are validated against Nyquist from dt_ns."
+                : id === "borehole.ingest_las"
+                  ? "Accepted CWLS LAS 2.0 WRAP.NO ingest. LASF LiDAR, WRAP.YES, and LAS 3.0 stay recognised-unsupported. Curve meaning is not invented from mnemonics."
+                : id === "borehole.view_logs"
+                  ? "Accepted borehole log viewing as measured depth. This is not TVD or a well trajectory."
+                : id === "borehole.map_collar"
+                  ? "Accepted collar mapping only with documented or user-confirmed CRS. Vertical logs without location stay unmapped."
+                : id === "borehole.interpret"
+                  ? "Accepted evidence-bound borehole interpretation limits. Lithology, aquifers, mineralisation, and drill targeting are not established."
                 : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
@@ -1029,6 +1093,11 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
   if (gprStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps))) {
     notes.push(
       "GPR products may display with magnetic, gravity, ERT, or radiometric maps. Joint inversion is not a registered capability."
+    );
+  }
+  if (boreholeStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps))) {
+    notes.push(
+      "Borehole products may display with magnetic, gravity, ERT, radiometric, or GPR maps. A collar overlay is coincidence, not a joint interpretation."
     );
   }
   const dag = compileCapabilityDag(capabilities);
@@ -1172,18 +1241,18 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
     });
   }
 
-  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps)) {
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps)) {
     blockers.push({
       level: "blocker",
       code: "unsupported_method",
       message:
-        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, already-corrected radiometric ingest, or G-AID GPR 1.0 after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic is not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities.",
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, already-corrected radiometric ingest, G-AID GPR 1.0, or CWLS LAS 2.0 well logs after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic is not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities. Lithology classification and well trajectories are not live borehole capabilities.",
     });
   } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({
       level: "warning",
       code: "unsupported_method",
-      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric/GPR DAG is executed.",
+      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric/GPR/borehole DAG is executed.",
     });
   }
 
@@ -1273,6 +1342,25 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
         code: "no_gpr_files",
         message:
           "GPR processing needs a supported gpr-csv catalog record. An arbitrary DZT or amplitude table is not GPR data.",
+      });
+    }
+  }
+
+  if (boreholeStepsEnabled(plan.steps)) {
+    const lasFiles = inputs.filter((item) => item.adapterId === "las-well" || item.kind === "las-well");
+    if (inputs.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_las_files",
+        message:
+          "Borehole processing needs a supported CWLS LAS 2.0 WRAP.NO catalog record. I will not take the first .las file or a LASF point cloud.",
+      });
+    } else if (lasFiles.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_las_files",
+        message:
+          "Borehole processing needs a supported las-well catalog record. An arbitrary .las or LASF/LAZ point cloud is not a well log.",
       });
     }
   }

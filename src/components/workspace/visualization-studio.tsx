@@ -28,10 +28,13 @@ import {
 } from "@/lib/map";
 import { cn } from "@/lib/utils";
 import { isErtSectionPath, isGprSectionPath, isSectionPath, parseSectionCsv } from "@/lib/section/parse";
+import { isBoreholeCollarPath, isBoreholeLogPath, parseBoreholeTracks } from "@/lib/log/parse";
 import { SectionView } from "@/components/workspace/section-view";
+import { LogView } from "@/components/workspace/log-view";
 import { gravityProductWarnings } from "@/lib/gravity-product";
 import { radioProductWarnings } from "@/lib/radio-product";
 import { gprProductWarnings, gprProductWarningsFromQc } from "@/lib/gpr-product";
+import { boreholeProductWarnings, layersOverlappingCollar } from "@/lib/borehole-product";
 import { isRadioTernaryPath, parseRadioTernaryJson } from "@/lib/radio/ternary";
 import { TernaryView } from "@/components/workspace/ternary-view";
 
@@ -111,18 +114,24 @@ export function VisualizationStudio() {
   const layers = useMemo(() => {
     const mapped = buildMapLayers({ catalog: projectCatalog, files: allPaths });
     const extras = allPaths
-      .filter((path) => isSectionPath(path) || isRadioTernaryPath(path))
+      .filter((path) => isSectionPath(path) || isRadioTernaryPath(path) || isBoreholeLogPath(path))
       .filter((path) => !mapped.some((layer) => layer.path === path));
     const extraLayers: MapLayerSpec[] = extras.map((path) => ({
-      id: `${isRadioTernaryPath(path) ? "ternary" : "section"}:${path}`,
+      id: `${isRadioTernaryPath(path) ? "ternary" : isBoreholeLogPath(path) ? "log" : "section"}:${path}`,
       path,
       label: path.replace(/\\/g, "/").split("/").pop() || path,
       origin: "derived-run",
       displayStatus: "viewable",
-      formatId: isRadioTernaryPath(path) ? "rad-ternary" : isGprSectionPath(path) ? "gpr-section" : "ert-section",
-      mediaClass: "section",
+      formatId: isRadioTernaryPath(path)
+        ? "rad-ternary"
+        : isBoreholeLogPath(path)
+          ? "las-well"
+          : isGprSectionPath(path)
+            ? "gpr-section"
+            : "ert-section",
+      mediaClass: isBoreholeLogPath(path) ? "borehole-log" : "section",
       runId: runIdFromPath(path),
-      units: isRadioTernaryPath(path) ? "unknown" : isGprSectionPath(path) ? "amp" : "ohm.m",
+      units: isRadioTernaryPath(path) ? "unknown" : isGprSectionPath(path) ? "amp" : isBoreholeLogPath(path) ? "measured depth" : "ohm.m",
       representation: "full",
     }));
     return [...mapped, ...extraLayers];
@@ -378,6 +387,11 @@ export function VisualizationStudio() {
     }
   }, [active, text]);
 
+  const boreholeLog = useMemo(() => {
+    if (!active || !text || !isBoreholeLogPath(active.path)) return null;
+    return parseBoreholeTracks(text, active.path);
+  }, [active, text]);
+
   const sidecar = useMemo(() => {
     if (!active || !/\.asc$/i.test(active.path)) return {};
     const metaPath = active.path.replace(/\.asc$/i, ".meta.json");
@@ -408,6 +422,37 @@ export function VisualizationStudio() {
     return found ? merged : null;
   }, [active, fileContents]);
 
+  const collarOverlap = useMemo(() => {
+    if (!active || !isBoreholeCollarPath(active.path) || !vector) return [];
+    const pt = vector.data.features[0]?.coordinates[0];
+    if (!pt) return [];
+    const seen = new Set<string>();
+    const sources: Array<{
+      path: string;
+      label: string;
+      formatId: string;
+      bbox?: { minX: number; minY: number; maxX: number; maxY: number };
+      crs?: MapLayerSpec["crs"] | string;
+    }> = [];
+    for (const layer of orderedLayers) {
+      if (!layer.bbox || seen.has(layer.path)) continue;
+      seen.add(layer.path);
+      sources.push({ path: layer.path, label: layer.label, formatId: layer.formatId, bbox: layer.bbox, crs: layer.crs });
+    }
+    for (const record of projectCatalog?.records || []) {
+      if (!record.bbox || seen.has(record.relativePath)) continue;
+      seen.add(record.relativePath);
+      sources.push({
+        path: record.relativePath,
+        label: record.filename,
+        formatId: record.formatId,
+        bbox: record.bbox,
+        crs: record.crs,
+      });
+    }
+    return layersOverlappingCollar(sources, { x: pt.x, y: pt.y, crs: activeCrs?.key });
+  }, [active, vector, orderedLayers, projectCatalog, activeCrs]);
+
   const quantity = raster?.quantity || sidecar.quantity || ternary?.quantity || "";
   const recordedUnits = raster?.units || sidecar.units || ternary?.units || active?.units;
   const units = mapValueUnits(active?.path || "", active?.formatId, recordedUnits);
@@ -422,6 +467,12 @@ export function VisualizationStudio() {
     ...(active ? gravityProductWarnings({ path: active.path }) : []),
     ...(active ? radioProductWarnings({ path: active.path, quantity, units }) : []),
     ...(active ? gprWarningsForPath(active.path, gprQc) : []),
+    ...(active && isBoreholeLogPath(active.path)
+      ? boreholeProductWarnings({ path: active.path, depthReference: boreholeLog?.depthReference, trajectoryComputed: boreholeLog?.trajectoryComputed })
+      : []),
+    ...(active && isBoreholeCollarPath(active.path)
+      ? boreholeProductWarnings({ path: active.path, collarMapped: true, crs: activeCrs?.key })
+      : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
   ].filter(Boolean);
@@ -457,7 +508,7 @@ export function VisualizationStudio() {
         <Layers className="h-8 w-8" />
         <h2 className="text-lg font-semibold text-[#cccccc]">Map workspace</h2>
         <p className="text-sm max-w-md text-center">
-          Catalog GeoJSON/DEM/ASCII records and completed magnetic run products appear here. Shapefile, LAS/LAZ, and SEG-Y are not decoded.
+          Catalog GeoJSON/DEM/ASCII records and completed magnetic run products appear here. Shapefile, LAS/LAZ point clouds, and SEG-Y are not decoded.
         </p>
       </section>
     );
@@ -568,7 +619,7 @@ export function VisualizationStudio() {
           })}
         </ul>
         <p className="px-3 py-2 text-[10px] text-[#6a6a6a] leading-snug border-t border-[#2b2b2b]">
-          Display is not processing. Shapefile, LAS/LAZ, FileGDB, and SEG-Y stay undecoded.
+          Display is not processing. Shapefile, LAS/LAZ point clouds, FileGDB, and SEG-Y stay undecoded. LAS well logs use the log viewer, not LiDAR.
         </p>
       </aside>
       <div className="flex-1 min-w-0 min-h-0 relative flex flex-col">
@@ -580,31 +631,55 @@ export function VisualizationStudio() {
         ) : null}
         {ternary ? (
           <TernaryView ternary={ternary} />
+        ) : boreholeLog ? (
+          <LogView log={boreholeLog} />
         ) : section ? (
           <SectionView
             section={section}
             extraWarnings={active && isGprSectionPath(active.path) ? gprWarningsForPath(active.path, gprQc) : []}
           />
         ) : active?.formatId === "geojson" && vector ? (
-          <GridMapView
-            title={active.label}
-            grid={{
-              ncols: 2,
-              nrows: 2,
-              xllcorner: (vector.data.features[0]?.coordinates[0]?.x ?? 0) - 1,
-              yllcorner: (vector.data.features[0]?.coordinates[0]?.y ?? 0) - 1,
-              cellsize: 1,
-              nodata: -9999,
-              values: new Float64Array([0, 0, 0, 0]),
-              units: "coordinate",
-            }}
-            overlay={pointsFromVector(vector.data)}
-            overlayLines={linesFromVector(vector.data)}
-            units={units}
-            warnings={warnings}
-            crsLabel={activeCrs?.label}
-            opacity={ui[active.id]?.opacity ?? 1}
-          />
+          <div className="h-full flex flex-col min-h-0">
+            <div className="flex-1 min-h-0">
+              <GridMapView
+                title={active.label}
+                grid={{
+                  ncols: 2,
+                  nrows: 2,
+                  xllcorner: (vector.data.features[0]?.coordinates[0]?.x ?? 0) - 1,
+                  yllcorner: (vector.data.features[0]?.coordinates[0]?.y ?? 0) - 1,
+                  cellsize: 1,
+                  nodata: -9999,
+                  values: new Float64Array([0, 0, 0, 0]),
+                  units: "coordinate",
+                }}
+                overlay={pointsFromVector(vector.data)}
+                overlayLines={linesFromVector(vector.data)}
+                units={units}
+                warnings={warnings}
+                crsLabel={activeCrs?.label}
+                opacity={ui[active.id]?.opacity ?? 1}
+              />
+            </div>
+            {isBoreholeCollarPath(active.path) ? (
+              <div className="border-t border-[#2b2b2b] px-3 py-2 text-[11px] bg-[#181818]" data-testid="collar-overlap">
+                <p className="text-[#858585] uppercase tracking-wide text-[10px]">Layers overlapping this collar</p>
+                {collarOverlap.length ? (
+                  <ul className="mt-1 space-y-1">
+                    {collarOverlap.map((hit) => (
+                      <li key={hit.path}>
+                        {hit.label} ({hit.formatId}) — {hit.reason}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-[#858585]">
+                    No same-CRS map layer bbox contains this collar. Coincidence is not a joint interpretation.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
         ) : (
           <GridMapView
             title={active?.label || folderOf(active?.path || "") || "Map"}

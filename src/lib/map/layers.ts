@@ -81,6 +81,7 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
     mediaClass: record.mediaClass,
     supportStatus: record.supportStatus,
     crs,
+    bbox: record.bbox,
     units: mapValueUnits(record.relativePath, formatId, record.units),
     reason: adapter?.reason,
     representation: decoded && viewable ? "full" : "undecoded",

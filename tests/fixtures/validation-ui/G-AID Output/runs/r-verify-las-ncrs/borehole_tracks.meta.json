@@ -1,0 +1,6 @@
+{
+  "kind": "borehole-log",
+  "vertical_axis": "measured depth",
+  "depth_reference": "measured depth",
+  "trajectory_computed": false
+}

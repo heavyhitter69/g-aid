@@ -5,6 +5,7 @@ import { demAsciiAdapter } from "./adapters/dem.ts";
 import { ertCsvAdapter, ertDatAdapter } from "./adapters/ert.ts";
 import { radiometricCsvAdapter, radiometricSpectrumAdapter, radiometricXyzAdapter } from "./adapters/radio.ts";
 import { gprCsvAdapter, gprDztAdapter } from "./adapters/gpr.ts";
+import { lasWellAdapter } from "./adapters/las.ts";
 import { recognisedAdapters } from "./adapters/recognised.ts";
 import type { CatalogAdapter } from "./adapters/types.ts";
 
@@ -21,6 +22,7 @@ const adapters: CatalogAdapter[] = [
   radiometricSpectrumAdapter,
   gprCsvAdapter,
   gprDztAdapter,
+  lasWellAdapter,
   ...recognisedAdapters,
 ];
 

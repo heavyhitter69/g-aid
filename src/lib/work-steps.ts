@@ -50,7 +50,10 @@ const NODE_LABELS: Record<string, { running: string; done: string }> = {
   gpr_gis_export: { running: "Writing GPR trace GIS", done: "Wrote GPR trace GIS" },
   gpr_interpret: { running: "Writing GPR interpretation limits", done: "Wrote GPR interpretation limits" },
   seismic_process: { running: "Processing seismic", done: "Processed seismic" },
-  las_ingest: { running: "Reading well log", done: "Wrote well log" },
+  las_ingest: { running: "Reading CWLS LAS 2.0 well log", done: "Read CWLS LAS 2.0 well log" },
+  borehole_view: { running: "Building measured-depth log tracks", done: "Wrote measured-depth log tracks" },
+  borehole_map_collar: { running: "Mapping borehole collar", done: "Wrote borehole collar" },
+  borehole_interpret: { running: "Writing borehole interpretation limits", done: "Wrote borehole interpretation limits" },
   excel_export_adapter: { running: "Writing tables", done: "Wrote tables" },
   report_export_adapter: { running: "Writing QC notes", done: "Wrote QC notes" },
 };

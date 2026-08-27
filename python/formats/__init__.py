@@ -286,55 +286,10 @@ def parse_geosoft_xyz(path: str) -> pd.DataFrame:
 
 
 def parse_las(path: str) -> dict:
-    """LAS 2.0 well log."""
-    sections: dict[str, list[str]] = {"V": [], "W": [], "C": [], "P": [], "A": []}
-    current = None
-    with open(path, "r", errors="ignore") as handle:
-        for line in handle:
-            if line.startswith("~"):
-                key = line[1].upper() if len(line) > 1 else "A"
-                current = key if key in sections else "A"
-                continue
-            if current:
-                sections[current].append(line.rstrip("\n"))
-    curves = []
-    for line in sections["C"]:
-        if not line or line.startswith("#"):
-            continue
-        name = line.split(".", 1)[0].strip().split()[0] if "." in line else line.split()[0]
-        curves.append(name)
-    if not curves:
-        raise ValueError(f"No LAS curve mnemonics in {path}")
-    rows = []
-    null = -999.25
-    for line in sections["W"]:
-        if "NULL" in line.upper():
-            try:
-                null = float(line.split(".", 1)[-1].split(":")[0].strip().split()[0])
-            except (ValueError, IndexError):
-                pass
-    for line in sections["A"]:
-        if not line.strip() or line.startswith("#"):
-            continue
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        try:
-            rows.append([float(p) for p in parts])
-        except ValueError:
-            continue
-    if not rows:
-        raise ValueError(f"No LAS ASCII data in {path}")
-    arr = np.asarray(rows, float)
-    n = min(arr.shape[1], len(curves))
-    data = {curves[i]: arr[:, i] for i in range(n)}
-    df = pd.DataFrame(data)
-    df = df.replace(null, np.nan)
-    well = ""
-    for line in sections["W"]:
-        if line.strip().upper().startswith("WELL"):
-            well = line.split(":", 1)[-1].strip()
-    return {"well": well, "null": null, "curves": curves[:n], "data": df, "path": path}
+    """CWLS LAS 2.0 WRAP.NO well log. LASF / WRAP.YES / LAS 3.0 raise ValueError."""
+    from formats.las import parse_las_20
+
+    return parse_las_20(path)
 
 
 def parse_dzt(path: str) -> dict:

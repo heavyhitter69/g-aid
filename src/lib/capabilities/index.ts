@@ -16,6 +16,8 @@ export {
   RADIO_NODE_ORDER,
   GPR_NODE_DEPS,
   GPR_NODE_ORDER,
+  LAS_NODE_DEPS,
+  LAS_NODE_ORDER,
   KERNEL_NODE_DEPS,
   KERNEL_NODE_ORDER,
 } from "./compile.ts";
@@ -28,6 +30,7 @@ export {
   RADIO_DEFAULT,
   GRAVITY_DEFAULT,
   GPR_DEFAULT,
+  BOREHOLE_DEFAULT,
 } from "./propose.ts";
 export { catalogInputsPayload, verifyBoundInputIdentity } from "./inputs.ts";
 export { dagForPlan, generateTasksMarkdown, taskNodeIdsFromMarkdown } from "./tasks.ts";

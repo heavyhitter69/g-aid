@@ -93,5 +93,13 @@ export function catalogInputsPayload(workspaceRoot: string, inputs: BoundInput[]
     elevationDatum: item.elevationDatum,
     units: item.units,
     crs: item.crs,
+    wellId: item.wellId,
+    curves: item.curves,
+    nullValue: item.nullValue,
+    collarX: item.collarX,
+    collarY: item.collarY,
+    collarMappable: item.collarMappable,
+    lasVersion: item.lasVersion,
+    wrap: item.wrap,
   }));
 }

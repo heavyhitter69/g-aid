@@ -69,6 +69,8 @@ export function validateCapabilityContracts(options: {
     fLowHz?: number;
     fHighHz?: number;
     applyBandpass?: boolean;
+    collarCrsConfirmed?: boolean;
+    selectedCurves?: string;
   };
   catalog?: ProjectCatalog | null;
   dag?: CompiledDag | null;
@@ -416,6 +418,42 @@ export function validateCapabilityContracts(options: {
         level: "blocker",
         code: "gpr_crs_required",
         message: "GPR GIS export needs a documented EPSG. Section viewing does not invent a map CRS.",
+      });
+    }
+  }
+
+  const lasInputs = boundSupported(options.inputs, "las-well");
+  const needsLas = expanded.some((id) => id.startsWith("borehole."));
+  if (needsLas && options.inputs.length && lasInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_las_files",
+      message:
+        "Borehole processing needs a supported CWLS LAS 2.0 WRAP.NO catalog record. An arbitrary .las or LASF point cloud is not a processing input.",
+    });
+  }
+  if (expanded.includes("borehole.map_collar")) {
+    const records = catalogRecordsForInputs(lasInputs, options.catalog || null);
+    const hasXy = records.some(
+      (record) => typeof record.collarX === "number" && typeof record.collarY === "number"
+    ) || lasInputs.some((item) => typeof item.collarX === "number" && typeof item.collarY === "number");
+    const hasCrs =
+      records.some((record) => record.crs || record.collarMappable) ||
+      lasInputs.some((item) => item.crs || item.collarMappable);
+    const confirmed = Boolean(options.parameters.collarCrsConfirmed);
+    if (lasInputs.length && !hasXy) {
+      issues.push({
+        level: "blocker",
+        code: "borehole_collar_xy_required",
+        message:
+          "Collar mapping needs documented LATI/LONG or X/Y. A vertical log can still be viewed. I will not invent a map position.",
+      });
+    } else if (lasInputs.length && hasXy && !hasCrs && !confirmed) {
+      issues.push({
+        level: "blocker",
+        code: "borehole_crs_required",
+        message:
+          "Collar mapping needs a documented EPSG or an explicit user-confirmed CRS. Log viewing does not invent a map CRS.",
       });
     }
   }

@@ -47,13 +47,14 @@ export function summarizeCatalog(catalog: ProjectCatalog | null, maxRecords = 80
       record.supportStatus === "supported"
   );
   const gpr = catalog.records.filter((record) => record.adapterId === "gpr-csv" && record.supportStatus === "supported");
+  const las = catalog.records.filter((record) => record.adapterId === "las-well" && record.supportStatus === "supported");
   const lines = [
     `Project catalog (${catalog.records.length} source files; G-AID Output skipped)`,
     `Support: supported ${counts.supported}, recognised-unsupported ${counts["recognised-unsupported"]}, unknown ${counts.unknown}`,
-    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}, radiometrics ${radio.length}, GPR ${gpr.length}`,
+    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}, radiometrics ${radio.length}, GPR ${gpr.length}, LAS ${las.length}`,
     catalog.truncated ? `Truncated: ${catalog.truncationReason || "file-count limit reached"}` : "",
     catalog.runs.length ? `Prior runs preserved: ${catalog.runs.map((run) => run.runId).join(", ")}` : "Prior runs preserved: (none)",
-    "This catalog does not imply a magnetic, gravity, ERT, radiometric, or GPR workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, and GPR-contract records can be processing inputs.",
+    "This catalog does not imply a magnetic, gravity, ERT, radiometric, GPR, or borehole workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, and LAS 2.0 records can be processing inputs.",
   ].filter(Boolean);
 
   const shown = catalog.records.slice(0, maxRecords);
@@ -87,6 +88,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     (r) => (r.adapterId === "radiometric-csv" || r.adapterId === "radiometric-xyz") && r.supportStatus === "supported"
   ).length;
   const gpr = catalog.records.filter((r) => r.adapterId === "gpr-csv" && r.supportStatus === "supported").length;
+  const las = catalog.records.filter((r) => r.adapterId === "las-well" && r.supportStatus === "supported").length;
   const formats = new Map<string, number>();
   for (const record of catalog.records) {
     formats.set(record.formatId, (formats.get(record.formatId) || 0) + 1);
@@ -98,7 +100,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     .join(", ");
   const lines = [
     `This folder has **${catalog.records.length}** source files in the project catalog (G-AID Output was skipped).`,
-    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}, radiometrics ${radio}, GPR ${gpr}`,
+    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}, radiometrics ${radio}, GPR ${gpr}, LAS ${las}`,
     `- **recognised-unsupported** (identified, not processed in this release): ${counts["recognised-unsupported"]}`,
     `- **unknown** (not identified reliably): ${counts.unknown}`,
     formatList ? `Formats: ${formatList}.` : "",
@@ -124,6 +126,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     gpr
       ? "I can plan G-AID GPR 1.0 ingest, dewow/time-zero/SEC/bandpass, and a two-way-time radargram if you ask. Kirchhoff migration needs a user velocity. Arbitrary .dzt files are recognised-unsupported."
       : "GPR processing needs a documented G-AID GPR 1.0 CSV (Units, dt_ns, dx_m, AntennaMHz, Trace/Sample/Amplitude), not the first .dzt file.",
+    las
+      ? "I can plan CWLS LAS 2.0 WRAP.NO ingest, measured-depth log viewing, and evidence-bound interpretation if you ask. A collar is mapped only with coordinates and CRS. LASF LiDAR is not a well log."
+      : "Borehole processing needs a documented CWLS LAS 2.0 WRAP.NO well log, not the first .las file or a LASF point cloud.",
     "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
   ].filter(Boolean);
   return lines.join("\n");

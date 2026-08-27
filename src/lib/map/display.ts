@@ -108,8 +108,8 @@ export function formatIdFromPath(path: string): string {
   if (ext === "geojson") return "geojson";
   if (ext === "prj" || ext === "wkt") return "esri-prj";
   if (ext === "shp") return "shapefile";
-  if (ext === "las") return "las-point-cloud";
   if (ext === "laz") return "laz-point-cloud";
+  if (ext === "las") return "unknown";
   if (ext === "sgy" || ext === "segy") return "segy";
   if (ext === "gdb") return "filegdb";
   return "unknown";

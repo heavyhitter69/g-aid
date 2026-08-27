@@ -143,9 +143,11 @@ test("catalog classifies mixed folder without defaulting to magnetics", () => {
     assert.equal(shp.formatId, "shapefile");
 
     const well = byPath(catalog.records, "logs/well.las");
-    assert.equal(well.formatId, "las-borehole");
+    assert.equal(well.formatId, "las-well");
+    assert.equal(well.adapterId, "las-well");
     assert.equal(well.mediaClass, "borehole-log");
     assert.equal(well.domainHint, "geology");
+    assert.equal(well.supportStatus, "supported");
 
     const cloud = byPath(catalog.records, "logs/cloud.las");
     assert.equal(cloud.formatId, "las-point-cloud");

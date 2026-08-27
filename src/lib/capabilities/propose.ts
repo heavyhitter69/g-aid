@@ -36,6 +36,12 @@ export const RADIO_DEFAULT: UserCapabilityId[] = [
 
 export const GPR_DEFAULT: UserCapabilityId[] = ["gpr.ingest", "gpr.process", "gpr.interpret"];
 
+export const BOREHOLE_DEFAULT: UserCapabilityId[] = [
+  "borehole.ingest_las",
+  "borehole.view_logs",
+  "borehole.interpret",
+];
+
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
 }
@@ -50,6 +56,7 @@ export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id.startsWith("ert.")) return "ert";
   if (id.startsWith("rad.")) return "radiometrics";
   if (id.startsWith("gpr.")) return "gpr";
+  if (id.startsWith("borehole.")) return "borehole";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
   return found?.[0] || id;
 }
@@ -111,6 +118,11 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
       if (!ids.includes(id)) ids.push(id);
     }
   }
+  if (steps.borehole) {
+    for (const id of BOREHOLE_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
   return ids;
 }
 
@@ -126,6 +138,7 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.ertInvert = false;
   steps.radiometrics = false;
   steps.gpr = false;
+  steps.borehole = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
     if (id === "grav.residual") {
@@ -169,6 +182,10 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
     }
     if (id.startsWith("gpr.")) {
       steps.gpr = true;
+      continue;
+    }
+    if (id.startsWith("borehole.")) {
+      steps.borehole = true;
       continue;
     }
     steps[stepKeyFromCapability(id)] = true;
@@ -276,12 +293,28 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     if (/\b(geojson|gis|map the traces|trace positions)\b/.test(m)) next.add("gpr.gis");
   }
 
+  const boreholeDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(borehole|well[\s-]?log|las)\b/.test(m);
+  const lidar = /\b(lidar|point[\s-]?cloud|\blaz\b)\b/.test(m);
+  const boreholeAsk =
+    /\b(borehole|well[\s-]?log|cwls)\b/.test(m) ||
+    (/\blas\b/.test(m) && !lidar);
+  if (boreholeAsk && !boreholeDeny) {
+    for (const id of BOREHOLE_DEFAULT) next.add(id);
+    if (/\b(geojson|gis|map|collar|location)\b/.test(m)) next.add("borehole.map_collar");
+  }
+
   return USER_CAPABILITY_IDS.filter((id) => next.has(id));
 }
 
 export function unregisteredProposal(message: string): string | undefined {
   const m = message.toLowerCase();
   if (/\b(seismic|segy|nmo)\b/.test(m)) return "seismic";
+  if (/\b(litholog(?:y|ies)?|aquifer|minerali[sz]ations?|minerali[sz]e|drill[\s-]?targets?|resource estimat\w*|well correlation|pay zone|reservoir)\b/.test(m)) {
+    return "borehole.classify";
+  }
+  if (/\b(deviation survey|well path|directional (well|survey)|true vertical depth|\btvd\b|3d trajectory)\b/.test(m)) {
+    return "borehole-trajectory";
+  }
   if (
     /\b(nasvd|stripp(?:ing|ed)|height[\s-]?correct|dead[\s-]?time|background[\s-]?correct|concentration conversion|window[\s-]?strip)\b/.test(
       m

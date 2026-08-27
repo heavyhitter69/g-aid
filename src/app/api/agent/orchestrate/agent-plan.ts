@@ -35,8 +35,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
   const runId = plan.runId || generateRunId();
   const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
   const notes = [...(plan.notes || [])];
-  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "gpr" && plan.intent !== "none") {
-    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, radiometric, or GPR checklist.");
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "gpr" && plan.intent !== "borehole" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, radiometric, GPR, or borehole checklist.");
   }
   const next: AgentPlan = {
     ...plan,
@@ -51,6 +51,13 @@ function paintPlan(plan: AgentPlan): AgentPlan {
   next.capabilities = next.capabilities?.length
     ? next.capabilities
     : capabilitiesFromSteps(next.steps as unknown as Record<string, boolean>);
+  if (
+    next.capabilities.includes("borehole.ingest_las") &&
+    !next.capabilities.includes("borehole.map_collar") &&
+    (next.inputs || []).some((item) => item.adapterId === "las-well" && (item.crs || item.collarMappable))
+  ) {
+    next.capabilities = [...next.capabilities, "borehole.map_collar"];
+  }
   next.dag = next.dag?.nodes?.length ? next.dag : compileCapabilityDag(next.capabilities);
   next.plan = renderImplementationPlan({
     projectName,

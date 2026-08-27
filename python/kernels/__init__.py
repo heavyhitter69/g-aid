@@ -84,6 +84,9 @@ def get_handler(node_id: str):
         "gpr_gis_export": gpr_gis_export,
         "gpr_interpret": gpr_interpret,
         "las_ingest": las_ingest,
+        "borehole_view": borehole_view,
+        "borehole_map_collar": borehole_map_collar,
+        "borehole_interpret": borehole_interpret,
         "crs_reproject": crs_reproject,
         "xyz_ingest": xyz_ingest,
     }
@@ -920,18 +923,23 @@ def gpr_interpret(payload: dict) -> dict:
 
 
 def las_ingest(payload: dict) -> dict:
-    from formats import parse_las
+    from kernels.borehole import las_ingest as impl
+    return impl(payload)
 
-    node_id = "las_ingest"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("LAS ingest needs parameters.inputPath")
-    parsed = parse_las(src)
-    path = os.path.join(out, "well_log.csv")
-    parsed["data"].to_csv(path, index=False)
-    write_json(os.path.join(out, "well_log_meta.json"), {"well": parsed["well"], "curves": parsed["curves"], "null": parsed["null"]})
-    return {"artifacts": [make_artifact("artifact-las", "well-log", "csv", path, node_id, [src])], "events": [{"type": "NODE_PROGRESS", "message": f"LAS well '{parsed['well']}' curves={parsed['curves']}."}]}
+
+def borehole_view(payload: dict) -> dict:
+    from kernels.borehole import borehole_view as impl
+    return impl(payload)
+
+
+def borehole_map_collar(payload: dict) -> dict:
+    from kernels.borehole import borehole_map_collar as impl
+    return impl(payload)
+
+
+def borehole_interpret(payload: dict) -> dict:
+    from kernels.borehole import borehole_interpret as impl
+    return impl(payload)
 
 
 def crs_reproject(payload: dict) -> dict:
