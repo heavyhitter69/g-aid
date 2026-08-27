@@ -79,6 +79,15 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     requestIntent: next.parameters.requestIntent,
     productName: next.parameters.productName,
     velocityMs: next.parameters.velocityMs,
+    fLowHz: next.parameters.fLowHz,
+    fHighHz: next.parameters.fHighHz,
+    applyDewow: next.parameters.applyDewow,
+    dewowWindow: next.parameters.dewowWindow,
+    applyTimeZero: next.parameters.applyTimeZero,
+    applySecGain: next.parameters.applySecGain,
+    applyBandpass: next.parameters.applyBandpass,
+    filterOrder: next.parameters.filterOrder,
+    secPower: next.parameters.secPower,
   });
   return next;
 }

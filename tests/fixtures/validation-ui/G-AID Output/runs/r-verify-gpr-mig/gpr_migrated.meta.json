@@ -1,0 +1,6 @@
+{
+  "kind": "gpr-radargram",
+  "vertical_axis": "depth m from user velocity (0.5 v t); not ground truth",
+  "velocity_ms": 100000000.0,
+  "geological_certainty_improved": false
+}

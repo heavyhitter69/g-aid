@@ -168,7 +168,7 @@ const NODE_LABELS: Record<string, string> = {
   rad_gis_export: "Radiometric GIS export",
   rad_interpret: "Radiometric interpretation limits",
   gpr_ingest: "Read bound G-AID GPR 1.0 catalog records",
-  gpr_process: "Dewow, time-zero, SEC gain, and bandpass",
+  gpr_process: "Dewow, time-zero, SEC gain, and Nyquist-safe bandpass",
   gpr_migrate: "Kirchhoff time migration (user velocity only)",
   gpr_gis_export: "GPR trace GIS export",
   gpr_interpret: "GPR interpretation limits",

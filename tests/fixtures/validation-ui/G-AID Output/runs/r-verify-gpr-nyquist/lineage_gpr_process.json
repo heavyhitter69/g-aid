@@ -1,0 +1,39 @@
+{
+  "node_id": "gpr_process",
+  "formula": "optional dewow + optional time-zero + optional SEC + optional Nyquist-safe Butterworth (Jol 2009)",
+  "parameters": {
+    "dt_ns": 2.0,
+    "dx_m": 0.05,
+    "antenna_mhz": 400.0,
+    "sampling_hz": 499999999.99999994,
+    "nyquist_hz": 249999999.99999997,
+    "bandpass": {
+      "dt_s": 2e-09,
+      "sampling_hz": 499999999.99999994,
+      "nyquist_hz": 249999999.99999997,
+      "nyquist_high_fraction": 0.8,
+      "safe_high_hz": 200000000.0,
+      "apply_bandpass_requested": true,
+      "requested_low_hz": 80000000.0,
+      "requested_high_hz": 800000000.0,
+      "requested_source": "antenna_default",
+      "applied_low_hz": 80000000.0,
+      "applied_high_hz": 200000000.0,
+      "bandpass_applied": true,
+      "bandpass_defaulted_from_antenna": true,
+      "bandpass_adjusted": true,
+      "bandpass_refused": false,
+      "refusal_reason": null,
+      "adjustment_reason": "Antenna default 0.2\u20132.0 \u00d7 AntennaMHz (80\u2013800 MHz) is not Nyquist-safe (Nyquist 250 MHz). Applied documented safe high-cut 0.8 \u00d7 Nyquist = 200 MHz. This is not a silent clamp to 0.999 Nyquist.",
+      "formula": "Butterworth SOS band-pass, order 4 unless overridden; filtfilt"
+    }
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr-nyquist/gpr_canonical.csv"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr-nyquist/gpr_radargram.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr-nyquist/gpr_process_qc.json"
+  ],
+  "created_at": "2026-08-27T14:40:38.171645Z"
+}

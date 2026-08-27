@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from formats.gpr import parse_gpr_table
-from science.gpr import dewow, process_section, time_zero
+from science.gpr import dewow, process_section, time_zero, resolve_bandpass
 
 FIXTURE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "gpr-project"
 
@@ -38,6 +38,8 @@ def test_process_section_defaults_bandpass_from_antenna():
     assert out["bandpass_applied"] is True
     assert abs(out["f_low_hz"] - 80e6) < 1.0
     assert abs(out["f_high_hz"] - 800e6) < 1.0
+    assert out["nyquist_hz"] > out["f_high_hz"]
+    assert out["geological_certainty_improved"] is False
     assert "migrated" not in out
 
 
@@ -93,4 +95,58 @@ def test_migrate_kernel_requires_velocity(tmp_path):
     qc = json.loads((out / "gpr_migrate_qc.json").read_text())
     assert qc["velocity_assumed"] is False
     assert qc["velocity_ms"] == 1.0e8
+    assert qc["benchmark_passed"] is True
     assert result["artifacts"]
+
+
+def _dispatch_section(tmp_path, rel, extra=None):
+    from kernels.gpr import gpr_ingest, gpr_process
+
+    src = FIXTURE / rel
+    payload = {
+        "parameters": {
+            "baseDir": str(FIXTURE),
+            "outDir": str(tmp_path / "G-AID Output" / "runs"),
+            "taskFolder": "r-gpr",
+            "catalogInputs": [
+                {
+                    "catalogId": "gpr-case",
+                    "path": rel,
+                    "adapterId": "gpr-csv",
+                    "absPath": str(src),
+                }
+            ],
+            **(extra or {}),
+        }
+    }
+    (tmp_path / "G-AID Output" / "runs" / "r-gpr").mkdir(parents=True)
+    gpr_ingest(payload)
+    gpr_process(payload)
+    qc = json.loads((tmp_path / "G-AID Output" / "runs" / "r-gpr" / "gpr_process_qc.json").read_text())
+    return qc
+
+
+def test_coarse_dt_adjusts_antenna_default_not_clamp(tmp_path):
+    qc = _dispatch_section(tmp_path, "coarse-dt/section.csv")
+    assert qc["bandpass_adjusted"] is True
+    assert qc["bandpass_applied"] is True
+    assert qc["bandpass_refused"] is False
+    assert qc["nyquist_hz"] == pytest.approx(250e6)
+    assert qc["applied_filter_hz"][1] == pytest.approx(0.8 * 250e6)
+    assert qc["applied_filter_hz"][1] < qc["nyquist_hz"]
+    assert "0.999" in (qc["bandpass"]["adjustment_reason"] or "")
+
+
+def test_undersampled_antenna_default_refuses_filter(tmp_path):
+    qc = _dispatch_section(tmp_path, "nyquist-refuse/section.csv")
+    assert qc["bandpass_refused"] is True
+    assert qc["bandpass_applied"] is False
+    assert qc["applied_filter_hz"] == [None, None]
+    assert qc["geological_certainty_improved"] is False
+
+
+def test_skip_dewow_is_frozen(tmp_path):
+    qc = _dispatch_section(tmp_path, "valid/section.csv", extra={"applyDewow": False, "applyBandpass": True})
+    assert qc["dewow_applied"] is False
+    assert qc["frozen_parameters"]["applyDewow"] is False
+    assert qc["sampling_hz"] == pytest.approx(2.5e9)

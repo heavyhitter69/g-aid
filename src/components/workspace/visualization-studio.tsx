@@ -31,7 +31,7 @@ import { isErtSectionPath, isGprSectionPath, isSectionPath, parseSectionCsv } fr
 import { SectionView } from "@/components/workspace/section-view";
 import { gravityProductWarnings } from "@/lib/gravity-product";
 import { radioProductWarnings } from "@/lib/radio-product";
-import { gprProductWarnings } from "@/lib/gpr-product";
+import { gprProductWarnings, gprProductWarningsFromQc } from "@/lib/gpr-product";
 import { isRadioTernaryPath, parseRadioTernaryJson } from "@/lib/radio/ternary";
 import { TernaryView } from "@/components/workspace/ternary-view";
 
@@ -45,6 +45,34 @@ function originBadge(origin: MapLayerSpec["origin"]): string {
   if (origin === "source") return "source";
   if (origin === "preview") return "preview";
   return "unsupported";
+}
+
+function gprWarningsForPath(path: string, qc: Record<string, unknown> | null): string[] {
+  if (qc) {
+    return gprProductWarningsFromQc(
+      {
+        migrated: Boolean(qc.migrated) || /gpr_migrated/.test(path),
+        velocity_ms: typeof qc.velocity_ms === "number" ? qc.velocity_ms : undefined,
+        dt_ns: typeof qc.dt_ns === "number" ? qc.dt_ns : undefined,
+        antenna_mhz: typeof qc.antenna_mhz === "number" ? qc.antenna_mhz : undefined,
+        sampling_hz: typeof qc.sampling_hz === "number" ? qc.sampling_hz : undefined,
+        nyquist_hz: typeof qc.nyquist_hz === "number" ? qc.nyquist_hz : undefined,
+        bandpass_applied: typeof qc.bandpass_applied === "boolean" ? qc.bandpass_applied : undefined,
+        bandpass_adjusted: typeof qc.bandpass_adjusted === "boolean" ? qc.bandpass_adjusted : undefined,
+        bandpass_refused: typeof qc.bandpass_refused === "boolean" ? qc.bandpass_refused : undefined,
+        requested_filter_hz: Array.isArray(qc.requested_filter_hz) ? (qc.requested_filter_hz as Array<number | null>) : undefined,
+        applied_filter_hz: Array.isArray(qc.applied_filter_hz) ? (qc.applied_filter_hz as Array<number | null>) : undefined,
+        refusal_reason: typeof qc.refusal_reason === "string" ? qc.refusal_reason : undefined,
+        adjustment_reason: typeof qc.adjustment_reason === "string" ? qc.adjustment_reason : undefined,
+        bandpass:
+          qc.bandpass && typeof qc.bandpass === "object"
+            ? (qc.bandpass as { refusal_reason?: string | null; adjustment_reason?: string | null })
+            : undefined,
+      },
+      path
+    );
+  }
+  return gprProductWarnings({ path });
 }
 
 function comparePathsFor(files: string[], compareRunId: string): string[] {
@@ -221,6 +249,33 @@ export function VisualizationStudio() {
     };
   }, [active, workspaceRoot, fileContents, setFileContent]);
 
+  useEffect(() => {
+    if (!active || !workspaceRoot || !window.gaidDesktop?.readWorkspaceFile) return;
+    if (!isGprSectionPath(active.path)) return;
+    const n = active.path.replace(/\\/g, "/");
+    const dir = n.includes("/") ? n.slice(0, n.lastIndexOf("/")) : "";
+    const companions = [
+      n.replace(/\.csv$/i, ".meta.json"),
+      dir ? `${dir}/gpr_process_qc.json` : "gpr_process_qc.json",
+      dir ? `${dir}/gpr_migrate_qc.json` : "gpr_migrate_qc.json",
+    ];
+    let cancelled = false;
+    for (const companion of companions) {
+      if (fileContents[companion] !== undefined) continue;
+      void window.gaidDesktop
+        .readWorkspaceFile(workspaceRoot, companion)
+        .then((result) => {
+          if (!cancelled) setFileContent(companion, result?.text || "");
+        })
+        .catch(() => {
+          if (!cancelled) setFileContent(companion, "");
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [active, workspaceRoot, fileContents, setFileContent]);
+
   const text = active ? fileContents[active.path] : undefined;
   const raster: RasterGrid | null = useMemo(() => {
     if (!active || !text) return null;
@@ -330,6 +385,29 @@ export function VisualizationStudio() {
     return sidecarText ? parseGridSidecarMeta(sidecarText) : {};
   }, [active, fileContents]);
 
+  const gprQc = useMemo(() => {
+    if (!active || !isGprSectionPath(active.path)) return null;
+    const n = active.path.replace(/\\/g, "/");
+    const dir = n.includes("/") ? n.slice(0, n.lastIndexOf("/")) : "";
+    const merged: Record<string, unknown> = {};
+    let found = false;
+    for (const candidate of [
+      `${dir}/gpr_process_qc.json`,
+      `${dir}/gpr_migrate_qc.json`,
+      n.replace(/\.csv$/i, ".meta.json"),
+    ]) {
+      const text = fileContents[candidate];
+      if (!text) continue;
+      try {
+        Object.assign(merged, JSON.parse(text) as Record<string, unknown>);
+        found = true;
+      } catch {
+        continue;
+      }
+    }
+    return found ? merged : null;
+  }, [active, fileContents]);
+
   const quantity = raster?.quantity || sidecar.quantity || ternary?.quantity || "";
   const recordedUnits = raster?.units || sidecar.units || ternary?.units || active?.units;
   const units = mapValueUnits(active?.path || "", active?.formatId, recordedUnits);
@@ -343,7 +421,7 @@ export function VisualizationStudio() {
     raster?.preview || vector?.data.preview ? "This view is a preview/overview — not the full dataset." : "",
     ...(active ? gravityProductWarnings({ path: active.path }) : []),
     ...(active ? radioProductWarnings({ path: active.path, quantity, units }) : []),
-    ...(active ? gprProductWarnings({ path: active.path }) : []),
+    ...(active ? gprWarningsForPath(active.path, gprQc) : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
   ].filter(Boolean);
@@ -503,7 +581,10 @@ export function VisualizationStudio() {
         {ternary ? (
           <TernaryView ternary={ternary} />
         ) : section ? (
-          <SectionView section={section} />
+          <SectionView
+            section={section}
+            extraWarnings={active && isGprSectionPath(active.path) ? gprWarningsForPath(active.path, gprQc) : []}
+          />
         ) : active?.formatId === "geojson" && vector ? (
           <GridMapView
             title={active.label}

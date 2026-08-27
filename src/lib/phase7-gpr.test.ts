@@ -10,6 +10,7 @@ import {
   applyChatPatches,
   EMPTY_STEPS,
   gprStepsEnabled,
+  renderImplementationPlan,
   validatePlan,
   type AgentPlan,
 } from "./plan-spec.ts";
@@ -22,7 +23,12 @@ import {
 } from "./capabilities/index.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
 import { parseSectionCsv } from "./section/parse.ts";
-import { gprProductWarnings } from "./gpr-product.ts";
+import {
+  GPR_MIGRATION_BENCHMARK_PASSED,
+  gprFrozenNyquistLine,
+  gprProductWarnings,
+  resolveGprBandpass,
+} from "./gpr-product.ts";
 import { detectAnalysisIntent } from "./workspace-index.ts";
 import type { CatalogRecord } from "./catalog/types.ts";
 
@@ -248,9 +254,18 @@ test("section parser reads a GPR radargram as two-way time, not utilities", () =
   assert.equal(section.kind, "gpr-radargram");
   assert.match(section.zReference, /two-way time/i);
   assert.equal(section.warnings.some((line) => /utilities/i.test(line)), true);
-  const warnings = gprProductWarnings({ path: "G-AID Output/runs/r1/gpr_radargram.csv" });
-  assert.equal(warnings.some((line) => /Complete Bouguer/i.test(line)), false);
-  assert.equal(warnings.some((line) => /not depth/i.test(line)), true);
+    const warnings = gprProductWarnings({
+      path: "G-AID Output/runs/r1/gpr_radargram.csv",
+      samplingHz: 2.5e9,
+      nyquistHz: 1.25e9,
+      requestedFilterHz: [80e6, 800e6],
+      appliedFilterHz: [80e6, 800e6],
+      bandpassApplied: true,
+    });
+    assert.equal(warnings.some((line) => /Complete Bouguer/i.test(line)), false);
+    assert.equal(warnings.some((line) => /not depth/i.test(line)), true);
+    assert.equal(warnings.some((line) => /Nyquist/i.test(line)), true);
+    assert.equal(warnings.some((line) => /geological certainty/i.test(line)), true);
   const migrated = parseSectionCsv(csv.replace(/two-way time ns — not depth/g, "depth m from user velocity (0.5 v t); not ground truth"), "gpr_migrated.csv");
   assert.equal(migrated.kind, "gpr-radargram");
   assert.match(migrated.zReference, /user velocity/i);
@@ -309,6 +324,11 @@ test("python kernels ingest → process → interpret; migrate requires velocity
     assert.equal(processQc.product_name, "G-AID GPR 1.0 processed radargram");
     assert.equal(processQc.migrated, false);
     assert.equal(processQc.bandpass_defaulted_from_antenna, true);
+    assert.equal(processQc.bandpass_applied, true);
+    assert.equal(processQc.bandpass_refused, false);
+    assert.equal(processQc.geological_certainty_improved, false);
+    assert.ok(Math.abs(processQc.sampling_hz - 2.5e9) < 1);
+    assert.ok(Math.abs(processQc.nyquist_hz - 1.25e9) < 1);
     assert.equal(processQc.vertical_axis, "two-way time ns");
     const radargram = parseSectionCsv(
       fs.readFileSync(path.join(outDir, taskFolder, "gpr_radargram.csv"), "utf8"),
@@ -369,6 +389,7 @@ test("python kernels ingest → process → interpret; migrate requires velocity
     const migQc = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "gpr_migrate_qc.json"), "utf8"));
     assert.equal(migQc.velocity_assumed, false);
     assert.equal(migQc.velocity_ms, 1e8);
+    assert.equal(migQc.benchmark_passed, true);
     const migrated = parseSectionCsv(
       fs.readFileSync(path.join(outDir, taskFolder, "gpr_migrated.csv"), "utf8"),
       path.join(outDir, taskFolder, "gpr_migrated.csv")
@@ -396,6 +417,160 @@ test("python kernels ingest → process → interpret; migrate requires velocity
     assert.match(dztRefuse.stdout, /recognised-unsupported/i);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Nyquist-safe band-pass: valid default, documented 0.8×Nyquist adjustment, user/high-cut refusal", () => {
+  const valid = resolveGprBandpass({ dtNs: 0.4, antennaMHz: 400 });
+  assert.equal(valid.bandpassApplied, true);
+  assert.equal(valid.bandpassAdjusted, false);
+  assert.equal(valid.appliedHighHz, 800e6);
+  const adjusted = resolveGprBandpass({ dtNs: 2.0, antennaMHz: 400 });
+  assert.equal(adjusted.bandpassAdjusted, true);
+  assert.equal(adjusted.bandpassApplied, true);
+  assert.equal(adjusted.appliedHighHz, 0.8 * 250e6);
+  assert.match(adjusted.reason || "", /0\.999/);
+  const refused = resolveGprBandpass({ dtNs: 20, antennaMHz: 400 });
+  assert.equal(refused.bandpassRefused, true);
+  assert.equal(refused.bandpassApplied, false);
+  const userNyq = resolveGprBandpass({ dtNs: 0.4, fLowHz: 80e6, fHighHz: 1.25e9 });
+  assert.equal(userNyq.bandpassRefused, true);
+  assert.equal(userNyq.appliedHighHz, undefined);
+  const line = gprFrozenNyquistLine({ dtNs: 2.0, antennaMHz: 400 });
+  assert.match(line, /Nyquist/);
+  assert.match(line, /Adjustment/);
+});
+
+test("coarse-dt catalog warns; undersampled catalog warns; skip dewow is frozen", () => {
+  const root = tmpCopy();
+  try {
+    const catalog = buildProjectCatalog(root);
+    const coarse = collectPlanInputs(null, "coarse-dt", catalog);
+    const coarseCheck = validatePlan(gprPlan(root, { targetFolder: "coarse-dt", inputs: coarse }), catalog);
+    assert.equal(coarseCheck.ok, true);
+    assert.equal(coarseCheck.warnings.some((issue) => issue.code === "gpr_bandpass_nyquist"), true);
+    const refuseInputs = collectPlanInputs(null, "nyquist-refuse", catalog);
+    const refuseCheck = validatePlan(
+      gprPlan(root, { targetFolder: "nyquist-refuse", inputs: refuseInputs }),
+      catalog
+    );
+    assert.equal(refuseCheck.ok, true);
+    assert.equal(refuseCheck.warnings.some((issue) => issue.code === "gpr_bandpass_nyquist"), true);
+    const skipped = applyChatPatches(gprPlan(root, { inputs: coarse }), "process the gpr skip dewow");
+    assert.equal(skipped.parameters.applyDewow, false);
+    const markdown = renderImplementationPlan({
+      projectName: "GPR",
+      targetFolder: "coarse-dt",
+      taskFolder: "r1",
+      productsRel: "G-AID Output/runs/r1",
+      steps: { ...EMPTY_STEPS, gpr: true },
+      baseReference: "mean_base",
+      inputs: coarse,
+      applyDewow: false,
+      capabilities: ["gpr.ingest", "gpr.process", "gpr.interpret"],
+    });
+    assert.match(markdown, /dewow off/);
+    assert.match(markdown, /Nyquist/);
+    assert.match(markdown, /visually enhanced radargram does not have improved geological certainty/i);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("python kernels record Nyquist adjustment, refusal, and skip-dewow; migration benchmark JSON matches TS gate", () => {
+  const bench = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "docs/validation/results/gpr_migration_benchmark.json"), "utf8")
+  );
+  assert.equal(bench.all_passed, GPR_MIGRATION_BENCHMARK_PASSED);
+  assert.equal(GPR_MIGRATION_BENCHMARK_PASSED, true);
+
+  const root = tmpCopy();
+  try {
+    const catalog = buildProjectCatalog(root);
+    const coarse = byPath(catalog.records, "coarse-dt/section.csv");
+    const refuse = byPath(catalog.records, "nyquist-refuse/section.csv");
+    const valid = byPath(catalog.records, "valid/section.csv");
+    const outDir = path.join(root, "G-AID Output", "runs");
+
+    function dispatch(taskFolder: string, rec: CatalogRecord, extra: Record<string, unknown> = {}) {
+      fs.mkdirSync(path.join(outDir, taskFolder), { recursive: true });
+      const payload = {
+        parameters: {
+          baseDir: root,
+          outDir,
+          taskFolder,
+          catalogInputs: [
+            {
+              catalogId: rec.id,
+              path: rec.relativePath,
+              adapterId: "gpr-csv",
+              absPath: path.join(root, rec.relativePath),
+              checksum: rec.checksum.value,
+            },
+          ],
+          ...extra,
+        },
+      };
+      const py = spawnSync(
+        "python3",
+        [
+          "-c",
+          [
+            "import json, os, sys",
+            "sys.path.insert(0, os.path.join(os.getcwd(), 'python'))",
+            "from kernels import dispatch",
+            "payload = json.loads(sys.argv[1])",
+            "dispatch('gpr_ingest', payload)",
+            "dispatch('gpr_process', payload)",
+            "print('ok')",
+          ].join("\n"),
+          JSON.stringify(payload),
+        ],
+        { encoding: "utf8", cwd: process.cwd() }
+      );
+      assert.equal(py.status, 0, py.stderr || py.stdout);
+      return JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "gpr_process_qc.json"), "utf8"));
+    }
+
+    const adjustedQc = dispatch("r-coarse", coarse);
+    assert.equal(adjustedQc.bandpass_adjusted, true);
+    assert.equal(adjustedQc.bandpass_applied, true);
+    assert.ok(adjustedQc.applied_filter_hz[1] < adjustedQc.nyquist_hz);
+    const refusedQc = dispatch("r-refuse", refuse);
+    assert.equal(refusedQc.bandpass_refused, true);
+    assert.equal(refusedQc.bandpass_applied, false);
+    const skipQc = dispatch("r-skip", valid, { applyDewow: false });
+    assert.equal(skipQc.dewow_applied, false);
+    assert.equal(skipQc.frozen_parameters.applyDewow, false);
+    assert.equal(skipQc.geological_certainty_improved, false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("desktop verification fixtures cover unmigrated, Nyquist, migrated, and interpretation products", () => {
+  const runs = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs");
+  const radarQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gpr", "gpr_process_qc.json"), "utf8"));
+  assert.equal(radarQc.vertical_axis, "two-way time ns");
+  assert.equal(radarQc.geological_certainty_improved, false);
+  assert.equal(radarQc.bandpass_applied, true);
+  const adjQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gpr-nyquist", "gpr_process_qc.json"), "utf8"));
+  assert.equal(adjQc.bandpass_adjusted, true);
+  const refQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gpr-refuse", "gpr_process_qc.json"), "utf8"));
+  assert.equal(refQc.bandpass_refused, true);
+  const migQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gpr-mig", "gpr_migrate_qc.json"), "utf8"));
+  assert.equal(migQc.velocity_assumed, false);
+  assert.equal(migQc.benchmark_passed, true);
+  const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gpr", "gpr_interpretation.json"), "utf8"));
+  assert.equal(interp.not_established.some((line: string) => /utilities/i.test(line)), true);
+  const uiPath = path.join(process.cwd(), "docs/validation/results/gpr_desktop_ui.json");
+  if (fs.existsSync(uiPath)) {
+    const ui = JSON.parse(fs.readFileSync(uiPath, "utf8"));
+    assert.equal(ui.passed, true);
+    assert.equal(ui.tabs.radargram.two_way_time, true);
+    assert.equal(ui.tabs.filter.silent_0_999_clamp, false);
+    assert.equal(ui.tabs.migrated.user_velocity, true);
+    assert.equal(ui.tabs.interpretation.geological_certainty_improved, false);
   }
 });
 

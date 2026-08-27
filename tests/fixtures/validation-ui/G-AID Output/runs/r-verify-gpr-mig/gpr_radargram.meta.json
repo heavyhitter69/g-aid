@@ -1,0 +1,20 @@
+{
+  "kind": "gpr-radargram",
+  "vertical_axis": "two-way time ns \u2014 not depth",
+  "sampling_hz": 2499999999.9999995,
+  "nyquist_hz": 1249999999.9999998,
+  "bandpass_applied": true,
+  "bandpass_adjusted": false,
+  "bandpass_refused": false,
+  "requested_filter_hz": [
+    80000000.0,
+    800000000.0
+  ],
+  "applied_filter_hz": [
+    80000000.0,
+    800000000.0
+  ],
+  "refusal_reason": null,
+  "adjustment_reason": null,
+  "geological_certainty_improved": false
+}

@@ -1,0 +1,136 @@
+{
+  "product_name": "G-AID GPR 1.0 processed radargram",
+  "observations": [
+    "GPR traces were ingested under the G-AID GPR 1.0 contract.",
+    "Process QC present: True",
+    "Migration QC present: False",
+    "Product reported in this run: G-AID GPR 1.0 processed radargram."
+  ],
+  "assumptions": [
+    "Antenna 400.0 MHz was documented on the contract.",
+    "Bandpass used 0.2\u20132.0 \u00d7 AntennaMHz because fLowHz/fHighHz were not supplied.",
+    "Kirchhoff migration was not applied."
+  ],
+  "uncertainty": [
+    "Two-way time is not depth unless a user velocity is applied.",
+    "A user velocity is not a measured dielectric structure.",
+    "Dewow, time-zero, SEC gain, and band-pass change amplitudes and apparent structure.",
+    "A visually enhanced radargram does not have improved geological certainty.",
+    "Band-pass high-cut 800 MHz is at or above Nyquist 25 MHz. G-AID will not silently place a high-cut at 0.999 \u00d7 Nyquist. Antenna default also cannot be replaced by 0.8 \u00d7 Nyquist (20 MHz) while keeping the 0.2 \u00d7 AntennaMHz low-cut. Supply fLowHz/fHighHz below Nyquist."
+  ],
+  "recommendations": [
+    "Do not pick utilities, voids, or archaeology from a radargram without field verification.",
+    "Do not treat migrated depth as ground truth."
+  ],
+  "not_established": [
+    "Utilities are not established.",
+    "Voids are not established.",
+    "Archaeology is not established.",
+    "Water table is not established.",
+    "Rebar is not established.",
+    "Lithology is not established.",
+    "Measured depth is not established without an independently verified velocity."
+  ],
+  "qc": {
+    "gpr_ingest_qc.json": {
+      "files": [
+        {
+          "product_name": "G-AID GPR 1.0 canonical section",
+          "n_traces": 20,
+          "n_samples": 64,
+          "dt_ns": 20.0,
+          "sampling_hz": 50000000.0,
+          "nyquist_hz": 25000000.0,
+          "dx_m": 0.05,
+          "antenna_mhz": 400.0,
+          "units": "amp",
+          "crs_epsg": 32630,
+          "velocity_ms": null,
+          "velocity_assumed": false,
+          "dzt_decoded": false,
+          "catalog_id": "gpr-r-verify-gpr-refuse",
+          "checksum": null,
+          "formula": "G-AID GPR 1.0 documented dt_ns, dx_m, AntennaMHz; amplitude as recorded"
+        }
+      ],
+      "n_traces": 20,
+      "units": "amp"
+    },
+    "gpr_process_qc.json": {
+      "product_name": "G-AID GPR 1.0 processed radargram",
+      "dt_ns": 20.0,
+      "sampling_hz": 50000000.0,
+      "nyquist_hz": 25000000.0,
+      "dx_m": 0.05,
+      "antenna_mhz": 400.0,
+      "units": "amp",
+      "vertical_axis": "two-way time ns",
+      "migrated": false,
+      "geological_certainty_improved": false,
+      "dewow_applied": true,
+      "dewow_window": 31,
+      "dewow_formula": "trace minus odd-length running mean (Jol 2009)",
+      "time_zero_applied": true,
+      "time_zero_sample": 0,
+      "time_zero_threshold": 0.05,
+      "time_zero_method": "First sample where the mean absolute amplitude of the (dewowed) stack is \u2265 0.05 \u00d7 the stack peak. Not a picked ground wave.",
+      "sec_applied": true,
+      "sec_power": 2.0,
+      "sec_exp": 0.0,
+      "sec_formula": "gain(t) = max(t, dt)^n * exp(\u03b1 t)  (Jol 2009 SEC; default n=2, \u03b1=0)",
+      "filter_order": 4,
+      "bandpass": {
+        "dt_s": 2e-08,
+        "sampling_hz": 50000000.0,
+        "nyquist_hz": 25000000.0,
+        "nyquist_high_fraction": 0.8,
+        "safe_high_hz": 20000000.0,
+        "apply_bandpass_requested": true,
+        "requested_low_hz": 80000000.0,
+        "requested_high_hz": 800000000.0,
+        "requested_source": "antenna_default",
+        "applied_low_hz": null,
+        "applied_high_hz": null,
+        "bandpass_applied": false,
+        "bandpass_defaulted_from_antenna": true,
+        "bandpass_adjusted": false,
+        "bandpass_refused": true,
+        "refusal_reason": "Band-pass high-cut 800 MHz is at or above Nyquist 25 MHz. G-AID will not silently place a high-cut at 0.999 \u00d7 Nyquist. Antenna default also cannot be replaced by 0.8 \u00d7 Nyquist (20 MHz) while keeping the 0.2 \u00d7 AntennaMHz low-cut. Supply fLowHz/fHighHz below Nyquist.",
+        "adjustment_reason": null,
+        "formula": "Butterworth SOS band-pass, order 4 unless overridden; filtfilt"
+      },
+      "requested_filter_hz": [
+        80000000.0,
+        800000000.0
+      ],
+      "applied_filter_hz": [
+        null,
+        null
+      ],
+      "bandpass_applied": false,
+      "bandpass_defaulted_from_antenna": true,
+      "bandpass_adjusted": false,
+      "bandpass_refused": true,
+      "formula": "optional dewow + optional time-zero + optional SEC + optional Nyquist-safe Butterworth (Jol 2009)",
+      "limitations": [
+        "Two-way time is not depth.",
+        "Dewow, time-zero, SEC gain, and band-pass are processing choices. A visually enhanced radargram does not have improved geological certainty.",
+        "Utilities, voids, archaeology, water table, and rebar are not established."
+      ],
+      "frozen_parameters": {
+        "applyDewow": true,
+        "dewowWindow": 31,
+        "applyTimeZero": true,
+        "timeZeroThreshold": 0.05,
+        "applySecGain": true,
+        "secPower": 2.0,
+        "secExp": 0.0,
+        "applyBandpass": true,
+        "filterOrder": 4,
+        "fLowHz": null,
+        "fHighHz": null
+      }
+    }
+  },
+  "interpretation_limit": "A radargram is an observation. Overlay and colour scale do not prove a buried object."
+}

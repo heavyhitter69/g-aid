@@ -1,0 +1,14 @@
+{
+  "runId": "r-verify-gpr-refuse",
+  "parentRunId": "r-verify-gpr-parent",
+  "planHash": "fixture-r-verify-gpr-refuse",
+  "intent": "gpr",
+  "status": "complete",
+  "capabilities": [
+    "gpr.ingest",
+    "gpr.process",
+    "gpr.interpret"
+  ],
+  "product": "G-AID GPR 1.0 processed radargram",
+  "parameters": {}
+}

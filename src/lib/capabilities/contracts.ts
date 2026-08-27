@@ -1,5 +1,6 @@
 import type { CatalogRecord, ProjectCatalog } from "../catalog/types.ts";
 import { findRecord } from "../catalog/summarize.ts";
+import { GPR_MIGRATION_BENCHMARK_PASSED, resolveGprBandpass } from "../gpr-product.ts";
 import { expandCapabilityIds } from "./compile.ts";
 import { isRegisteredCapability } from "./registry.ts";
 import type { BoundInput, CompiledDag } from "./types.ts";
@@ -67,6 +68,7 @@ export function validateCapabilityContracts(options: {
     velocityMs?: number;
     fLowHz?: number;
     fHighHz?: number;
+    applyBandpass?: boolean;
   };
   catalog?: ProjectCatalog | null;
   dag?: CompiledDag | null;
@@ -351,13 +353,53 @@ export function validateCapabilityContracts(options: {
         "GPR processing needs a supported G-AID GPR 1.0 catalog record (Units, dt_ns, dx_m, AntennaMHz, Trace/Sample/Amplitude). An arbitrary .dzt file is not a processing input.",
     });
   }
+  if (expanded.includes("gpr.process") && gprInputs.length) {
+    const records = catalogRecordsForInputs(gprInputs, options.catalog || null);
+    const dtNs =
+      records.find((record) => typeof record.dtNs === "number")?.dtNs ||
+      gprInputs.find((item) => typeof item.dtNs === "number")?.dtNs;
+    const antennaMHz =
+      records.find((record) => typeof record.antennaMHz === "number")?.antennaMHz ||
+      gprInputs.find((item) => typeof item.antennaMHz === "number")?.antennaMHz;
+    if (typeof dtNs === "number" && dtNs > 0) {
+      const band = resolveGprBandpass({
+        dtNs,
+        antennaMHz,
+        fLowHz: options.parameters.fLowHz,
+        fHighHz: options.parameters.fHighHz,
+        applyBandpass: options.parameters.applyBandpass,
+      });
+      if (band.bandpassRefused || band.bandpassAdjusted) {
+        issues.push({
+          level: "warning",
+          code: "gpr_bandpass_nyquist",
+          message:
+            band.reason ||
+            `Band-pass corners are not Nyquist-safe for dt_ns=${dtNs}. Sampling ${band.samplingHz?.toExponential(3)} Hz, Nyquist ${band.nyquistHz?.toExponential(3)} Hz.`,
+        });
+      }
+    }
+  }
   if (expanded.includes("gpr.migrate")) {
+    if (!GPR_MIGRATION_BENCHMARK_PASSED) {
+      issues.push({
+        level: "blocker",
+        code: "gpr_migration_benchmark",
+        message:
+          "gpr.migrate is unavailable until the documented diffraction/migration benchmark in docs/validation/results/gpr_migration_benchmark.json reports all_passed.",
+      });
+    }
     const vel = options.parameters.velocityMs;
     const fromInputs = options.inputs.some((item) => typeof item.velocityMs === "number" && item.velocityMs > 0);
     const fromCatalog = catalogRecordsForInputs(gprInputs, options.catalog || null).some(
       (record) => typeof record.velocityMs === "number" && record.velocityMs > 0
     );
-    if (!(typeof vel === "number" && Number.isFinite(vel) && vel > 0) && !fromInputs && !fromCatalog) {
+    if (
+      GPR_MIGRATION_BENCHMARK_PASSED &&
+      !(typeof vel === "number" && Number.isFinite(vel) && vel > 0) &&
+      !fromInputs &&
+      !fromCatalog
+    ) {
       issues.push({
         level: "blocker",
         code: "gpr_velocity_required",

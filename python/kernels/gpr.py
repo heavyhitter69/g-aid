@@ -73,6 +73,9 @@ def gpr_ingest(payload: dict) -> dict:
         if filepath and not os.path.isabs(str(filepath)):
             filepath = os.path.abspath(os.path.join(str(params.get("baseDir") or ""), str(filepath)))
         parsed = parse_gpr_table(str(filepath))
+        from science.gpr import sampling_from_dt
+
+        samp = sampling_from_dt(float(parsed["dt_ns"]) * 1e-9)
         table = parsed["table"].copy()
         table["dt_ns"] = parsed["dt_ns"]
         table["dx_m"] = parsed["dx_m"]
@@ -88,6 +91,8 @@ def gpr_ingest(payload: dict) -> dict:
             "n_traces": parsed["n_traces"],
             "n_samples": parsed["n_samples"],
             "dt_ns": parsed["dt_ns"],
+            "sampling_hz": samp["sampling_hz"],
+            "nyquist_hz": samp["nyquist_hz"],
             "dx_m": parsed["dx_m"],
             "antenna_mhz": parsed["antenna_mhz"],
             "units": parsed["units"],
@@ -116,8 +121,25 @@ def gpr_ingest(payload: dict) -> dict:
     }
 
 
+def _flag(params: dict, *names: str, default: bool = True) -> bool:
+    for name in names:
+        if name in params and params[name] is not None:
+            value = params[name]
+            if isinstance(value, str):
+                return value.strip().lower() not in {"0", "false", "no", "off"}
+            return bool(value)
+    return default
+
+
+def _num(params: dict, *names: str, default=None):
+    for name in names:
+        if params.get(name) not in (None, ""):
+            return params[name]
+    return default
+
+
 def gpr_process(payload: dict) -> dict:
-    from science.gpr import process_section
+    from science.gpr import process_section, sampling_from_dt
 
     node_id = "gpr_process"
     out = _out(payload)
@@ -131,17 +153,37 @@ def gpr_process(payload: dict) -> dict:
     traces = traces.reindex(sorted(traces.index), axis=0).reindex(sorted(traces.columns), axis=1)
     grid = traces.to_numpy(dtype=float)
     params = _params(payload)
-    f_low = params.get("fLowHz") or params.get("f_low_hz")
-    f_high = params.get("fHighHz") or params.get("f_high_hz")
+    f_low = _num(params, "fLowHz", "f_low_hz")
+    f_high = _num(params, "fHighHz", "f_high_hz")
+    samp = sampling_from_dt(dt_ns * 1e-9)
     result = process_section(
         grid,
         dt=dt_ns * 1e-9,
         dx=dx,
-        f_low=float(f_low) if f_low else None,
-        f_high=float(f_high) if f_high else None,
+        f_low=float(f_low) if f_low not in (None, "") else None,
+        f_high=float(f_high) if f_high not in (None, "") else None,
         antenna_mhz=antenna,
+        dewow_window=int(_num(params, "dewowWindow", "dewow_window") or 31),
+        sec_power=float(_num(params, "secPower", "sec_power") or 2.0),
+        sec_exp=float(_num(params, "secExp", "sec_exp") or 0.0),
+        time_zero_threshold=float(_num(params, "timeZeroThreshold", "time_zero_threshold") or 0.05),
+        filter_order=int(_num(params, "filterOrder", "filter_order") or 4),
+        apply_dewow=_flag(params, "applyDewow", "apply_dewow", default=True),
+        apply_time_zero=_flag(params, "applyTimeZero", "apply_time_zero", default=True),
+        apply_sec_gain=_flag(params, "applySecGain", "apply_sec_gain", default=True),
+        apply_bandpass=_flag(params, "applyBandpass", "apply_bandpass", default=True),
     )
-    section = result["bandpassed"]
+    section = result["section"]
+    filt = result["bandpass"]
+    if filt["bandpass_applied"]:
+        model_status = (
+            f"processed radargram; Nyquist-safe band-pass {filt['applied_low_hz']/1e6:.4g}–{filt['applied_high_hz']/1e6:.4g} MHz; "
+            "not migrated; visually enhanced ≠ geological certainty"
+        )
+    elif filt["bandpass_refused"]:
+        model_status = f"processed radargram; band-pass refused: {filt['refusal_reason']}; not migrated"
+    else:
+        model_status = "processed radargram; band-pass off; not migrated; visually enhanced ≠ geological certainty"
     csv_path = os.path.join(out, "gpr_radargram.csv")
     _write_section_csv(
         csv_path,
@@ -149,7 +191,7 @@ def gpr_process(payload: dict) -> dict:
         dx,
         dt_ns,
         z_reference="two-way time ns — not depth",
-        model_status="processed radargram; not migrated; not utilities/voids/archaeology",
+        model_status=model_status,
         units=units,
     )
     np.savez(
@@ -161,40 +203,115 @@ def gpr_process(payload: dict) -> dict:
     )
     qc = {
         "product_name": "G-AID GPR 1.0 processed radargram",
-        "time_zero_sample": result["time_zero_sample"],
-        "dewow_window": result["dewow_window"],
-        "sec_power": result["sec_power"],
-        "bandpass_hz": [result["f_low_hz"], result["f_high_hz"]],
-        "bandpass_applied": result["bandpass_applied"],
-        "bandpass_defaulted_from_antenna": result["bandpass_defaulted_from_antenna"],
         "dt_ns": dt_ns,
+        "sampling_hz": samp["sampling_hz"],
+        "nyquist_hz": samp["nyquist_hz"],
         "dx_m": dx,
         "antenna_mhz": antenna,
         "units": units,
         "vertical_axis": "two-way time ns",
         "migrated": False,
+        "geological_certainty_improved": False,
+        "dewow_applied": result["dewow_applied"],
+        "dewow_window": result["dewow_window"],
+        "dewow_formula": result["dewow_formula"],
+        "time_zero_applied": result["time_zero_applied"],
+        "time_zero_sample": result["time_zero_sample"],
+        "time_zero_threshold": result["time_zero_threshold"],
+        "time_zero_method": result["time_zero_method"],
+        "sec_applied": result["sec_applied"],
+        "sec_power": result["sec_power"],
+        "sec_exp": result["sec_exp"],
+        "sec_formula": result["sec_formula"],
+        "filter_order": result["filter_order"],
+        "bandpass": filt,
+        "requested_filter_hz": [filt["requested_low_hz"], filt["requested_high_hz"]],
+        "applied_filter_hz": [filt["applied_low_hz"], filt["applied_high_hz"]],
+        "bandpass_applied": filt["bandpass_applied"],
+        "bandpass_defaulted_from_antenna": filt["bandpass_defaulted_from_antenna"],
+        "bandpass_adjusted": filt["bandpass_adjusted"],
+        "bandpass_refused": filt["bandpass_refused"],
         "formula": result["formula"],
-        "limitations": [
-            "Two-way time is not depth.",
-            "Dewow, time-zero, and SEC gain are processing choices.",
-            "Utilities, voids, archaeology, water table, and rebar are not established.",
-        ],
+        "limitations": result["limitations"],
+        "frozen_parameters": {
+            "applyDewow": result["dewow_applied"],
+            "dewowWindow": result["dewow_window"],
+            "applyTimeZero": result["time_zero_applied"],
+            "timeZeroThreshold": result["time_zero_threshold"],
+            "applySecGain": result["sec_applied"],
+            "secPower": result["sec_power"],
+            "secExp": result["sec_exp"],
+            "applyBandpass": filt["apply_bandpass_requested"],
+            "filterOrder": result["filter_order"],
+            "fLowHz": f_low,
+            "fHighHz": f_high,
+        },
     }
     qc_path = write_json(os.path.join(out, "gpr_process_qc.json"), qc)
-    write_lineage(out, node_id, result["formula"], {"dt_ns": dt_ns, "dx_m": dx, "antenna_mhz": antenna}, [src], [csv_path, qc_path])
+    write_json(os.path.join(out, "gpr_radargram.meta.json"), {
+        "kind": "gpr-radargram",
+        "vertical_axis": "two-way time ns — not depth",
+        "sampling_hz": samp["sampling_hz"],
+        "nyquist_hz": samp["nyquist_hz"],
+        "bandpass_applied": filt["bandpass_applied"],
+        "bandpass_adjusted": filt["bandpass_adjusted"],
+        "bandpass_refused": filt["bandpass_refused"],
+        "requested_filter_hz": [filt["requested_low_hz"], filt["requested_high_hz"]],
+        "applied_filter_hz": [filt["applied_low_hz"], filt["applied_high_hz"]],
+        "refusal_reason": filt["refusal_reason"],
+        "adjustment_reason": filt["adjustment_reason"],
+        "geological_certainty_improved": False,
+    })
+    write_lineage(
+        out,
+        node_id,
+        result["formula"],
+        {"dt_ns": dt_ns, "dx_m": dx, "antenna_mhz": antenna, "sampling_hz": samp["sampling_hz"], "nyquist_hz": samp["nyquist_hz"], "bandpass": filt},
+        [src],
+        [csv_path, qc_path],
+    )
+    msg = (
+        f"Processed GPR radargram. fs={samp['sampling_hz']/1e6:.4g} MHz, Nyquist={samp['nyquist_hz']/1e6:.4g} MHz. "
+        f"{'Band-pass applied.' if filt['bandpass_applied'] else 'Band-pass not applied.'} Two-way time, not depth. "
+        "A visually enhanced radargram does not have improved geological certainty."
+    )
+    if filt.get("adjustment_reason"):
+        msg += " " + filt["adjustment_reason"]
+    if filt.get("refusal_reason") and filt["bandpass_refused"]:
+        msg += " " + filt["refusal_reason"]
     return {
         "artifacts": [
             make_artifact("artifact-gpr-radargram", "section", "csv", csv_path, node_id, [src], qc),
             make_artifact("artifact-gpr-process-qc", "qc_report", "json", qc_path, node_id, [src]),
         ],
-        "events": [{"type": "NODE_PROGRESS", "message": f"Processed GPR radargram. Time-zero sample {qc['time_zero_sample']}. Two-way time, not depth."}],
+        "events": [{"type": "NODE_PROGRESS", "message": msg}],
     }
+
+
+def _migration_benchmark_gate() -> tuple[bool, dict]:
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    path = os.path.join(root, "docs", "validation", "results", "gpr_migration_benchmark.json")
+    if not os.path.isfile(path):
+        return False, {
+            "all_passed": False,
+            "unavailable_reason": "Migration benchmark file is missing. Kirchhoff migration is unavailable.",
+        }
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    return bool(data.get("all_passed")), data
 
 
 def gpr_migrate(payload: dict) -> dict:
     from science.seismic import kirchhoff_time_migrate_2d
+    from science.gpr import MIGRATION_FORMULA, sampling_from_dt
 
     node_id = "gpr_migrate"
+    allowed, bench = _migration_benchmark_gate()
+    if not allowed:
+        raise ValueError(
+            bench.get("unavailable_reason")
+            or "Kirchhoff time migration is unavailable until the documented diffraction benchmark passes."
+        )
     out = _out(payload)
     params = _params(payload)
     src = _find(out, "gpr_processed.npz")
@@ -213,6 +330,7 @@ def gpr_migrate(payload: dict) -> dict:
     section = loaded["bandpassed"]
     dt_ns = float(loaded["dt_ns"])
     dx = float(loaded["dx_m"])
+    samp = sampling_from_dt(dt_ns * 1e-9)
     migrated = kirchhoff_time_migrate_2d(section, dt_ns * 1e-9, dx, vel)
     depth_dz = 0.5 * vel * (dt_ns * 1e-9)
     csv_path = os.path.join(out, "gpr_migrated.csv")
@@ -222,7 +340,7 @@ def gpr_migrate(payload: dict) -> dict:
         dx,
         depth_dz,
         z_reference="depth m from user velocity (0.5 v t); not ground truth",
-        model_status="Kirchhoff time migration with user velocity; not a measured depth model",
+        model_status="Kirchhoff time migration with user velocity; not a measured depth model; not geological certainty",
         units="amp",
     )
     qc = {
@@ -232,22 +350,34 @@ def gpr_migrate(payload: dict) -> dict:
         "velocity_source": velocity_source,
         "velocity_assumed": False,
         "dt_ns": dt_ns,
+        "sampling_hz": samp["sampling_hz"],
+        "nyquist_hz": samp["nyquist_hz"],
         "dx_m": dx,
         "depth_sample_m": depth_dz,
-        "formula": "Kirchhoff 2-D time migration (Yilmaz 2001). z = 0.5 v t with user v.",
+        "formula": MIGRATION_FORMULA,
+        "benchmark_passed": True,
+        "benchmark_file": "docs/validation/results/gpr_migration_benchmark.json",
+        "geological_certainty_improved": False,
         "limitations": [
             "Migrated depth uses the supplied velocity and is not ground truth.",
             "Hyperbola collapse does not prove a pipe, void, or archaeological feature.",
+            "The operator passed a noise-free constant-velocity diffraction benchmark. Field data are not that case.",
         ],
     }
     qc_path = write_json(os.path.join(out, "gpr_migrate_qc.json"), qc)
-    write_lineage(out, node_id, qc["formula"], {"velocityMs": vel}, [src], [csv_path, qc_path])
+    write_json(os.path.join(out, "gpr_migrated.meta.json"), {
+        "kind": "gpr-radargram",
+        "vertical_axis": "depth m from user velocity (0.5 v t); not ground truth",
+        "velocity_ms": vel,
+        "geological_certainty_improved": False,
+    })
+    write_lineage(out, node_id, qc["formula"], {"velocityMs": vel, "benchmark_passed": True}, [src], [csv_path, qc_path])
     return {
         "artifacts": [
             make_artifact("artifact-gpr-migrated", "section", "csv", csv_path, node_id, [src], qc),
             make_artifact("artifact-gpr-migrate-qc", "qc_report", "json", qc_path, node_id, [src]),
         ],
-        "events": [{"type": "NODE_PROGRESS", "message": f"Kirchhoff migration at {vel} m/s (user-supplied). Depth is not ground truth."}],
+        "events": [{"type": "NODE_PROGRESS", "message": f"Kirchhoff migration at {vel} m/s (user-supplied). Depth is not ground truth. Benchmark passed."}],
     }
 
 
@@ -302,7 +432,16 @@ def gpr_interpret(payload: dict) -> dict:
             process.get("antenna_mhz") and f"Antenna {process['antenna_mhz']} MHz was documented on the contract."
             or "Antenna frequency was required on ingest.",
             process.get("bandpass_defaulted_from_antenna")
-            and "Bandpass used 0.2–2.0 × AntennaMHz because fLowHz/fHighHz were not supplied."
+            and (
+                "Bandpass used 0.2–2.0 × AntennaMHz because fLowHz/fHighHz were not supplied."
+                + (
+                    " Corners were then adjusted to a documented Nyquist-safe high-cut."
+                    if process.get("bandpass_adjusted")
+                    else ""
+                )
+            )
+            or process.get("bandpass_refused")
+            and "Band-pass was refused; traces were not filtered."
             or "Bandpass frequencies were recorded when applied.",
             migrate.get("velocity_ms")
             and f"Migration velocity {migrate['velocity_ms']} m/s was user-supplied."
@@ -311,7 +450,11 @@ def gpr_interpret(payload: dict) -> dict:
         "uncertainty": [
             "Two-way time is not depth unless a user velocity is applied.",
             "A user velocity is not a measured dielectric structure.",
-            "Dewow, time-zero, SEC gain, and bandpass change amplitudes and apparent structure.",
+            "Dewow, time-zero, SEC gain, and band-pass change amplitudes and apparent structure.",
+            "A visually enhanced radargram does not have improved geological certainty.",
+            process.get("bandpass_refused") and process.get("bandpass", {}).get("refusal_reason")
+            or process.get("bandpass_adjusted") and process.get("bandpass", {}).get("adjustment_reason")
+            or "Band-pass status is recorded in process QC.",
         ],
         "recommendations": [
             "Do not pick utilities, voids, or archaeology from a radargram without field verification.",

@@ -45,7 +45,7 @@ const NODE_LABELS: Record<string, { running: string; done: string }> = {
   rad_gis_export: { running: "Writing radiometric GIS", done: "Wrote radiometric GIS" },
   rad_interpret: { running: "Writing radiometric interpretation limits", done: "Wrote radiometric interpretation limits" },
   gpr_ingest: { running: "Reading G-AID GPR 1.0 traces", done: "Read G-AID GPR 1.0 traces" },
-  gpr_process: { running: "Dewow, time-zero, SEC, and bandpass", done: "Wrote processed radargram (two-way time)" },
+  gpr_process: { running: "Dewow, time-zero, SEC, and Nyquist-safe bandpass", done: "Wrote processed radargram (two-way time)" },
   gpr_migrate: { running: "Kirchhoff time migration (user velocity)", done: "Wrote Kirchhoff migration (user velocity)" },
   gpr_gis_export: { running: "Writing GPR trace GIS", done: "Wrote GPR trace GIS" },
   gpr_interpret: { running: "Writing GPR interpretation limits", done: "Wrote GPR interpretation limits" },

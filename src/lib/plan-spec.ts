@@ -23,7 +23,7 @@ import {
 } from "./capabilities/index.ts";
 import { NEAR_ZONE_STATEMENTS, ZONED_PLANAR_OFFER, ZONED_PLANAR_PRODUCT_NAME, ZONED_TERRAIN_STATEMENTS, COMPLETE_BOUGUER_REFUSAL, isCompleteBouguerRequest, isZonedPlanarApproval } from "./gravity-product.ts";
 import { RADIO_STATEMENTS } from "./radio-product.ts";
-import { GPR_STATEMENTS } from "./gpr-product.ts";
+import { GPR_STATEMENTS, GPR_MIGRATION_BENCHMARK_PASSED, DEFAULT_DEWOW_WINDOW, DEFAULT_FILTER_ORDER, DEFAULT_SEC_POWER, gprFrozenNyquistLine } from "./gpr-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -160,6 +160,15 @@ export interface AgentPlan {
     velocityMs?: number;
     fLowHz?: number;
     fHighHz?: number;
+    applyDewow?: boolean;
+    dewowWindow?: number;
+    applyTimeZero?: boolean;
+    timeZeroThreshold?: number;
+    applySecGain?: boolean;
+    secPower?: number;
+    secExp?: number;
+    applyBandpass?: boolean;
+    filterOrder?: number;
     gravityMapping?: {
       x: string;
       y: string;
@@ -473,6 +482,15 @@ export function renderImplementationPlan(opts: {
   requestIntent?: string;
   productName?: string;
   velocityMs?: number;
+  fLowHz?: number;
+  fHighHz?: number;
+  applyDewow?: boolean;
+  dewowWindow?: number;
+  applyTimeZero?: boolean;
+  applySecGain?: boolean;
+  applyBandpass?: boolean;
+  filterOrder?: number;
+  secPower?: number;
 }): string {
   const target = opts.targetFolder || "(opened folder)";
   const capabilityIds = opts.capabilities?.length
@@ -529,6 +547,18 @@ export function renderImplementationPlan(opts: {
     typeof opts.surveyLatitude === "number" ? `Survey latitude: ${opts.surveyLatitude}° (Somigliana; easting/northing is not latitude)` : "",
     opts.elevationDatum ? `Elevation datum: ${opts.elevationDatum}` : "",
     typeof opts.velocityMs === "number" ? `GPR migration velocity: ${opts.velocityMs} m/s (user-supplied, not assumed)` : "",
+    gprStepsEnabled(opts.steps)
+      ? `GPR processing (frozen): dewow ${opts.applyDewow === false ? "off" : `on (window ${opts.dewowWindow ?? DEFAULT_DEWOW_WINDOW})`}; time-zero ${opts.applyTimeZero === false ? "off" : "on (stack first-break threshold)"}; SEC ${opts.applySecGain === false ? "off" : `on (n=${opts.secPower ?? DEFAULT_SEC_POWER})`}; band-pass ${opts.applyBandpass === false ? "off" : "on (Nyquist-validated Butterworth)"}; filter order ${opts.filterOrder ?? DEFAULT_FILTER_ORDER}. A visually enhanced radargram does not have improved geological certainty.`
+      : "",
+    gprStepsEnabled(opts.steps)
+      ? gprFrozenNyquistLine({
+          dtNs: (opts.inputs || []).find((item) => item.adapterId === "gpr-csv" && typeof item.dtNs === "number")?.dtNs,
+          antennaMHz: (opts.inputs || []).find((item) => item.adapterId === "gpr-csv" && typeof item.antennaMHz === "number")?.antennaMHz,
+          fLowHz: opts.fLowHz,
+          fHighHz: opts.fHighHz,
+          applyBandpass: opts.applyBandpass,
+        })
+      : "",
     opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
     opts.requestIntent ? `Frozen request intent: ${opts.requestIntent}` : "",
     opts.steps.farZoneTerrain
@@ -791,6 +821,16 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const fHigh = raw.match(/\bfHigh(?:Hz)?[:\s=]+(\d+(?:\.\d+)?)/i);
   if (fLow) parameters.fLowHz = parseFloat(fLow[1]);
   if (fHigh) parameters.fHighHz = parseFloat(fHigh[1]);
+  if (/\b(skip|omit|without|no)\b.{0,24}\bdewow/.test(m)) parameters.applyDewow = false;
+  if (/\b(skip|omit|without|no)\b.{0,24}\btime[\s-]?zero/.test(m)) parameters.applyTimeZero = false;
+  if (/\b(skip|omit|without|no)\b.{0,24}\b(sec\s+)?gain\b/.test(m) && !/\bband/.test(m)) parameters.applySecGain = false;
+  if (/\b(skip|omit|without|no)\b.{0,24}\b(band[\s-]?pass|bandpass|filter)\b/.test(m)) parameters.applyBandpass = false;
+  const dewowWin = raw.match(/\bdewow window[:\s=]+(\d+)/i);
+  if (dewowWin) parameters.dewowWindow = parseInt(dewowWin[1], 10);
+  const ford = raw.match(/\bfilter order[:\s=]+(\d+)/i);
+  if (ford) parameters.filterOrder = parseInt(ford[1], 10);
+  const tzTh = raw.match(/\btime[\s-]?zero threshold[:\s=]+(\d+(?:\.\d+)?)/i);
+  if (tzTh) parameters.timeZeroThreshold = parseFloat(tzTh[1]);
 
   const zonedOk = isZonedPlanarApproval(raw, Boolean(parameters.zonedPlanarOffered));
   if (zonedOk) {
@@ -859,11 +899,14 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
         !parameters.useDemExtent &&
         !(typeof parameters.terrainRadiusM === "number" && Number.isFinite(parameters.terrainRadiusM));
       const needsVelocity =
-        id === "gpr.migrate" && !(typeof parameters.velocityMs === "number" && Number.isFinite(parameters.velocityMs) && parameters.velocityMs > 0);
+        id === "gpr.migrate" &&
+        GPR_MIGRATION_BENCHMARK_PASSED &&
+        !(typeof parameters.velocityMs === "number" && Number.isFinite(parameters.velocityMs) && parameters.velocityMs > 0);
+      const migrateBlocked = id === "gpr.migrate" && !GPR_MIGRATION_BENCHMARK_PASSED;
       decisions.push({
         at: now,
         message: raw,
-        status: needsRtpParams || needsDensity || needsTerrain || needsVelocity ? "needs-data" : "accepted",
+        status: needsRtpParams || needsDensity || needsTerrain || needsVelocity ? "needs-data" : migrateBlocked ? "refused" : "accepted",
         capabilityId: id,
         reason: needsRtpParams
           ? "RTP was requested. It needs mag.igrf or explicit inclination/declination before Proceed."
@@ -886,7 +929,11 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
                 : id === "gpr.ingest"
                   ? "Accepted G-AID GPR 1.0 ingest. Arbitrary DZT files stay recognised-unsupported."
                 : id === "gpr.migrate"
-                  ? "Accepted Kirchhoff time migration only with a user-supplied velocity. Velocity is not assumed from AntennaMHz."
+                  ? GPR_MIGRATION_BENCHMARK_PASSED
+                    ? "Accepted Kirchhoff time migration only with a user-supplied velocity after the documented diffraction benchmark passed. Velocity is not assumed from AntennaMHz."
+                    : "Kirchhoff time migration is unavailable until the documented diffraction benchmark passes."
+                : id === "gpr.process"
+                  ? "Accepted GPR process. Dewow, time-zero, SEC, and band-pass are optional frozen parameters. Band-pass corners are validated against Nyquist from dt_ns."
                 : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }

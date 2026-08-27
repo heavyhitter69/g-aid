@@ -3,7 +3,21 @@
 import { useMemo } from "react";
 import type { SectionGrid } from "@/lib/section/parse";
 
-export function SectionView({ section }: { section: SectionGrid }) {
+function gprTitle(section: SectionGrid): string {
+  const z = (section.zReference || "").toLowerCase();
+  if (/user velocity|depth m/.test(z) || /migrat/.test(section.modelStatus || "")) {
+    return "GPR Kirchhoff time migration (user-velocity depth, not ground truth)";
+  }
+  return "GPR radargram (two-way time, not depth)";
+}
+
+export function SectionView({
+  section,
+  extraWarnings = [],
+}: {
+  section: SectionGrid;
+  extraWarnings?: string[];
+}) {
   const { width, height, cells } = useMemo(() => {
     const xs = [...new Set(section.points.map((p) => p.x))].sort((a, b) => a - b);
     const zs = [...new Set(section.points.map((p) => p.z))].sort((a, b) => a - b);
@@ -29,25 +43,35 @@ export function SectionView({ section }: { section: SectionGrid }) {
       })
     );
     return { width: xs.length, height: zs.length, cells };
-  }, [section.points]);
+  }, [section.points, section.kind]);
+
+  const gpr = section.kind === "gpr-radargram";
+  const heading = gpr
+    ? gprTitle(section)
+    : section.kind === "pseudosection"
+      ? "ERT pseudosection"
+      : "Experimental ERT 2-D invert (not production)";
+  const axisLabel = gpr
+    ? /user velocity|depth m/i.test(section.zReference)
+      ? "Vertical axis is user-velocity depth (0.5 v t), not a measured depth."
+      : "Vertical axis is two-way travel time in ns, not depth."
+    : `Depth/elevation: ${section.zReference}`;
+  const warnings = [...section.warnings, ...extraWarnings.filter(Boolean)];
 
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e] text-[#cccccc] p-4 gap-3 overflow-auto">
       <header>
         <p className="text-[10px] uppercase tracking-wide text-[#858585]">Section workspace</p>
-        <h2 className="text-sm font-medium">
-          {section.kind === "gpr-radargram"
-            ? "GPR radargram"
-            : section.kind === "pseudosection"
-              ? "ERT pseudosection"
-              : "Experimental ERT 2-D invert (not production)"}
+        <h2 className="text-sm font-medium" data-testid={gpr ? "gpr-section-title" : "section-title"}>
+          {heading}
         </h2>
-        <p className="text-[11px] text-[#9d9d9d] mt-1">
-          Units: {section.units}. {section.kind === "gpr-radargram" ? "Vertical axis" : "Depth/elevation"}: {section.zReference}. Interpolation: {section.interpolation}. Model: {section.modelStatus}.
+        <p className="text-[11px] text-[#9d9d9d] mt-1" data-testid={gpr ? "gpr-z-axis" : "section-z-axis"}>
+          Units: {section.units}. {axisLabel} Interpolation: {section.interpolation}. Model: {section.modelStatus}.
         </p>
       </header>
       <div
         className="border border-[#3c3c3c] rounded overflow-hidden"
+        data-testid={gpr ? "gpr-radargram" : "section-grid"}
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(${Math.max(width, 1)}, minmax(4px, 1fr))`,
@@ -60,8 +84,8 @@ export function SectionView({ section }: { section: SectionGrid }) {
           ))
         )}
       </div>
-      <ul className="text-[11px] text-[#c0c0c0] space-y-1">
-        {section.warnings.map((line) => (
+      <ul className="text-[11px] text-[#c0c0c0] space-y-1" data-testid={gpr ? "gpr-warnings" : "section-warnings"}>
+        {warnings.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
