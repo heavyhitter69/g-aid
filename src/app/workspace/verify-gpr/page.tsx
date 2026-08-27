@@ -30,6 +30,12 @@ type Payload = {
 
 type Tab = "radargram" | "filter" | "migrated" | "interpretation";
 
+function mhz(hz: unknown): string {
+  const n = Number(hz);
+  if (!Number.isFinite(n)) return "unknown";
+  return `${(n / 1e6).toPrecision(4)} MHz`;
+}
+
 function qcWarnings(pack: RunPack, path: string): string[] {
   const merged = { ...(pack.qc || {}), ...(pack.meta || {}) };
   return gprProductWarningsFromQc(
@@ -149,7 +155,7 @@ export default function GprVerifyPage() {
                 Coarse-dt adjustment: refused={String(Boolean(data.nyquistAdjust.qc?.bandpass_refused))} adjusted=
                 {String(Boolean(data.nyquistAdjust.qc?.bandpass_adjusted))} applied=
                 {String(Boolean(data.nyquistAdjust.qc?.bandpass_applied))} Nyquist{" "}
-                {String(data.nyquistAdjust.qc?.nyquist_hz)} Hz
+                {mhz(data.nyquistAdjust.qc?.nyquist_hz)}
               </p>
               <p data-testid="filter-refused">
                 Undersampled refusal: refused={String(Boolean(data.nyquistRefuse.qc?.bandpass_refused))} applied=

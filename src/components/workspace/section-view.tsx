@@ -2,14 +2,7 @@
 
 import { useMemo } from "react";
 import type { SectionGrid } from "@/lib/section/parse";
-
-function gprTitle(section: SectionGrid): string {
-  const z = (section.zReference || "").toLowerCase();
-  if (/user velocity|depth m/.test(z) || /migrat/.test(section.modelStatus || "")) {
-    return "GPR Kirchhoff time migration (user-velocity depth, not ground truth)";
-  }
-  return "GPR radargram (two-way time, not depth)";
-}
+import { gprSectionHeading } from "@/lib/gpr-product";
 
 export function SectionView({
   section,
@@ -47,7 +40,7 @@ export function SectionView({
 
   const gpr = section.kind === "gpr-radargram";
   const heading = gpr
-    ? gprTitle(section)
+    ? gprSectionHeading(section.zReference, section.modelStatus)
     : section.kind === "pseudosection"
       ? "ERT pseudosection"
       : "Experimental ERT 2-D invert (not production)";

@@ -1,0 +1,71 @@
+{
+  "product_name": "G-AID GPR 1.0 processed radargram",
+  "capabilities": ["gpr.ingest", "gpr.process", "gpr.migrate", "gpr.interpret"],
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["SectionView"],
+  "url": "http://127.0.0.1:3000/workspace/verify-gpr",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-27T15:00:00Z",
+  "electron_packaged_app": false,
+  "silent_0_999_clamp": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same SectionView).",
+    "A packaged Electron executable was not launched.",
+    "Unmigrated vertical axis is two-way time, not depth. Migrated z uses the user velocity 1e8 m/s and is not ground truth.",
+    "Band-pass high-cut at or above Nyquist is refused; antenna-default overflow uses a documented 0.8 × Nyquist high-cut when the low-cut still fits.",
+    "A visually enhanced radargram does not have improved geological certainty."
+  ],
+  "tabs": {
+    "radargram": {
+      "passed": true,
+      "two_way_time": true,
+      "title": "GPR radargram (two-way time, not depth)",
+      "z_axis": "Vertical axis is two-way travel time in ns, not depth.",
+      "model": "processed radargram; Nyquist-safe band-pass 80–800 MHz; not migrated; visually enhanced ≠ geological certainty",
+      "warnings": "This radargram is two-way time, not depth. Utilities, voids, archaeology, water table, and rebar are not established. A visually enhanced radargram does not have improved geological certainty.",
+      "screenshot": "docs/validation/results/screenshots/gpr-radargram.webp"
+    },
+    "filter": {
+      "passed": true,
+      "silent_0_999_clamp": false,
+      "title": "GPR radargram (two-way time, not depth)",
+      "adjusted": true,
+      "applied": true,
+      "refused_undersampled": true,
+      "nyquist_mhz": 250.0,
+      "requested_mhz": "80–800",
+      "applied_mhz": "80–200",
+      "filter_adjusted": "Coarse-dt adjustment: refused=false adjusted=true applied=true Nyquist 250.0 MHz",
+      "filter_refused": "Undersampled refusal: refused=true applied=false reason=Band-pass high-cut 800 MHz is at or above Nyquist 25 MHz. G-AID will not silently place a high-cut at 0.999 × Nyquist.",
+      "filter_no_clamp": "High-cut is never silently placed at 0.999 × Nyquist.",
+      "screenshot": "docs/validation/results/screenshots/gpr-filter.webp"
+    },
+    "migrated": {
+      "passed": true,
+      "user_velocity": true,
+      "velocity_ms": 100000000,
+      "title": "GPR Kirchhoff time migration (user-velocity depth, not ground truth)",
+      "z_axis": "Vertical axis is user-velocity depth (0.5 v t), not a measured depth.",
+      "warnings": "Migrated depth uses the supplied velocity and is not ground truth. Utilities, voids, and archaeology are not established.",
+      "screenshot": "docs/validation/results/screenshots/gpr-migrated.webp"
+    },
+    "interpretation": {
+      "passed": true,
+      "geological_certainty_improved": false,
+      "unmigrated_run": "r-verify-gpr",
+      "migrated_run": "r-verify-gpr-mig",
+      "not_established": [
+        "Utilities are not established.",
+        "Voids are not established.",
+        "Archaeology is not established.",
+        "Water table is not established.",
+        "Rebar are not established.",
+        "Lithology are not established.",
+        "Measured depth is not established without an independently verified velocity."
+      ],
+      "screenshot": "docs/validation/results/screenshots/gpr-interpretation.webp"
+    }
+  }
+}

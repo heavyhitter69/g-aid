@@ -27,6 +27,7 @@ import {
   GPR_MIGRATION_BENCHMARK_PASSED,
   gprFrozenNyquistLine,
   gprProductWarnings,
+  gprSectionHeading,
   resolveGprBandpass,
 } from "./gpr-product.ts";
 import { detectAnalysisIntent } from "./workspace-index.ts";
@@ -269,6 +270,11 @@ test("section parser reads a GPR radargram as two-way time, not utilities", () =
   const migrated = parseSectionCsv(csv.replace(/two-way time ns — not depth/g, "depth m from user velocity (0.5 v t); not ground truth"), "gpr_migrated.csv");
   assert.equal(migrated.kind, "gpr-radargram");
   assert.match(migrated.zReference, /user velocity/i);
+  assert.equal(gprSectionHeading("two-way time ns — not depth", "processed radargram; not migrated"), "GPR radargram (two-way time, not depth)");
+  assert.equal(
+    gprSectionHeading("depth m from user velocity (0.5 v t); not ground truth", "Kirchhoff time migration with user velocity"),
+    "GPR Kirchhoff time migration (user-velocity depth, not ground truth)"
+  );
 });
 
 test("python kernels ingest → process → interpret; migrate requires velocity", () => {
@@ -564,14 +570,12 @@ test("desktop verification fixtures cover unmigrated, Nyquist, migrated, and int
   const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gpr", "gpr_interpretation.json"), "utf8"));
   assert.equal(interp.not_established.some((line: string) => /utilities/i.test(line)), true);
   const uiPath = path.join(process.cwd(), "docs/validation/results/gpr_desktop_ui.json");
-  if (fs.existsSync(uiPath)) {
-    const ui = JSON.parse(fs.readFileSync(uiPath, "utf8"));
-    assert.equal(ui.passed, true);
-    assert.equal(ui.tabs.radargram.two_way_time, true);
-    assert.equal(ui.tabs.filter.silent_0_999_clamp, false);
-    assert.equal(ui.tabs.migrated.user_velocity, true);
-    assert.equal(ui.tabs.interpretation.geological_certainty_improved, false);
-  }
+  const ui = JSON.parse(fs.readFileSync(uiPath, "utf8"));
+  assert.equal(ui.passed, true);
+  assert.equal(ui.tabs.radargram.two_way_time, true);
+  assert.equal(ui.tabs.filter.silent_0_999_clamp, false);
+  assert.equal(ui.tabs.migrated.user_velocity, true);
+  assert.equal(ui.tabs.interpretation.geological_certainty_improved, false);
 });
 
 if (failed) {

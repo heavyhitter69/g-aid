@@ -162,6 +162,15 @@ export function isGprSectionPath(path: string): boolean {
   return /gpr_radargram\.csv$/.test(n) || /gpr_migrated\.csv$/.test(n);
 }
 
+export function gprSectionHeading(zReference?: string, modelStatus?: string): string {
+  const z = (zReference || "").toLowerCase();
+  const status = (modelStatus || "").toLowerCase();
+  const migrated = /user velocity|0\.5 v t|depth m from/.test(z) || (/kirchhoff/.test(status) && !/not migrated/.test(status));
+  return migrated
+    ? "GPR Kirchhoff time migration (user-velocity depth, not ground truth)"
+    : "GPR radargram (two-way time, not depth)";
+}
+
 export function gprProductWarnings(options: {
   path?: string;
   migrated?: boolean;

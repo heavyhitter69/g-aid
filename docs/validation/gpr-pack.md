@@ -113,8 +113,12 @@ model, a utility map, or Complete Bouguer.
 
 Workspace route `/workspace/verify-gpr` (same `SectionView` as the live
 workspace) is fed by versioned fixtures under
-`tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr*`. Recorded results
-live in `docs/validation/results/gpr_desktop_ui.json` after a live click-through.
+`tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr*`.
+
+Live React pass recorded 2026-08-27 (`docs/validation/results/gpr_desktop_ui.json`):
+unmigrated two-way-time radargram, Nyquist adjustment/refusal (no 0.999 clamp),
+migrated user-velocity depth labels, and interpretation
+`geological_certainty_improved=false`. See `docs/validation/gpr-desktop-ui.md`.
 
 ## Required user confirmations
 
