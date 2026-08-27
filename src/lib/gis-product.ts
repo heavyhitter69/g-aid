@@ -1,13 +1,16 @@
-import { overlayDecision, parseEpsg, type CrsInfo } from "./map/crs.ts";
+import { crsFromCatalog, overlayDecision, type CrsInfo } from "./map/crs.ts";
 
 export const GIS_PRODUCT_NAME = "G-AID documented GeoJSON vector layer";
-export const GIS_SUPPORTED_FORMAT = "GeoJSON Feature/FeatureCollection with documented EPSG";
+export const GIS_SUPPORTED_FORMAT =
+  "RFC 7946 GeoJSON (OGC:CRS84), legacy-GeoJSON with a validated CRS mapping, or G-AID custom import (.prj / EPSG=)";
 
 export const GIS_STATEMENTS = [
   "Product: G-AID documented GeoJSON vector layer. Geometry and attributes are source information, not an AI-confirmed interpretation.",
+  "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (WGS 84 longitude-latitude degrees). It is not EPSG:4326.",
+  "A legacy GeoJSON crs member is not RFC 7946. Projected files with .prj or / EPSG= are a G-AID custom import contract.",
   "GeoJSON is the only supported vector ingest. Shapefile and GeoPackage stay recognised-unsupported (no geometry/attribute parser in this pack).",
   "Layer purpose (geology, structure, tenure, alteration, mine feature, sample location) is user-assigned. Filenames and field names do not establish geology or mineral meaning.",
-  "Overlay and spatial-overlap queries require matching documented CRS. G-AID will not silently reproject.",
+  "Overlay and spatial-overlap queries require documented CRS compatibility. G-AID will not silently reproject or swap axes.",
   "Spatial overlap is a geometric relationship table. It does not establish geological, mineral, or causal relationships.",
   "Buffer, clip, dissolve, reprojection, geoprocessing, and attribute editing are not registered capabilities.",
   "Mineral targets, prospectivity maps, resource/reserve claims, and drill recommendations are not established from overlays.",
@@ -25,6 +28,8 @@ export function gisProductWarnings(opts: {
   role?: string;
   roleReviewed?: boolean;
   crs?: string;
+  geojsonContract?: string;
+  axisOrder?: string;
   overlapComputed?: boolean;
 }): string[] {
   const warnings = [
@@ -38,6 +43,15 @@ export function gisProductWarnings(opts: {
   }
   if (!opts.crs) {
     warnings.push("CRS is undocumented. Overlay and overlap queries are blocked.");
+  } else if (opts.crs === "OGC:CRS84") {
+    warnings.push("CRS is OGC:CRS84 (lon, lat degrees). This is not EPSG:4326 and was not reprojected.");
+  } else if (opts.geojsonContract === "legacy-geojson") {
+    warnings.push("This is legacy-GeoJSON. The crs member is not the RFC 7946 CRS mechanism.");
+  } else if (opts.geojsonContract === "g-aid-custom-import") {
+    warnings.push("This is a G-AID custom import contract, not standard RFC 7946 GeoJSON.");
+  }
+  if (opts.crs === "EPSG:4326") {
+    warnings.push("EPSG:4326 OGC axis order is lat-lon. GeoJSON coordinates remain [lon, lat]. G-AID will not silently swap axes.");
   }
   if (opts.overlapComputed) {
     warnings.push("Spatial overlap is geometric coincidence, not a joint geological or mineral interpretation.");
@@ -54,17 +68,17 @@ export interface VectorOverlapHit {
   reason: string;
 }
 
-function crsInfoOf(crs?: CrsInfo | string): CrsInfo | undefined {
+function crsInfoOf(
+  crs?: CrsInfo | string,
+  extras?: { geojsonContract?: CrsInfo["geojsonContract"]; coordinateOrder?: CrsInfo["coordinateOrder"] }
+): CrsInfo | undefined {
   if (!crs) return undefined;
   if (typeof crs === "string") {
-    const epsg = parseEpsg(crs);
-    return {
-      key: epsg ? `EPSG:${epsg}` : crs,
-      label: crs,
+    return crsFromCatalog(crs, {
       source: "catalog",
-      assumed: !epsg,
-      epsg,
-    };
+      geojsonContract: extras?.geojsonContract,
+      coordinateOrder: extras?.coordinateOrder,
+    });
   }
   return crs;
 }
@@ -89,6 +103,8 @@ export function layersOverlappingVectors(
     bbox?: { minX: number; minY: number; maxX: number; maxY: number };
     crs?: CrsInfo | string;
     id?: string;
+    geojsonContract?: CrsInfo["geojsonContract"];
+    coordinateOrder?: CrsInfo["coordinateOrder"];
   }>
 ): VectorOverlapHit[] {
   const hits: VectorOverlapHit[] = [];
@@ -96,7 +112,10 @@ export function layersOverlappingVectors(
     for (let j = i + 1; j < layers.length; j++) {
       const left = layers[i];
       const right = layers[j];
-      const decision = overlayDecision(crsInfoOf(left.crs), crsInfoOf(right.crs));
+      const decision = overlayDecision(
+        crsInfoOf(left.crs, { geojsonContract: left.geojsonContract, coordinateOrder: left.coordinateOrder }),
+        crsInfoOf(right.crs, { geojsonContract: right.geojsonContract, coordinateOrder: right.coordinateOrder })
+      );
       if (!decision.allowed) continue;
       if (!bboxOverlap(left.bbox, right.bbox)) continue;
       hits.push({

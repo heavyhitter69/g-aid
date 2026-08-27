@@ -1,5 +1,6 @@
 {
   "format": "geojson",
+  "rfc7946_crs84": true,
   "shapefile": false,
   "geopackage": false,
   "reprojected": false,

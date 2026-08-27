@@ -1,6 +1,6 @@
 import type { VectorFeature, VectorLayerData } from "./types.ts";
 import { PREVIEW_POLICY, previewNote } from "./preview.ts";
-import { crsFromGeojson, type CrsInfo } from "./crs.ts";
+import { crsFromEpsg, resolveGeojsonCrs, type CrsInfo } from "./crs.ts";
 
 function asCoord(pair: unknown): { x: number; y: number } | null {
   if (!Array.isArray(pair) || pair.length < 2) return null;
@@ -69,7 +69,7 @@ function featuresFromGeometry(
 export function parseGeojson(text: string): { data: VectorLayerData; crs: CrsInfo } | null {
   if (text.length > PREVIEW_POLICY.maxGeojsonBytes) {
     return {
-      crs: crsFromGeojson(null),
+      crs: crsFromEpsg(undefined, "geojson"),
       data: {
         features: [],
         featureCount: 0,
@@ -93,7 +93,6 @@ export function parseGeojson(text: string): { data: VectorLayerData; crs: CrsInf
     properties?: Record<string, unknown>;
     coordinates?: unknown;
   };
-  const crs = crsFromGeojson(parsed);
   const collected: VectorFeature[] = [];
   if (obj.type === "FeatureCollection" && Array.isArray(obj.features)) {
     for (const feature of obj.features) {
@@ -106,9 +105,22 @@ export function parseGeojson(text: string): { data: VectorLayerData; crs: CrsInf
   } else {
     return null;
   }
+  let bbox: { minX: number; minY: number; maxX: number; maxY: number } | undefined;
+  for (const feature of collected) {
+    for (const p of feature.coordinates) {
+      if (!bbox) bbox = { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y };
+      else {
+        bbox.minX = Math.min(bbox.minX, p.x);
+        bbox.minY = Math.min(bbox.minY, p.y);
+        bbox.maxX = Math.max(bbox.maxX, p.x);
+        bbox.maxY = Math.max(bbox.maxY, p.y);
+      }
+    }
+  }
+  const resolved = resolveGeojsonCrs(parsed, { sourceText: text, bbox });
   const truncated = collected.length > PREVIEW_POLICY.maxGeojsonFeatures;
   return {
-    crs,
+    crs: resolved.crs,
     data: {
       features: collected.slice(0, PREVIEW_POLICY.maxGeojsonFeatures),
       featureCount: collected.length,

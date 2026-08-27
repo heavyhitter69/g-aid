@@ -125,7 +125,9 @@ test("catalog classifies mixed folder without defaulting to magnetics", () => {
 
     const geojson = byPath(catalog.records, "gis/clip.geojson");
     assert.equal(geojson.formatId, "geojson");
-    assert.equal(geojson.supportStatus, "recognised-unsupported");
+    assert.equal(geojson.supportStatus, "supported");
+    assert.equal(geojson.crs, "OGC:CRS84");
+    assert.equal(geojson.geojsonContract, "rfc7946");
 
     const prj = byPath(catalog.records, "gis/crs.prj");
     assert.equal(prj.formatId, "esri-prj");

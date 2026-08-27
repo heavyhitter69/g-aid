@@ -152,6 +152,10 @@ export interface CatalogRecord {
     dbf: boolean;
     prj: boolean;
   };
+  geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
+  coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   provenance: CatalogProvenance;
 }
 

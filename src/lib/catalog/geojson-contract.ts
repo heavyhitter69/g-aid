@@ -1,10 +1,12 @@
 /**
  * Documented GeoJSON vector contract.
- * RFC 7946 default CRS84 is not treated as a documented CRS.
+ * RFC 7946 GeoJSON with no crs member is OGC:CRS84 (lon, lat degrees).
+ * Legacy crs members and companion .prj / EPSG comments are not RFC 7946.
  * Layer purpose is never inferred from filename or field names.
  */
 
-import { parseEpsg } from "../map/crs.ts";
+import { resolveGeojsonCrs, type CrsAxisOrder } from "../map/crs.ts";
+import type { GeojsonContractKind } from "../map/types.ts";
 
 export const GEOJSON_ADAPTER_ID = "geojson";
 export const GEOJSON_FORMAT = "geojson";
@@ -47,7 +49,10 @@ export interface GeojsonInspect {
   attributeNames: string[];
   bbox?: { minX: number; minY: number; maxX: number; maxY: number };
   crs?: string;
-  crsSource?: "geojson-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  geojsonContract?: GeojsonContractKind;
+  axisOrder?: CrsAxisOrder;
+  coordinateOrder?: CrsAxisOrder;
   locationQuality: "documented" | "user-confirmed" | "missing";
   errors: string[];
   warnings: string[];
@@ -190,22 +195,6 @@ function validateGeometry(
   return { ok: false, pts: [] };
 }
 
-function crsFromObject(obj: unknown): { crs?: string; source?: GeojsonInspect["crsSource"] } {
-  if (!obj || typeof obj !== "object") return {};
-  const rec = obj as { crs?: { properties?: { name?: string } }; properties?: Record<string, unknown> };
-  const name = rec.crs?.properties?.name;
-  const fromMember = parseEpsg(name);
-  if (fromMember) return { crs: `EPSG:${fromMember}`, source: "geojson-crs" };
-  const fromProp = parseEpsg(String(rec.properties?.EPSG || rec.properties?.crs || rec.properties?.CRS || ""));
-  if (fromProp) return { crs: `EPSG:${fromProp}`, source: "epsg-comment" };
-  return {};
-}
-
-function epsgFromText(text: string): string | undefined {
-  const match = text.match(/\/\s*EPSG\s*=\s*(\d{4,6})/i) || text.match(/EPSG[:\s]+(\d{4,6})/i);
-  return match ? `EPSG:${match[1]}` : undefined;
-}
-
 export function inspectGeojsonText(
   text: string,
   extras?: { companionPrjText?: string; filename?: string }
@@ -285,23 +274,18 @@ export function inspectGeojsonText(
   if (!features.length) errors.push("GeoJSON has no features.");
   if (features.length && valid === 0) errors.push("No valid geometries after coordinate and ring checks.");
 
-  let crsInfo = crsFromObject(parsed);
-  if (!crsInfo.crs) {
-    const comment = epsgFromText(text.slice(0, 2000));
-    if (comment) crsInfo = { crs: comment, source: "epsg-comment" };
-  }
-  if (!crsInfo.crs && extras?.companionPrjText) {
-    const epsg = parseEpsg(extras.companionPrjText);
-    if (epsg) crsInfo = { crs: `EPSG:${epsg}`, source: "companion-prj" };
-    else warnings.push("Companion .prj has no EPSG authority. Overlay is blocked until CRS is documented.");
-  }
-  if (!crsInfo.crs) {
-    warnings.push("No documented EPSG. RFC 7946 lon/lat is not assumed. Overlay and processing stay blocked.");
-  }
+  const resolved = resolveGeojsonCrs(parsed, {
+    companionPrjText: extras?.companionPrjText,
+    sourceText: text,
+    bbox,
+  });
+  errors.push(...resolved.errors);
+  warnings.push(...resolved.warnings);
   warnings.push("Attribute names have unknown semantics. Geology, tenure, alteration, and sample meaning are not inferred from field names or filenames.");
   void extras?.filename;
 
   const uniqueErrors = [...new Set(errors)];
+  const documented = !resolved.crs.assumed && resolved.crs.key !== "unknown" && resolved.errors.length === 0;
   return {
     looksLikeGeojson: true,
     geometryTypes: [...types],
@@ -309,9 +293,21 @@ export function inspectGeojsonText(
     validFeatureCount: valid,
     attributeNames: [...attr],
     bbox,
-    crs: crsInfo.crs,
-    crsSource: crsInfo.source,
-    locationQuality: crsInfo.crs ? "documented" : "missing",
+    crs: documented ? resolved.crs.key : undefined,
+    crsSource:
+      resolved.contract === "rfc7946"
+        ? "rfc7946"
+        : resolved.crs.source === "legacy-crs"
+          ? "legacy-crs"
+          : resolved.crs.source === "custom-import"
+            ? extras?.companionPrjText
+              ? "companion-prj"
+              : "epsg-comment"
+            : undefined,
+    geojsonContract: resolved.contract,
+    axisOrder: resolved.crs.axisOrder,
+    coordinateOrder: resolved.crs.coordinateOrder,
+    locationQuality: documented ? "documented" : "missing",
     errors: uniqueErrors,
     warnings: [...new Set(warnings)],
   };

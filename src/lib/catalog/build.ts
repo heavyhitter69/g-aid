@@ -170,6 +170,10 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     attributeNames: classified.inspect.attributeNames,
     vectorRole: classified.inspect.vectorRole,
     shapefileSidecars: classified.inspect.shapefileSidecars,
+    geojsonContract: classified.inspect.geojsonContract,
+    crsSource: classified.inspect.crsSource,
+    axisOrder: classified.inspect.axisOrder,
+    coordinateOrder: classified.inspect.coordinateOrder,
     provenance: {
       method: classified.method,
       adapterId: classified.adapterId || undefined,

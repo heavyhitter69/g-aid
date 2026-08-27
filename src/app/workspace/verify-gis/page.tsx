@@ -10,6 +10,10 @@ type TrackLayer = {
   role?: string;
   role_reviewed?: boolean;
   crs?: string;
+  crs_source?: string;
+  geojson_contract?: string;
+  axis_order?: string;
+  coordinate_order?: string;
   geometry_types?: string[];
   attribute_names?: string[];
 };
@@ -23,6 +27,10 @@ type CatalogRow = {
   adapterId: string;
   mediaClass: string;
   crs: string | null;
+  crsSource?: string | null;
+  geojsonContract?: string | null;
+  axisOrder?: string | null;
+  coordinateOrder?: string | null;
   locationQuality?: string;
   vectorRole?: { role?: string; reviewed?: boolean; source?: string };
   geometryTypes?: string[];
@@ -37,7 +45,11 @@ type Pack = {
   geojson: string | null;
   tracks: { layers?: TrackLayer[] } | null;
   ingestQc: Record<string, unknown> | null;
-  overlap: { rows?: Array<Record<string, string>>; blocked?: Array<{ reason?: string }> } | null;
+  overlap: {
+    rows?: Array<Record<string, string>>;
+    blocked?: Array<{ reason?: string }>;
+    crs_decisions?: Array<Record<string, string>>;
+  } | null;
   overlapQc: { skipped?: boolean; reason?: string; message?: string } | null;
   interpretation: {
     not_established?: string[];
@@ -56,8 +68,12 @@ type Payload = {
   points: Pack;
   lines: Pack;
   polygons: Pack;
+  rfc7946: Pack;
+  legacy: Pack;
+  customImport: Pack;
   unknownCrs: Pack;
   conflict: Pack;
+  compat: Pack;
   overlap: Pack;
   interpretation: Pack;
 };
@@ -66,10 +82,29 @@ type Tab =
   | "points"
   | "lines"
   | "polygons"
-  | "unknown-crs"
+  | "rfc7946"
+  | "legacy"
+  | "custom-import"
+  | "undocumented"
+  | "compat"
   | "conflict"
   | "overlap"
   | "interpretation";
+
+const TAB_LABEL: Record<Tab, string> = {
+  catalog: "catalog",
+  points: "points",
+  lines: "lines",
+  polygons: "polygons",
+  rfc7946: "RFC 7946 CRS84",
+  legacy: "legacy-GeoJSON",
+  "custom-import": "custom import",
+  undocumented: "undocumented projected",
+  compat: "CRS84 vs 4326",
+  conflict: "Conflicting CRS",
+  overlap: "overlap",
+  interpretation: "interpretation",
+};
 
 function MapPack({ pack, title }: { pack: Pack; title: string }) {
   const vector = useMemo(() => (pack.geojson ? parseGeojson(pack.geojson) : null), [pack.geojson]);
@@ -106,7 +141,13 @@ function MapPack({ pack, title }: { pack: Pack; title: string }) {
             layers.some((item) => item.role_reviewed)
               ? "User-assigned roles are catalog labels, not geological confirmation."
               : "Layer purpose is unassigned. Geology/tenure/structure were not inferred from the filename.",
-            "Spatial overlap is geometric coincidence, not a joint interpretation.",
+            layer?.crs === "OGC:CRS84"
+              ? "OGC:CRS84 is WGS 84 longitude-latitude degrees. It is not EPSG:4326 and was not reprojected."
+              : layer?.geojson_contract === "legacy-geojson"
+                ? "legacy-GeoJSON: the crs member is not the RFC 7946 CRS mechanism."
+                : layer?.geojson_contract === "g-aid-custom-import"
+                  ? "G-AID custom import contract, not standard RFC 7946 GeoJSON."
+                  : "Spatial overlap is geometric coincidence, not a joint interpretation.",
           ]}
         />
       </div>
@@ -114,7 +155,8 @@ function MapPack({ pack, title }: { pack: Pack; title: string }) {
         {layers.map((item) => (
           <p key={item.source_path || item.role}>
             {item.source_path || "layer"} · Role:{" "}
-            {item.role_reviewed ? `${item.role} (user-assigned)` : "unassigned generic vector"} · CRS: {item.crs || "undocumented"} ·{" "}
+            {item.role_reviewed ? `${item.role} (user-assigned)` : "unassigned generic vector"} · CRS: {item.crs || "undocumented"} ·
+            contract {item.geojson_contract || "n/a"} · axis {item.axis_order || "n/a"} · storage {item.coordinate_order || "n/a"} ·{" "}
             {(item.geometry_types || []).join(", ")} · attributes {(item.attribute_names || []).join(", ") || "none"} (unknown semantics)
           </p>
         ))}
@@ -128,8 +170,9 @@ function CatalogTable({ records }: { records: CatalogRow[] }) {
   return (
     <div className="h-full overflow-auto p-4" data-testid="gis-catalog">
       <p className="text-[12px] text-[#9d9d9d] mb-3">
-        Catalog classification for the GIS fixture project. Filenames do not assign geology or mineral meaning. Role
-        changes here are a reviewed catalog label only and are not persisted into the fixture folder.
+        Catalog classification for the GIS fixture project. RFC 7946 GeoJSON with no crs member is documented OGC:CRS84.
+        Filenames do not assign geology or mineral meaning. Role changes here are a reviewed catalog label only and are
+        not persisted into the fixture folder.
       </p>
       <table className="w-full text-left border border-[#3c3c3c] text-[12px]">
         <thead className="bg-[#252526] text-[11px] uppercase tracking-wide text-[#858585]">
@@ -138,6 +181,7 @@ function CatalogTable({ records }: { records: CatalogRow[] }) {
             <th className="px-2 py-1">Support</th>
             <th className="px-2 py-1">Format</th>
             <th className="px-2 py-1">CRS</th>
+            <th className="px-2 py-1">Contract</th>
             <th className="px-2 py-1">Vector role</th>
             <th className="px-2 py-1">Notes</th>
           </tr>
@@ -156,7 +200,12 @@ function CatalogTable({ records }: { records: CatalogRow[] }) {
                 </td>
                 <td className="px-2 py-1">{record.formatId}</td>
                 <td className="px-2 py-1" data-testid={`catalog-crs-${record.relativePath}`}>
-                  {record.crs || "EPSG not documented"}
+                  {record.crs || "CRS not documented"}
+                </td>
+                <td className="px-2 py-1" data-testid={`catalog-contract-${record.relativePath}`}>
+                  {record.geojsonContract || "—"}
+                  {record.axisOrder ? ` · ${record.axisOrder}` : ""}
+                  {record.coordinateOrder ? ` / ${record.coordinateOrder}` : ""}
                 </td>
                 <td className="px-2 py-1">
                   {record.adapterId === "geojson" ? (
@@ -215,44 +264,93 @@ export default function GisVerifyPage() {
   if (error) return <p className="p-6 text-sm text-red-300">Verification fixtures failed to load: {error}</p>;
   if (!data) return <p className="p-6 text-sm text-[#858585]">Loading GIS verification fixtures…</p>;
 
+  const tabs: Tab[] = [
+    "catalog",
+    "points",
+    "lines",
+    "polygons",
+    "rfc7946",
+    "legacy",
+    "custom-import",
+    "undocumented",
+    "compat",
+    "conflict",
+    "overlap",
+    "interpretation",
+  ];
+
   return (
     <main className="h-screen bg-[#1e1e1e] text-[#cccccc] flex flex-col">
       <header className="px-4 py-3 border-b border-[#2b2b2b]">
         <p className="text-[10px] uppercase tracking-wide text-[#858585]">Desktop verification</p>
         <h1 className="text-sm font-medium">G-AID documented GeoJSON vector layer</h1>
         <p className="text-[11px] text-[#9d9d9d] mt-1">
-          Source geometry only. Roles are user-assigned. Overlay is not geological, mineral, or causal proof.
+          RFC 7946 is OGC:CRS84. Legacy crs and .prj / EPSG= are not RFC 7946. Overlay is not geological, mineral, or causal proof.
         </p>
       </header>
       <nav className="flex gap-1 px-3 py-2 border-b border-[#2b2b2b] text-[12px] flex-wrap">
-        {(["catalog", "points", "lines", "polygons", "unknown-crs", "conflict", "overlap", "interpretation"] as Tab[]).map(
-          (id) => (
-            <button
-              key={id}
-              type="button"
-              data-testid={`tab-${id}`}
-              onClick={() => setTab(id)}
-              className={`px-2 py-1 rounded ${tab === id ? "bg-[#094771] text-white" : "text-[#858585]"}`}
-            >
-              {id === "unknown-crs" ? "Unknown CRS" : id === "conflict" ? "Conflicting CRS" : id}
-            </button>
-          )
-        )}
+        {tabs.map((id) => (
+          <button
+            key={id}
+            type="button"
+            data-testid={`tab-${id}`}
+            onClick={() => setTab(id)}
+            className={`px-2 py-1 rounded ${tab === id ? "bg-[#094771] text-white" : "text-[#858585]"}`}
+          >
+            {TAB_LABEL[id]}
+          </button>
+        ))}
       </nav>
       <div className="flex-1 min-h-0">
         {tab === "catalog" ? <CatalogTable records={data.catalog.records} /> : null}
         {tab === "points" ? <MapPack pack={data.points} title="Sample points (EPSG:32734)" /> : null}
         {tab === "lines" ? <MapPack pack={data.lines} title="Structure lines (filename is not a role)" /> : null}
         {tab === "polygons" ? <MapPack pack={data.polygons} title="Geology polygons (filename is not a role)" /> : null}
-        {tab === "unknown-crs" ? (
+        {tab === "rfc7946" ? <MapPack pack={data.rfc7946} title="RFC 7946 GeoJSON (OGC:CRS84, no crs member)" /> : null}
+        {tab === "legacy" ? <MapPack pack={data.legacy} title="legacy-GeoJSON with crs member EPSG:4326" /> : null}
+        {tab === "custom-import" ? (
+          <MapPack pack={data.customImport} title="G-AID custom import (.prj AUTHORITY EPSG:32734)" />
+        ) : null}
+        {tab === "undocumented" ? (
           <div className="p-4 text-[12px] space-y-2" data-testid="unknown-crs-skip">
-            <p>Overlay and overlap stay blocked until every layer has a documented EPSG. RFC 7946 lon/lat is not assumed.</p>
+            <p>
+              Projected coordinates without a legacy crs mapping or G-AID custom import are not RFC 7946 OGC:CRS84.
+              Overlay and overlap stay blocked. G-AID will not silently reproject.
+            </p>
             <p data-testid="overlap-skipped">
               skipped={String(Boolean(data.unknownCrs.overlapQc?.skipped))} reason=
               {String(data.unknownCrs.overlapQc?.reason)}
             </p>
             <p data-testid="unknown-crs-message">{String(data.unknownCrs.overlapQc?.message || "")}</p>
-            <p>G-AID will not silently reproject.</p>
+            <p data-testid="undocumented-ingest">ingest_layers={String(data.unknownCrs.ingestQc?.n_layers ?? 0)}</p>
+          </div>
+        ) : null}
+        {tab === "compat" ? (
+          <div className="h-full flex flex-col">
+            <div className="flex-1 min-h-0">
+              <MapPack pack={data.compat} title="OGC:CRS84 + EPSG:4326 GeoJSON lon-lat compatibility" />
+            </div>
+            <div className="border-t border-[#2b2b2b] px-3 py-2 text-[12px]" data-testid="crs84-compat">
+              <p>
+                OGC:CRS84 and EPSG:4326 are different CRS identities. Documented compatibility uses stored GeoJSON [lon,
+                lat] without an axis swap or reprojection. Decision id: geojson-lonlat-no-axis-swap.
+              </p>
+              <ul>
+                {(data.compat.overlap?.crs_decisions || []).map((row, index) => (
+                  <li key={index} data-testid="compat-decision">
+                    {row.left_crs} vs {row.right_crs} · {row.code} · {row.compatibility_decision || "none"}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[#858585]">Geometric overlap (not CRS identity, not a prospectivity map)</p>
+              <ul>
+                {(data.compat.overlap?.rows || []).map((row, index) => (
+                  <li key={index}>
+                    {row.relation}: {row.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         ) : null}
         {tab === "conflict" ? (

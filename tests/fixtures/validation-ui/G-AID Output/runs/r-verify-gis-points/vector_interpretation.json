@@ -3,14 +3,16 @@
   "observations": [
     "1 documented GeoJSON layer(s) were ingested as source geometry.",
     "Observed geometry types: Point.",
-    "valid-points/samples.geojson: 2 feature(s), CRS EPSG:32734, role=sample-location (reviewed=True)."
+    "valid-points/samples.geojson: 2 feature(s), CRS EPSG:32734, contract=legacy-geojson, axis_order=east-north, role=sample-location (reviewed=True)."
   ],
   "user_supplied_curve_meaning": [
     "No attribute meanings were supplied. Field names remain unknown semantics."
   ],
   "assumptions": [
-    "EPSG codes were taken from the GeoJSON crs member, an / EPSG= comment, or a companion .prj AUTHORITY.",
-    "RFC 7946 default CRS84 was not assumed.",
+    "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (lon, lat degrees). It is not EPSG:4326.",
+    "A legacy GeoJSON crs member is not the RFC 7946 CRS mechanism.",
+    "Companion .prj or / EPSG= annotations are a G-AID custom import contract, not standard RFC 7946.",
+    "OGC:CRS84 vs EPSG:4326 overlay, when allowed, uses stored GeoJSON [lon, lat] without an axis swap.",
     "User-assigned roles are catalog labels, not geological confirmation."
   ],
   "uncertainty": [

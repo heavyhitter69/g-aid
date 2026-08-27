@@ -1,11 +1,5 @@
 {
   "type": "FeatureCollection",
-  "crs": {
-    "type": "name",
-    "properties": {
-      "name": "EPSG:32734"
-    }
-  },
   "features": [
     {
       "type": "Feature",
@@ -13,6 +7,10 @@
       "properties": {
         "SAMPLE_ID": "IN",
         "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": "legacy-geojson",
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
         "_g_aid_role": "sample-location",
         "_g_aid_role_reviewed": true
       },
@@ -30,6 +28,10 @@
       "properties": {
         "SAMPLE_ID": "OUT",
         "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": "legacy-geojson",
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
         "_g_aid_role": "sample-location",
         "_g_aid_role_reviewed": true
       },
@@ -41,5 +43,11 @@
         ]
       }
     }
-  ]
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
 }

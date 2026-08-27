@@ -6,7 +6,10 @@
       "format": "geojson",
       "crs_epsg": 32734,
       "crs": "EPSG:32734",
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "location_quality": "documented",
       "geometry_types": [
         "Point"
@@ -37,10 +40,11 @@
       "role_reviewed": false,
       "source_path": "conflict-crs/a.geojson",
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON."
       ],
       "errors": [],
-      "formula": "GeoJSON Feature/FeatureCollection with documented EPSG. Overlay is not geological proof.",
+      "formula": "GeoJSON Feature/FeatureCollection with documented CRS. Overlay is not geological proof. No silent reprojection or axis swap.",
       "catalog_id": "conflict-crs/a.geojson",
       "checksum": "conflict-crs/a.geojson"
     },
@@ -49,7 +53,10 @@
       "format": "geojson",
       "crs_epsg": 4326,
       "crs": "EPSG:4326",
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "lat-lon",
+      "coordinate_order": "lon-lat",
       "location_quality": "documented",
       "geometry_types": [
         "Point"
@@ -80,10 +87,12 @@
       "role_reviewed": false,
       "source_path": "conflict-crs/b.geojson",
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON.",
+        "Legacy crs names EPSG:4326 (OGC axis order lat-lon). GeoJSON coordinate arrays stay [lon, lat]. G-AID will not silently swap axes or relabel this as OGC:CRS84."
       ],
       "errors": [],
-      "formula": "GeoJSON Feature/FeatureCollection with documented EPSG. Overlay is not geological proof.",
+      "formula": "GeoJSON Feature/FeatureCollection with documented CRS. Overlay is not geological proof. No silent reprojection or axis swap.",
       "catalog_id": "conflict-crs/b.geojson",
       "checksum": "conflict-crs/b.geojson"
     }

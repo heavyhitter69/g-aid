@@ -3,7 +3,7 @@ import { catalogRecordId } from "../catalog/ids.ts";
 import { layerLabel } from "../raster-layers.ts";
 import type { MapLayerSpec, RunArtifact } from "./types.ts";
 import { displayAdapterFor, formatIdFromPath, isDemAscii } from "./display.ts";
-import { crsFromEpsg, crsFromPrj } from "./crs.ts";
+import { crsFromCatalog, crsFromPrj } from "./crs.ts";
 import { gravityProductWarnings, isNearZoneTerrainPath } from "../gravity-product.ts";
 import { gisLayerHeading, gisProductWarnings } from "../gis-product.ts";
 
@@ -70,7 +70,16 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
   if (viewable && decoded) displayStatus = "viewable";
   else if (viewable) displayStatus = "recognised-not-decoded";
   else if (adapter && !adapter.decoded) displayStatus = "recognised-not-decoded";
-  const crs = record.crs ? crsFromPrj(record.crs) : record.formatId === "esri-prj" ? crsFromPrj(record.headerSummary) : undefined;
+  const crs = record.crs
+    ? crsFromCatalog(record.crs, {
+        source: "catalog",
+        geojsonContract: record.geojsonContract,
+        axisOrder: record.axisOrder,
+        coordinateOrder: record.coordinateOrder,
+      })
+    : record.formatId === "esri-prj"
+      ? crsFromPrj(record.headerSummary)
+      : undefined;
   const vectorWarnings =
     record.formatId === "geojson"
       ? gisProductWarnings({
@@ -78,6 +87,8 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
           role: record.vectorRole?.role,
           roleReviewed: record.vectorRole?.reviewed,
           crs: record.crs,
+          geojsonContract: record.geojsonContract,
+          axisOrder: record.axisOrder,
         })
       : undefined;
   const label =

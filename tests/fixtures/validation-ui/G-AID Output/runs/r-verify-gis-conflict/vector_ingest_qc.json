@@ -8,7 +8,10 @@
       "checksum": "conflict-crs/a.geojson",
       "crs": "EPSG:32734",
       "crs_epsg": 32734,
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "geometry_types": [
         "Point"
       ],
@@ -23,7 +26,8 @@
       "role": "generic-vector",
       "role_reviewed": false,
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON."
       ]
     },
     {
@@ -32,7 +36,10 @@
       "checksum": "conflict-crs/b.geojson",
       "crs": "EPSG:4326",
       "crs_epsg": 4326,
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "lat-lon",
+      "coordinate_order": "lon-lat",
       "geometry_types": [
         "Point"
       ],
@@ -47,7 +54,9 @@
       "role": "generic-vector",
       "role_reviewed": false,
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON.",
+        "Legacy crs names EPSG:4326 (OGC axis order lat-lon). GeoJSON coordinate arrays stay [lon, lat]. G-AID will not silently swap axes or relabel this as OGC:CRS84."
       ]
     }
   ],

@@ -1,0 +1,37 @@
+{
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "format": "geojson",
+  "layers": [
+    {
+      "source_path": "no-crs/clip.geojson",
+      "catalog_id": "clip",
+      "checksum": "crs84",
+      "crs": "OGC:CRS84",
+      "crs_epsg": null,
+      "crs_source": "rfc7946",
+      "geojson_contract": "rfc7946",
+      "axis_order": "lon-lat",
+      "coordinate_order": "lon-lat",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 18.4,
+        "minY": -33.9,
+        "maxX": 18.4,
+        "maxY": -33.9
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (WGS 84 longitude-latitude degrees). It is not EPSG:4326."
+      ]
+    }
+  ],
+  "n_layers": 1,
+  "reprojected": false,
+  "geoprocessing": false
+}

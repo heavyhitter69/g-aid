@@ -153,6 +153,10 @@ export interface PlanInput {
     reviewedAt?: string;
     source: "user-assigned" | "unassigned";
   };
+  geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
+  coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
 }
 
 export interface AgentPlan {
@@ -1420,7 +1424,7 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
         level: "blocker",
         code: "no_geojson_files",
         message:
-          "GIS vector processing needs a supported GeoJSON catalog record with documented EPSG. I will not take the first .geojson, shapefile, or GeoPackage.",
+          "GIS vector processing needs a supported GeoJSON catalog record (RFC 7946 OGC:CRS84, legacy-GeoJSON with a validated CRS mapping, or a G-AID custom import). I will not take the first .geojson, shapefile, or GeoPackage.",
       });
     } else if (geoFiles.length === 0) {
       blockers.push({

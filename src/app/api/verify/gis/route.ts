@@ -37,6 +37,10 @@ function featureGeometry(feature: {
 
 type TrackLayer = {
   crs?: string;
+  crs_source?: string;
+  geojson_contract?: string;
+  axis_order?: string;
+  coordinate_order?: string;
   source_path?: string;
   role?: string;
   role_reviewed?: boolean;
@@ -52,9 +56,8 @@ function tracksToGeojson(tracks: { layers?: TrackLayer[] } | null): string | nul
   const layers = tracks?.layers || [];
   if (!layers.length) return null;
   const crs = layers[0]?.crs;
-  return JSON.stringify({
+  const fc: Record<string, unknown> = {
     type: "FeatureCollection",
-    crs: { type: "name", properties: { name: crs || "EPSG:0" } },
     features: layers.flatMap((layer) =>
       (layer.features || []).map((feature) => ({
         type: "Feature",
@@ -64,11 +67,19 @@ function tracksToGeojson(tracks: { layers?: TrackLayer[] } | null): string | nul
           _g_aid_source: layer.source_path,
           _g_aid_role: layer.role,
           _g_aid_role_reviewed: layer.role_reviewed,
+          _g_aid_crs: layer.crs,
+          _g_aid_geojson_contract: layer.geojson_contract,
+          _g_aid_axis_order: layer.axis_order,
+          _g_aid_coordinate_order: layer.coordinate_order,
         },
         geometry: featureGeometry(feature),
       }))
     ),
-  });
+  };
+  if (crs && crs !== "OGC:CRS84") {
+    fc.crs = { type: "name", properties: { name: crs } };
+  }
+  return JSON.stringify(fc);
 }
 
 function pack(run: string) {
@@ -100,6 +111,10 @@ function catalogSnapshot() {
       adapterId: record.adapterId,
       mediaClass: record.mediaClass,
       crs: record.crs || null,
+      crsSource: record.crsSource || null,
+      geojsonContract: record.geojsonContract || null,
+      axisOrder: record.axisOrder || null,
+      coordinateOrder: record.coordinateOrder || null,
       locationQuality: record.locationQuality,
       vectorRole: record.vectorRole,
       geometryTypes: record.geometryTypes,
@@ -117,12 +132,16 @@ export async function GET(): Promise<Response> {
     bbox?: { minX: number; minY: number; maxX: number; maxY: number };
     crs?: string;
     role?: string;
+    geojson_contract?: string;
+    coordinate_order?: string;
   }>).map((layer) => ({
     path: layer.source_path || "",
     label: layer.role || layer.source_path || "layer",
     formatId: "geojson",
     bbox: layer.bbox,
     crs: layer.crs,
+    geojsonContract: layer.geojson_contract,
+    coordinateOrder: layer.coordinate_order,
   }));
   const bboxHits = layersOverlappingVectors(overlapLayers);
   return Response.json({
@@ -130,8 +149,12 @@ export async function GET(): Promise<Response> {
     points: pack("r-verify-gis-points"),
     lines: pack("r-verify-gis-lines"),
     polygons: pack("r-verify-gis-polygons"),
+    rfc7946: pack("r-verify-gis-crs84"),
+    legacy: pack("r-verify-gis-legacy"),
+    customImport: pack("r-verify-gis-custom"),
     unknownCrs: pack("r-verify-gis-unknown"),
     conflict: pack("r-verify-gis-conflict"),
+    compat: pack("r-verify-gis-compat"),
     overlap: { ...overlapPack, bboxHits },
     interpretation: pack("r-verify-gis-interpret"),
   });

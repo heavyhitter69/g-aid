@@ -293,7 +293,7 @@ def parse_las(path: str) -> dict:
 
 
 def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = False) -> dict:
-    """Documented GeoJSON. RFC 7946 default CRS84 is not assumed."""
+    """Documented GeoJSON. RFC 7946 files are OGC:CRS84; legacy crs and .prj are custom contracts."""
     from formats.geojson import parse_geojson as impl
 
     return impl(path, role=role, role_reviewed=role_reviewed)

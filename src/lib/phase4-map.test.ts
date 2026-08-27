@@ -11,6 +11,7 @@ import {
   compareRunLayers,
   crsFromEpsg,
   crsFromPrj,
+  crs84,
   decodeRasterLayer,
   decodeVectorLayer,
   encodeGaidGeoTiff,
@@ -214,8 +215,9 @@ test("catalog GeoJSON and DEM records follow implemented display support", () =>
   const vector = decodeVectorLayer({ formatId: geoLayer.formatId, text: geoText });
   assert.ok(vector);
   assert.equal(vector.data.features[0].type, "Point");
-  assert.equal(vector.crs.key, "unknown");
-  assert.equal(vector.crs.assumed, true);
+  assert.equal(vector.crs.key, "OGC:CRS84");
+  assert.equal(vector.crs.assumed, false);
+  assert.equal(vector.crs.axisOrder, "lon-lat");
 });
 
 test("CRS warnings appear for unknown, assumed, and conflicting CRS", () => {
@@ -232,6 +234,18 @@ test("CRS warnings appear for unknown, assumed, and conflicting CRS", () => {
   assert.equal(conflict.allowed, false);
   assert.equal(conflict.code, "conflicting-crs");
   assert.match(conflict.message, /not silently reproject/i);
+
+  const crs84VsRaster4326 = overlayDecision(crs84("rfc7946"), crsFromEpsg(4326, "geotiff"));
+  assert.equal(crs84VsRaster4326.allowed, false);
+  assert.equal(crs84VsRaster4326.code, "crs84-epsg4326-axis-order");
+
+  const crs84VsGeojson4326 = overlayDecision(
+    crs84("rfc7946"),
+    crsFromEpsg(4326, "legacy-crs", { geojsonContract: "legacy-geojson", coordinateOrder: "lon-lat" })
+  );
+  assert.equal(crs84VsGeojson4326.allowed, true);
+  assert.equal(crs84VsGeojson4326.code, "crs84-epsg4326-geojson-lonlat");
+  assert.equal(crs84VsGeojson4326.compatibilityDecision, "geojson-lonlat-no-axis-swap");
 
   const same = overlayDecision(crsFromEpsg(32630, "prj"), crsFromEpsg(32630, "geotiff"));
   assert.equal(same.allowed, true);
@@ -347,6 +361,9 @@ test("agent map answers stay inside catalog/artifact metadata and deny overlay-a
   assert.equal(isMapQuestion("proceed"), false);
   const answer = mapWorkspaceAnswer({ catalog, layers, message: "what layers are on the map?" });
   assert.match(answer, /does not prove geological, mineral, or geophysical causation/i);
+  const crsAnswer = mapWorkspaceAnswer({ catalog, layers, message: "what CRS is on the map?" });
+  assert.match(crsAnswer, /OGC:CRS84|longitude-latitude/i);
+  assert.match(crsAnswer, /not EPSG:4326/i);
   assert.equal(isRegisteredCapability("gis.reproject"), false);
 });
 

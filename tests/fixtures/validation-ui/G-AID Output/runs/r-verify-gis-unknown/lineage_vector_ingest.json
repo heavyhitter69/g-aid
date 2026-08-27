@@ -1,15 +1,4 @@
 {
   "node_id": "vector_ingest",
-  "formula": "Documented GeoJSON ingest",
-  "parameters": {
-    "n": 0
-  },
-  "inputs": [
-    "no-crs/clip.geojson"
-  ],
-  "outputs": [
-    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-unknown/vector_canonical.json",
-    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-unknown/vector_ingest_qc.json"
-  ],
-  "created_at": "2026-08-27T16:50:00.000000Z"
+  "summary": "Projected undocumented GeoJSON not ingested"
 }

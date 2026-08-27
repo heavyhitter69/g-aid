@@ -1,6 +1,6 @@
 import type { ProjectCatalog } from "../catalog/types.ts";
 import { inventoryAnswer } from "../catalog/summarize.ts";
-import { overlayDecision } from "./crs.ts";
+import { isCrs84Key, overlayDecision } from "./crs.ts";
 import { provenanceLabel } from "./compare.ts";
 import { displayAdapterFor } from "./display.ts";
 import type { MapLayerSpec } from "./types.ts";
@@ -31,14 +31,16 @@ export function mapWorkspaceAnswer(options: {
     return `I can compare runs ${runs.slice(0, 8).join(", ")} by switching layers or transparency. A visual overlay is not geological proof.`;
   }
   if (/\bcrs|datum|projection\b/.test(t)) {
-    const known = layers.filter((layer) => layer.crs?.epsg);
-    const unknown = layers.filter((layer) => layer.displayStatus === "viewable" && !layer.crs?.epsg);
+    const documented = (layer: (typeof layers)[number]) =>
+      Boolean(layer.crs && !layer.crs.assumed && layer.crs.key !== "unknown" && (layer.crs.epsg || isCrs84Key(layer.crs.key)));
+    const known = layers.filter(documented);
+    const unknown = layers.filter((layer) => layer.displayStatus === "viewable" && !documented(layer));
     const lines = [
       known.length
         ? `Documented CRS: ${[...new Set(known.map((layer) => layer.crs?.label))].join("; ")}.`
-        : "No layer on the map has a documented EPSG code.",
+        : "No layer on the map has a documented CRS (OGC:CRS84 or EPSG).",
       unknown.length ? `${unknown.length} viewable layer(s) have unknown CRS. Overlay is blocked until CRS is documented.` : "",
-      "I will not silently reproject. Reprojection is not a registered capability in this release.",
+      "OGC:CRS84 is WGS 84 longitude-latitude degrees and is not EPSG:4326. I will not silently reproject or swap axes.",
     ];
     return lines.filter(Boolean).join(" ");
   }

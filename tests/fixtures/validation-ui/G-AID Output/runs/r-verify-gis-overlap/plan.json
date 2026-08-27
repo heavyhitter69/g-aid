@@ -5,6 +5,7 @@
   "status": "complete",
   "capabilities": [
     "gis.vector_ingest",
+    "gis.vector_view",
     "gis.spatial_overlap",
     "gis.export_vector"
   ],

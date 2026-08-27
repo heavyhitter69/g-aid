@@ -104,5 +104,9 @@ export function catalogInputsPayload(workspaceRoot: string, inputs: BoundInput[]
     geometryTypes: item.geometryTypes,
     attributeNames: item.attributeNames,
     vectorRole: item.vectorRole,
+    geojsonContract: item.geojsonContract,
+    crsSource: item.crsSource,
+    axisOrder: item.axisOrder,
+    coordinateOrder: item.coordinateOrder,
   }));
 }

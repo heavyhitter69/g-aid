@@ -1,11 +1,5 @@
 {
   "type": "FeatureCollection",
-  "crs": {
-    "type": "name",
-    "properties": {
-      "name": "EPSG:32734"
-    }
-  },
   "features": [
     {
       "type": "Feature",
@@ -13,6 +7,10 @@
       "properties": {
         "LICENCE": "L-9",
         "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": "legacy-geojson",
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
         "_g_aid_role": "tenure",
         "_g_aid_role_reviewed": true
       },
@@ -44,5 +42,11 @@
         ]
       }
     }
-  ]
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
 }

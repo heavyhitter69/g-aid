@@ -22,6 +22,8 @@ def test_valid_geojson_preserves_geometry_attributes_and_crs():
     assert parsed["features"][0]["semantics"] == "unknown"
     assert parsed["role"] == "generic-vector"
     assert parsed["role_reviewed"] is False
+    assert parsed["geojson_contract"] == "legacy-geojson"
+    assert parsed["crs_source"] == "legacy-crs"
 
 
 def test_filename_geology_is_not_a_role():
@@ -31,9 +33,54 @@ def test_filename_geology_is_not_a_role():
     assert "UNIT" in parsed["attribute_names"]
 
 
-def test_no_crs_is_refused():
-    with pytest.raises(ValueError, match="documented EPSG"):
-        parse_geojson(str(FIXTURE / "no-crs" / "clip.geojson"))
+def test_rfc7946_without_crs_member_is_crs84():
+    parsed = parse_geojson(str(FIXTURE / "no-crs" / "clip.geojson"))
+    assert parsed["crs"] == "OGC:CRS84"
+    assert parsed["crs_epsg"] is None
+    assert parsed["geojson_contract"] == "rfc7946"
+    assert parsed["crs_source"] == "rfc7946"
+    assert parsed["axis_order"] == "lon-lat"
+    assert parsed["coordinate_order"] == "lon-lat"
+    assert parsed["crs"] != "EPSG:4326"
+
+
+def test_rfc7946_feature_root_is_crs84():
+    parsed = parse_geojson(str(FIXTURE / "rfc7946-feature" / "point.geojson"))
+    assert parsed["crs"] == "OGC:CRS84"
+    assert parsed["geojson_contract"] == "rfc7946"
+
+
+def test_legacy_crs_member_is_not_rfc7946():
+    parsed = parse_geojson(str(FIXTURE / "compat" / "legacy-4326.geojson"))
+    assert parsed["crs"] == "EPSG:4326"
+    assert parsed["geojson_contract"] == "legacy-geojson"
+    assert parsed["crs_source"] == "legacy-crs"
+    assert parsed["axis_order"] == "lat-lon"
+    assert parsed["coordinate_order"] == "lon-lat"
+
+
+def test_custom_import_prj_is_not_rfc7946():
+    parsed = parse_geojson(str(FIXTURE / "custom-import" / "samples.geojson"))
+    assert parsed["crs"] == "EPSG:32734"
+    assert parsed["geojson_contract"] == "g-aid-custom-import"
+    assert parsed["crs_source"] == "companion-prj"
+
+
+def test_epsg_comment_is_custom_import():
+    parsed = parse_geojson(str(FIXTURE / "epsg-comment" / "samples.geojson"))
+    assert parsed["crs"] == "EPSG:32734"
+    assert parsed["geojson_contract"] == "g-aid-custom-import"
+    assert parsed["crs_source"] == "epsg-comment"
+
+
+def test_projected_undocumented_is_refused():
+    with pytest.raises(ValueError, match="OGC:CRS84 does not apply"):
+        parse_geojson(str(FIXTURE / "projected-undocumented" / "utm.geojson"))
+
+
+def test_legacy_unmapped_crs_is_refused():
+    with pytest.raises(ValueError, match="user-confirmed CRS mapping"):
+        parse_geojson(str(FIXTURE / "legacy-unmapped" / "named-only.geojson"))
 
 
 def test_malformed_polygon_is_refused():
@@ -182,3 +229,40 @@ def test_conflicting_crs_is_blocked_not_reprojected(tmp_path):
     assert overlap["rows"] == []
     assert overlap["blocked"]
     assert "Reprojection is not a registered capability" in overlap["blocked"][0]["reason"]
+
+
+def test_crs84_epsg4326_overlap_records_compatibility_decision(tmp_path):
+    from kernels.vector import vector_export, vector_ingest, vector_overlap
+
+    out = tmp_path / "G-AID Output" / "runs" / "r-gis-compat"
+    out.mkdir(parents=True)
+    payload = {
+        "parameters": {
+            "baseDir": str(FIXTURE),
+            "outDir": str(tmp_path / "G-AID Output" / "runs"),
+            "taskFolder": "r-gis-compat",
+            "catalogInputs": [
+                {"catalogId": "crs84", "path": "compat/crs84.geojson", "adapterId": "geojson", "formatId": "geojson", "checksum": "a"},
+                {"catalogId": "legacy", "path": "compat/legacy-4326.geojson", "adapterId": "geojson", "formatId": "geojson", "checksum": "b"},
+            ],
+        }
+    }
+    vector_ingest(payload)
+    vector_overlap(payload)
+    vector_export(payload)
+    qc = json.loads((out / "vector_ingest_qc.json").read_text())
+    assert {layer["crs"] for layer in qc["layers"]} == {"OGC:CRS84", "EPSG:4326"}
+    assert {layer["geojson_contract"] for layer in qc["layers"]} == {"rfc7946", "legacy-geojson"}
+    overlap = json.loads((out / "vector_overlap.json").read_text())
+    assert overlap["rows"]
+    assert overlap["reprojected"] is False
+    assert overlap["axis_swap"] is False
+    assert overlap["crs_decisions"][0]["compatibility_decision"] == "geojson-lonlat-no-axis-swap"
+    assert all(row["compatibility_decision"] == "geojson-lonlat-no-axis-swap" for row in overlap["rows"])
+    exports = [
+        json.loads((out / "vector_export_1.geojson").read_text()),
+        json.loads((out / "vector_export_2.geojson").read_text()),
+    ]
+    crs84_export = next(item for item in exports if item["features"][0]["properties"].get("_g_aid_crs") == "OGC:CRS84")
+    assert "crs" not in crs84_export
+    assert crs84_export["features"][0]["properties"]["_g_aid_geojson_contract"] == "rfc7946"

@@ -6,6 +6,10 @@
       "source_path": "valid-lines/faults.geojson",
       "catalog_id": "valid-lines/faults.geojson",
       "crs": "EPSG:32734",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "role": "structure",
       "role_reviewed": true,
       "geometry_types": [

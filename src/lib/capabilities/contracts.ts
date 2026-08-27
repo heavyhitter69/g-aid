@@ -465,7 +465,7 @@ export function validateCapabilityContracts(options: {
       level: "blocker",
       code: "no_geojson_files",
       message:
-        "GIS vector processing needs a supported GeoJSON catalog record with documented EPSG. I will not take a shapefile, GeoPackage, or a GeoJSON that has no CRS.",
+        "GIS vector processing needs a supported GeoJSON catalog record (RFC 7946 OGC:CRS84, legacy-GeoJSON with a validated CRS mapping, or a G-AID custom import). I will not take a shapefile or GeoPackage.",
     });
   }
   const shapefileBound = options.inputs.filter(
@@ -504,20 +504,36 @@ export function validateCapabilityContracts(options: {
         level: "blocker",
         code: "gis_overlap_needs_two_layers",
         message:
-          "Spatial overlap needs at least two documented same-CRS GeoJSON layers. I will not invent a second layer or silently reproject.",
-      });
-    } else if (geojsonInputs.length >= 2 && crsKeys.length > 1) {
-      issues.push({
-        level: "blocker",
-        code: "gis_crs_conflict",
-        message: `Conflicting CRS among vector layers (${crsKeys.join(", ")}). Overlay and overlap are blocked. Reprojection is not a registered capability.`,
+          "Spatial overlap needs at least two documented GeoJSON layers with compatible CRS. I will not invent a second layer or silently reproject.",
       });
     } else if (geojsonInputs.length >= 2 && crsKeys.length === 0) {
       issues.push({
         level: "blocker",
         code: "gis_crs_required",
-        message: "Spatial overlap needs a documented EPSG on every layer. RFC 7946 lon/lat is not assumed.",
+        message: "Spatial overlap needs a documented CRS on every layer (OGC:CRS84, a validated legacy mapping, or a G-AID custom import EPSG).",
       });
+    } else if (geojsonInputs.length >= 2 && crsKeys.length > 1) {
+      const set = new Set(crsKeys);
+      const crs84Vs4326 = set.size === 2 && set.has("OGC:CRS84") && set.has("EPSG:4326");
+      const orders = [
+        ...records.map((record) => record.coordinateOrder),
+        ...geojsonInputs.map((item) => item.coordinateOrder),
+      ].filter((value): value is NonNullable<typeof value> => Boolean(value));
+      const lonLatStorage = orders.length >= 2 && orders.every((value) => value === "lon-lat");
+      if (crs84Vs4326 && lonLatStorage) {
+        issues.push({
+          level: "warning",
+          code: "gis_crs84_epsg4326_compat",
+          message:
+            "OGC:CRS84 and EPSG:4326 are different CRS identities. Documented compatibility uses stored GeoJSON [lon, lat] without an axis swap or reprojection. Decision id: geojson-lonlat-no-axis-swap. This is not CRS identity.",
+        });
+      } else {
+        issues.push({
+          level: "blocker",
+          code: "gis_crs_conflict",
+          message: `Conflicting CRS among vector layers (${crsKeys.join(", ")}). Overlay and overlap are blocked. Reprojection and silent axis swaps are not registered capabilities.`,
+        });
+      }
     }
   }
 

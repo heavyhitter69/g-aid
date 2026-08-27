@@ -11,7 +11,7 @@ export type {
   VectorLayerData,
 } from "./types.ts";
 export { PREVIEW_POLICY, previewNote } from "./preview.ts";
-export { crsFromEpsg, crsFromGeojson, crsFromPrj, overlayDecision, parseEpsg } from "./crs.ts";
+export { crs84, crsFromCatalog, crsFromEpsg, crsFromGeojson, crsFromPrj, overlayDecision, parseEpsg, resolveGeojsonCrs } from "./crs.ts";
 export { encodeGaidGeoTiff, parseGaidGeoTiff, companionAsciiPath } from "./geotiff.ts";
 export { inspectRaster, parseAsciiCommentMeta, parseEsriAscii, parseGridSidecarMeta } from "./ascii.ts";
 export type { AsciiCommentMeta } from "./ascii.ts";

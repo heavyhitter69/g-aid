@@ -6,6 +6,10 @@
       "source_path": "overlap/tenure.geojson",
       "catalog_id": "overlap/tenure.geojson",
       "crs": "EPSG:32734",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "role": "tenure",
       "role_reviewed": true,
       "geometry_types": [
@@ -59,6 +63,10 @@
       "source_path": "overlap/samples.geojson",
       "catalog_id": "overlap/samples.geojson",
       "crs": "EPSG:32734",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "role": "sample-location",
       "role_reviewed": true,
       "geometry_types": [

@@ -77,6 +77,10 @@ export interface CatalogInspection {
     dbf: boolean;
     prj: boolean;
   };
+  geojsonContract?: CatalogRecord["geojsonContract"];
+  crsSource?: CatalogRecord["crsSource"];
+  axisOrder?: CatalogRecord["axisOrder"];
+  coordinateOrder?: CatalogRecord["coordinateOrder"];
 }
 
 export interface AdapterValidation {

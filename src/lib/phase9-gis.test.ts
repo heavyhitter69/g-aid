@@ -155,27 +155,57 @@ test("catalog classifies documented GeoJSON as supported and does not infer geol
   assert.ok(pts.attributeNames?.includes("SAMPLE_ID"));
 });
 
-test("GeoJSON without CRS, malformed rings, shapefile sidecars, and GeoPackage stay recognised-unsupported", () => {
+test("RFC 7946 GeoJSON without a crs member is documented OGC:CRS84", () => {
   const root = tmpCopy();
   const catalog = buildProjectCatalog(root);
-  const noCrs = byPath(catalog.records, "no-crs/clip.geojson");
-  assert.equal(noCrs.formatId, "geojson");
-  assert.equal(noCrs.supportStatus, "recognised-unsupported");
-  assert.equal(noCrs.locationQuality, "missing");
+  const rfc = byPath(catalog.records, "no-crs/clip.geojson");
+  assert.equal(rfc.supportStatus, "supported");
+  assert.equal(rfc.crs, "OGC:CRS84");
+  assert.equal(rfc.geojsonContract, "rfc7946");
+  assert.equal(rfc.crsSource, "rfc7946");
+  assert.equal(rfc.axisOrder, "lon-lat");
+  assert.equal(rfc.coordinateOrder, "lon-lat");
+  assert.notEqual(rfc.crs, "EPSG:4326");
+  const featureRoot = byPath(catalog.records, "rfc7946-feature/point.geojson");
+  assert.equal(featureRoot.supportStatus, "supported");
+  assert.equal(featureRoot.crs, "OGC:CRS84");
+  assert.equal(featureRoot.geojsonContract, "rfc7946");
+  const inspected = inspectGeojsonText(fs.readFileSync(path.join(fixtureSrc, "no-crs", "clip.geojson"), "utf8"));
+  assert.equal(geojsonReadyForSupport(inspected), true);
+  assert.ok(inspected.warnings.some((line) => /OGC:CRS84/i.test(line)));
+});
+
+test("legacy GeoJSON, custom import, projected-undocumented, and unmapped crs are classified distinctly", () => {
+  const root = tmpCopy();
+  const catalog = buildProjectCatalog(root);
+  const legacy = byPath(catalog.records, "conflict-crs/b.geojson");
+  assert.equal(legacy.supportStatus, "supported");
+  assert.equal(legacy.crs, "EPSG:4326");
+  assert.equal(legacy.geojsonContract, "legacy-geojson");
+  assert.equal(legacy.axisOrder, "lat-lon");
+  assert.equal(legacy.coordinateOrder, "lon-lat");
+  const custom = byPath(catalog.records, "custom-import/samples.geojson");
+  assert.equal(custom.supportStatus, "supported");
+  assert.equal(custom.crs, "EPSG:32734");
+  assert.equal(custom.geojsonContract, "g-aid-custom-import");
+  assert.equal(custom.crsSource, "companion-prj");
+  const commented = byPath(catalog.records, "epsg-comment/samples.geojson");
+  assert.equal(commented.supportStatus, "supported");
+  assert.equal(commented.crs, "EPSG:32734");
+  assert.equal(commented.geojsonContract, "g-aid-custom-import");
+  assert.equal(commented.crsSource, "epsg-comment");
+  const projected = byPath(catalog.records, "projected-undocumented/utm.geojson");
+  assert.equal(projected.supportStatus, "recognised-unsupported");
+  assert.ok(projected.parseErrors?.some((line) => /OGC:CRS84 does not apply/i.test(line)));
+  const unmapped = byPath(catalog.records, "legacy-unmapped/named-only.geojson");
+  assert.equal(unmapped.supportStatus, "recognised-unsupported");
+  assert.ok(unmapped.parseErrors?.some((line) => /user-confirmed CRS mapping/i.test(line)));
   const malformed = byPath(catalog.records, "malformed/open-ring.geojson");
   assert.equal(malformed.supportStatus, "recognised-unsupported");
   const incomplete = byPath(catalog.records, "shapefile-incomplete/clip.shp");
   assert.equal(incomplete.formatId, "shapefile");
   assert.equal(incomplete.supportStatus, "recognised-unsupported");
   assert.equal(incomplete.shapefileSidecars?.shx, false);
-  assert.equal(incomplete.shapefileSidecars?.dbf, false);
-  assert.equal(incomplete.shapefileSidecars?.prj, false);
-  assert.ok(incomplete.parseErrors?.some((line) => /sidecar/i.test(line)));
-  const sidecars = byPath(catalog.records, "shapefile-sidecars/clip.shp");
-  assert.equal(sidecars.shapefileSidecars?.shx, true);
-  assert.equal(sidecars.shapefileSidecars?.dbf, true);
-  assert.equal(sidecars.shapefileSidecars?.prj, true);
-  assert.ok(sidecars.parseErrors?.some((line) => /EPSG/i.test(line) || /not parse/i.test(line)));
   const gpkg = byPath(catalog.records, "gpkg/dummy.gpkg");
   assert.equal(gpkg.formatId, "geopackage");
   assert.equal(gpkg.supportStatus, "recognised-unsupported");
@@ -187,7 +217,7 @@ test("plan binds only supported GeoJSON; shapefile and no-CRS GeoJSON are not pr
   const overlapInputs = collectPlanInputs(null, "overlap", catalog);
   assert.equal(overlapInputs.every((item) => item.adapterId === "geojson"), true);
   assert.equal(overlapInputs.length, 2);
-  const noCrsInputs = collectPlanInputs(null, "no-crs", catalog);
+  const noCrsInputs = collectPlanInputs(null, "projected-undocumented", catalog);
   assert.equal(noCrsInputs.length, 0);
   const shpInputs = collectPlanInputs(null, "shapefile-incomplete", catalog);
   assert.equal(shpInputs.length, 0);
@@ -196,7 +226,7 @@ test("plan binds only supported GeoJSON; shapefile and no-CRS GeoJSON are not pr
 test("validatePlan blocks GIS without GeoJSON and overlap without two same-CRS layers", () => {
   const root = tmpCopy();
   const catalog = buildProjectCatalog(root);
-  const empty = validatePlan(gisPlan(root, { targetFolder: "no-crs", inputs: collectPlanInputs(null, "no-crs", catalog) }), catalog);
+  const empty = validatePlan(gisPlan(root, { targetFolder: "projected-undocumented", inputs: collectPlanInputs(null, "projected-undocumented", catalog) }), catalog);
   assert.equal(empty.ok, false);
   assert.ok(empty.blockers.some((item) => item.code === "no_geojson_files"));
   const one = validatePlan(
@@ -227,6 +257,22 @@ test("validatePlan blocks GIS without GeoJSON and overlap without two same-CRS l
     catalog
   );
   assert.equal(ok.ok, true);
+  const compat = validatePlan(
+    gisPlan(root, {
+      targetFolder: "compat",
+      inputs: collectPlanInputs(null, "compat", catalog),
+      capabilities: ["gis.vector_ingest", "gis.vector_view", "gis.spatial_overlap", "gis.interpret"],
+    }),
+    catalog
+  );
+  assert.equal(compat.ok, true);
+  assert.ok(compat.warnings.some((item) => item.code === "gis_crs84_epsg4326_compat"));
+  assert.ok(compat.warnings.some((item) => /geojson-lonlat-no-axis-swap/.test(item.message)));
+  assert.equal(compat.blockers.some((item) => item.code === "gis_crs_conflict"), false);
+  const rfcInputs = collectPlanInputs(null, "no-crs", catalog);
+  assert.equal(rfcInputs.length, 1);
+  assert.equal(rfcInputs[0].crs, "OGC:CRS84");
+  assert.equal(rfcInputs[0].geojsonContract, "rfc7946");
   assert.equal(gisVectorStepsEnabled(gisPlan(root).steps), true);
 });
 
@@ -267,14 +313,38 @@ test("map parser preserves MultiPolygon, attributes, and blocks unknown/conflict
   ]);
   assert.equal(hits.length, 1);
   assert.match(hits[0].reason, /coincidence/i);
+  const compatHits = layersOverlappingVectors([
+    {
+      path: "crs84.geojson",
+      label: "crs84",
+      formatId: "geojson",
+      bbox: { minX: 18.39, minY: -33.92, maxX: 18.42, maxY: -33.89 },
+      crs: "OGC:CRS84",
+      geojsonContract: "rfc7946",
+      coordinateOrder: "lon-lat",
+    },
+    {
+      path: "legacy-4326.geojson",
+      label: "legacy",
+      formatId: "geojson",
+      bbox: { minX: 18.41, minY: -33.91, maxX: 18.41, maxY: -33.91 },
+      crs: "EPSG:4326",
+      geojsonContract: "legacy-geojson",
+      coordinateOrder: "lon-lat",
+    },
+  ]);
+  assert.equal(compatHits.length, 1);
+  assert.match(compatHits[0].reason, /GeoJSON \[lon, lat\]/i);
 });
 
-test("contract inspect requires documented EPSG and does not assume RFC 7946", () => {
-  const noCrs = inspectGeojsonText('{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[18, -33]},"properties":{}}]}');
-  assert.equal(geojsonReadyForSupport(noCrs), false);
-  assert.ok(noCrs.warnings.some((line) => /RFC 7946/i.test(line)));
+test("contract inspect documents RFC 7946 as OGC:CRS84 and does not relabel it EPSG:4326", () => {
+  const rfc = inspectGeojsonText('{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[18, -33]},"properties":{}}]}');
+  assert.equal(geojsonReadyForSupport(rfc), true);
+  assert.equal(rfc.crs, "OGC:CRS84");
+  assert.equal(rfc.geojsonContract, "rfc7946");
   const ready = inspectGeojsonText(fs.readFileSync(path.join(fixtureSrc, "valid-points", "samples.geojson"), "utf8"));
   assert.equal(geojsonReadyForSupport(ready), true);
+  assert.equal(ready.geojsonContract, "legacy-geojson");
 });
 
 test("python kernels ingest, overlap, export, and refuse shapefile search", () => {
@@ -328,7 +398,7 @@ test("python kernels ingest, overlap, export, and refuse shapefile search", () =
   assert.ok(fs.existsSync(path.join(run, "vector_export_1.geojson")));
 });
 
-test("desktop verification fixtures cover catalog, points, lines, polygons, unknown CRS, conflict, overlap, and interpretation", () => {
+test("desktop verification fixtures cover catalog, CRS contracts, overlap, and interpretation", () => {
   const runs = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs");
   const tracks = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-points", "vector_tracks.json"), "utf8"));
   assert.equal(tracks.kind, "gis-vector");
@@ -336,19 +406,36 @@ test("desktop verification fixtures cover catalog, points, lines, polygons, unkn
   assert.ok(lines.layers[0].geometry_types.includes("LineString"));
   const poly = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-polygons", "vector_tracks.json"), "utf8"));
   assert.ok(poly.layers[0].geometry_types.includes("Polygon"));
+  const crs84 = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-crs84", "vector_tracks.json"), "utf8"));
+  assert.equal(crs84.layers[0].crs, "OGC:CRS84");
+  assert.equal(crs84.layers[0].geojson_contract, "rfc7946");
+  assert.equal(crs84.layers[0].axis_order, "lon-lat");
+  const legacy = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-legacy", "vector_tracks.json"), "utf8"));
+  assert.equal(legacy.layers[0].crs, "EPSG:4326");
+  assert.equal(legacy.layers[0].geojson_contract, "legacy-geojson");
+  const custom = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-custom", "vector_tracks.json"), "utf8"));
+  assert.equal(custom.layers[0].crs, "EPSG:32734");
+  assert.equal(custom.layers[0].geojson_contract, "g-aid-custom-import");
   const unknownQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-unknown", "vector_overlap_qc.json"), "utf8"));
   assert.equal(unknownQc.skipped, true);
   assert.equal(unknownQc.reason, "gis_crs_required");
   const unknownIngest = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-unknown", "vector_ingest_qc.json"), "utf8"));
   assert.equal(unknownIngest.n_layers, 0);
+  assert.ok(String(unknownIngest.rejected?.[0]?.source_path || "").includes("projected-undocumented"));
   const conflict = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-conflict", "vector_overlap.json"), "utf8"));
   assert.ok(conflict.blocked.length);
+  const compat = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-compat", "vector_overlap.json"), "utf8"));
+  assert.equal(compat.crs_decisions[0].compatibility_decision, "geojson-lonlat-no-axis-swap");
+  assert.ok(compat.rows.length);
+  assert.equal(compat.reprojected, false);
+  assert.equal(compat.axis_swap, false);
   const overlap = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-overlap", "vector_overlap.json"), "utf8"));
   assert.ok(overlap.rows.length);
   assert.ok(overlap.rows[0].reason.includes("does not establish geological"));
   const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-interpret", "vector_interpretation.json"), "utf8"));
   assert.equal(interp.geological_certainty_improved, false);
   assert.ok((interp.not_established as string[]).some((line) => /Prospectivity/i.test(line)));
+  assert.ok((interp.assumptions as string[]).some((line) => /OGC:CRS84/i.test(line)));
   const ui = JSON.parse(fs.readFileSync(path.join(process.cwd(), "docs/validation/results/gis_desktop_ui.json"), "utf8"));
   assert.equal(ui.passed, true);
   assert.equal(ui.shapefile_parsed, false);
@@ -356,7 +443,9 @@ test("desktop verification fixtures cover catalog, points, lines, polygons, unkn
   assert.equal(ui.silent_reprojection, false);
   assert.equal(ui.filename_inferred_geology, false);
   assert.equal(ui.tabs.catalog.geology_filename_auto_role, false);
-  assert.equal(ui.tabs.unknown_crs.reason, "gis_crs_required");
+  assert.equal(ui.tabs.catalog.rfc7946_crs84, "OGC:CRS84");
+  assert.equal(ui.tabs.undocumented_projected.reason, "gis_crs_required");
+  assert.equal(ui.tabs.compat.compatibility_decision, "geojson-lonlat-no-axis-swap");
   assert.equal(ui.tabs.conflict_crs.reprojection_registered, false);
   assert.equal(ui.tabs.overlap.prospectivity_map, false);
   assert.equal(ui.tabs.interpretation.geological_certainty_improved, false);

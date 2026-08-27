@@ -1,0 +1,47 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "layers": [
+    {
+      "source_path": "no-crs/clip.geojson",
+      "catalog_id": "clip",
+      "crs": "OGC:CRS84",
+      "crs_source": "rfc7946",
+      "geojson_contract": "rfc7946",
+      "axis_order": "lon-lat",
+      "coordinate_order": "lon-lat",
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 18.4,
+        "minY": -33.9,
+        "maxX": 18.4,
+        "maxY": -33.9
+      },
+      "features": [
+        {
+          "id": 0,
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 18.4,
+              "y": -33.9
+            }
+          ],
+          "properties": {},
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

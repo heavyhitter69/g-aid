@@ -32,7 +32,7 @@ function geojsonSniff(ctx: SniffContext): AdapterSniff | null {
     domainHint: "gis",
     notes: [
       ready
-        ? "Matched documented GeoJSON vector contract (geometry + EPSG)."
+        ? `Matched documented GeoJSON vector contract (${inspected.geojsonContract || "geojson"}).`
         : "GeoJSON tokens present; CRS, geometry validity, or feature content did not meet the processing contract.",
     ],
   };
@@ -52,22 +52,36 @@ export const geojsonAdapter: CatalogAdapter = {
     const errors = [...inspected.errors];
     if (!ready && inspected.looksLikeGeojson) {
       errors.push(
-        "This GeoJSON is recognised but not a supported processing input until geometries validate and an EPSG is documented (crs member, / EPSG= comment, or companion .prj AUTHORITY)."
+        "This GeoJSON is recognised but not a supported processing input until geometries validate and CRS is documented as RFC 7946 OGC:CRS84, a validated legacy crs mapping, or a G-AID custom import (.prj / EPSG=)."
       );
     }
+    const contractNote =
+      inspected.geojsonContract === "rfc7946"
+        ? "RFC 7946 OGC:CRS84 (lon, lat degrees)."
+        : inspected.geojsonContract === "legacy-geojson"
+          ? "legacy-GeoJSON (crs member is not RFC 7946)."
+          : inspected.geojsonContract === "g-aid-custom-import"
+            ? "G-AID custom import contract (not RFC 7946 GeoJSON)."
+            : "GeoJSON tokens present.";
     return {
       columns: inspected.attributeNames,
-      headerSummary: firstLines(ctx.peekText, 4).join(" | ") || headerSummaryFromText(ctx.peekText),
+      headerSummary:
+        `${contractNote} ${firstLines(ctx.peekText, 4).join(" | ") || headerSummaryFromText(ctx.peekText)}`.trim(),
       crs: inspected.crs,
-      units: inspected.crs === "EPSG:4326" ? "degrees" : inspected.crs ? "metres-or-degrees" : undefined,
+      units: inspected.crs === "OGC:CRS84" || inspected.crs === "EPSG:4326" ? "degrees" : inspected.crs ? "metres-or-degrees" : undefined,
       bbox: inspected.bbox,
       recordCount: inspected.validFeatureCount,
       parseErrors: errors.length ? errors : undefined,
       supportStatus: ready ? "supported" : inspected.looksLikeGeojson ? "recognised-unsupported" : "unknown",
       geometryTypes: inspected.geometryTypes,
       locationQuality: inspected.locationQuality,
+      coordinateKind: inspected.crs === "OGC:CRS84" || inspected.crs === "EPSG:4326" ? "geographic" : inspected.crs ? "easting-northing" : "unknown",
       vectorRole: UNASSIGNED_VECTOR_ROLE,
       attributeNames: inspected.attributeNames,
+      geojsonContract: inspected.geojsonContract,
+      crsSource: inspected.crsSource,
+      axisOrder: inspected.axisOrder,
+      coordinateOrder: inspected.coordinateOrder,
     };
   },
   validate: (record) =>

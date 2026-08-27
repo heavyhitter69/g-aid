@@ -100,6 +100,9 @@ def vector_ingest(payload: dict) -> dict:
                 "crs": layer["crs"],
                 "crs_epsg": layer["crs_epsg"],
                 "crs_source": layer["crs_source"],
+                "geojson_contract": layer.get("geojson_contract"),
+                "axis_order": layer.get("axis_order"),
+                "coordinate_order": layer.get("coordinate_order"),
                 "geometry_types": layer["geometry_types"],
                 "attribute_names": layer["attribute_names"],
                 "feature_count": layer["feature_count"],
@@ -148,6 +151,10 @@ def vector_view(payload: dict) -> dict:
                 "source_path": layer.get("source_path"),
                 "catalog_id": layer.get("catalog_id"),
                 "crs": layer.get("crs"),
+                "crs_source": layer.get("crs_source"),
+                "geojson_contract": layer.get("geojson_contract"),
+                "axis_order": layer.get("axis_order"),
+                "coordinate_order": layer.get("coordinate_order"),
                 "role": layer.get("role"),
                 "role_reviewed": layer.get("role_reviewed"),
                 "geometry_types": layer.get("geometry_types"),
@@ -219,6 +226,40 @@ def _relation(left: dict, right: dict) -> str:
     return "bbox-overlap"
 
 
+def _lonlat_storage(layer: dict) -> bool:
+    return str(layer.get("coordinate_order") or "") == "lon-lat"
+
+
+def _crs_pair(left: dict, right: dict) -> dict:
+    a = str(left.get("crs") or "")
+    b = str(right.get("crs") or "")
+    if a == b:
+        return {"allowed": True, "code": "same-crs", "crs": a, "decision": None, "reason": f"Both layers use {a}."}
+    keys = {a, b}
+    if keys == {"OGC:CRS84", "EPSG:4326"}:
+        if _lonlat_storage(left) and _lonlat_storage(right):
+            return {
+                "allowed": True,
+                "code": "crs84-epsg4326-geojson-lonlat",
+                "crs": "OGC:CRS84+EPSG:4326",
+                "decision": "geojson-lonlat-no-axis-swap",
+                "reason": (
+                    "OGC:CRS84 and EPSG:4326 are different CRS identities. "
+                    "Documented compatibility uses stored GeoJSON [lon, lat] without an axis swap or reprojection."
+                ),
+            }
+        return {
+            "allowed": False,
+            "code": "crs84-epsg4326-axis-order",
+            "reason": "OGC:CRS84 vs EPSG:4326 axis order is not compatible without GeoJSON [lon, lat] storage on both layers.",
+        }
+    return {
+        "allowed": False,
+        "code": "conflicting-crs",
+        "reason": f"Conflicting CRS {a} vs {b}. Reprojection is not a registered capability.",
+    }
+
+
 def vector_overlap(payload: dict) -> dict:
     node_id = "vector_overlap"
     out = _out(payload)
@@ -251,8 +292,9 @@ def vector_overlap(payload: dict) -> dict:
             "skipped": True,
             "reason": "gis_crs_required",
             "message": (
-                "Spatial overlap needs a documented EPSG on every layer. "
-                "RFC 7946 lon/lat is not assumed. I will not silently reproject."
+                "Spatial overlap needs a documented CRS on every layer "
+                "(OGC:CRS84, a validated legacy mapping, or a G-AID custom import EPSG). "
+                "I will not silently reproject or swap axes."
             ),
             "geological_certainty_improved": False,
             "reprojected": False,
@@ -267,14 +309,30 @@ def vector_overlap(payload: dict) -> dict:
 
     rows = []
     blocked = []
+    decisions = []
     for i, left in enumerate(layers):
         for right in layers[i + 1 :]:
-            if left.get("crs") != right.get("crs"):
+            pair = _crs_pair(left, right)
+            decisions.append(
+                {
+                    "left": left.get("source_path"),
+                    "right": right.get("source_path"),
+                    "code": pair["code"],
+                    "compatibility_decision": pair.get("decision"),
+                    "left_crs": left.get("crs"),
+                    "right_crs": right.get("crs"),
+                    "left_axis_order": left.get("axis_order"),
+                    "right_axis_order": right.get("axis_order"),
+                    "left_coordinate_order": left.get("coordinate_order"),
+                    "right_coordinate_order": right.get("coordinate_order"),
+                }
+            )
+            if not pair["allowed"]:
                 blocked.append(
                     {
                         "left": left.get("source_path"),
                         "right": right.get("source_path"),
-                        "reason": f"Conflicting CRS {left.get('crs')} vs {right.get('crs')}. Reprojection is not a registered capability.",
+                        "reason": pair["reason"],
                     }
                 )
                 continue
@@ -291,28 +349,45 @@ def vector_overlap(payload: dict) -> dict:
                             "right_id": rf.get("id"),
                             "left_role": left.get("role"),
                             "right_role": right.get("role"),
-                            "crs": left.get("crs"),
+                            "crs": pair.get("crs") or left.get("crs"),
+                            "compatibility_decision": pair.get("decision") or "",
                             "relation": relation,
                             "reason": (
-                                f"Geometric {relation} under {left.get('crs')}. "
+                                f"Geometric {relation}. {pair['reason']} "
                                 "Spatial overlap does not establish geological, mineral, or causal relationships."
                             ),
                         }
                     )
 
     table_path = os.path.join(out, "vector_overlap.csv")
-    fieldnames = ["left_path", "right_path", "left_id", "right_id", "left_role", "right_role", "crs", "relation", "reason"]
+    fieldnames = [
+        "left_path",
+        "right_path",
+        "left_id",
+        "right_id",
+        "left_role",
+        "right_role",
+        "crs",
+        "compatibility_decision",
+        "relation",
+        "reason",
+    ]
     with open(table_path, "w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
-    json_path = write_json(os.path.join(out, "vector_overlap.json"), {"kind": "gis-overlap", "rows": rows, "blocked": blocked})
+    json_path = write_json(
+        os.path.join(out, "vector_overlap.json"),
+        {"kind": "gis-overlap", "rows": rows, "blocked": blocked, "crs_decisions": decisions, "reprojected": False, "axis_swap": False},
+    )
     qc = {
         "skipped": False,
         "n_rows": len(rows),
         "blocked": blocked,
+        "crs_decisions": decisions,
         "reprojected": False,
+        "axis_swap": False,
         "geological_certainty_improved": False,
         "interpretation_limit": "Overlap is a geometric table, not a prospectivity map.",
     }
@@ -342,11 +417,13 @@ def vector_export(payload: dict) -> dict:
     exported = []
     for index, layer in enumerate(canonical.get("layers") or []):
         epsg = layer.get("crs_epsg")
-        fc = {
-            "type": "FeatureCollection",
-            "crs": {"type": "name", "properties": {"name": f"EPSG:{epsg}"}},
-            "features": [],
-        }
+        crs_key = layer.get("crs") or (f"EPSG:{epsg}" if epsg else "")
+        fc: dict = {"type": "FeatureCollection", "features": []}
+        if crs_key == "OGC:CRS84":
+            # RFC 7946 export: no legacy crs member.
+            pass
+        elif epsg:
+            fc["crs"] = {"type": "name", "properties": {"name": f"EPSG:{epsg}"}}
         for feature in layer.get("features") or []:
             coords = feature.get("coordinates") or []
             gtype = feature.get("geometry_type") or "Point"
@@ -358,6 +435,10 @@ def vector_export(payload: dict) -> dict:
                 geometry = {"type": "Polygon", "coordinates": [[[p["x"], p["y"]] for p in coords]]}
             props = dict(feature.get("properties") or {})
             props["_g_aid_semantics"] = "unknown"
+            props["_g_aid_crs"] = crs_key
+            props["_g_aid_geojson_contract"] = layer.get("geojson_contract")
+            props["_g_aid_axis_order"] = layer.get("axis_order")
+            props["_g_aid_coordinate_order"] = layer.get("coordinate_order")
             props["_g_aid_role"] = layer.get("role")
             props["_g_aid_role_reviewed"] = layer.get("role_reviewed")
             fc["features"].append({"type": "Feature", "id": feature.get("id"), "properties": props, "geometry": geometry})
@@ -370,6 +451,7 @@ def vector_export(payload: dict) -> dict:
         os.path.join(out, "vector_export.meta.json"),
         {
             "format": "geojson",
+            "rfc7946_crs84": True,
             "shapefile": False,
             "geopackage": False,
             "reprojected": False,
@@ -407,6 +489,7 @@ def vector_interpret(payload: dict) -> dict:
     for layer in layers:
         observations.append(
             f"{layer.get('source_path')}: {layer.get('feature_count')} feature(s), CRS {layer.get('crs')}, "
+            f"contract={layer.get('geojson_contract')}, axis_order={layer.get('axis_order')}, "
             f"role={layer.get('role')} (reviewed={layer.get('role_reviewed')})."
         )
     report = {
@@ -416,8 +499,10 @@ def vector_interpret(payload: dict) -> dict:
             "No attribute meanings were supplied. Field names remain unknown semantics.",
         ],
         "assumptions": [
-            "EPSG codes were taken from the GeoJSON crs member, an / EPSG= comment, or a companion .prj AUTHORITY.",
-            "RFC 7946 default CRS84 was not assumed.",
+            "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (lon, lat degrees). It is not EPSG:4326.",
+            "A legacy GeoJSON crs member is not the RFC 7946 CRS mechanism.",
+            "Companion .prj or / EPSG= annotations are a G-AID custom import contract, not standard RFC 7946.",
+            "OGC:CRS84 vs EPSG:4326 overlay, when allowed, uses stored GeoJSON [lon, lat] without an axis swap.",
             "User-assigned roles are catalog labels, not geological confirmation.",
         ],
         "uncertainty": [

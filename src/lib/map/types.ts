@@ -15,14 +15,22 @@ export type LayerOrigin = "source" | "derived-run" | "unsupported" | "preview";
 
 export type DisplayStatus = "viewable" | "preview" | "recognised-not-decoded" | "not-viewable";
 
+export type CrsAxisOrder = "lon-lat" | "lat-lon" | "east-north" | "unknown";
+export type GeojsonContractKind = "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
+
 export interface CrsInfo {
   key: string;
   label: string;
   epsg?: number;
   units?: string;
   datum?: string;
-  source: "prj" | "geotiff" | "geojson" | "catalog" | "unknown";
+  source: "prj" | "geotiff" | "geojson" | "catalog" | "rfc7946" | "legacy-crs" | "custom-import" | "unknown";
   assumed: boolean;
+  authority?: "OGC" | "EPSG";
+  axisOrder?: CrsAxisOrder;
+  /** File storage order. GeoJSON coordinate arrays are [lon, lat] even when a legacy crs names EPSG:4326. */
+  coordinateOrder?: CrsAxisOrder;
+  geojsonContract?: GeojsonContractKind;
 }
 
 export interface PreviewPolicy {
@@ -94,8 +102,15 @@ export interface MapLayerSpec {
 
 export interface OverlayDecision {
   allowed: boolean;
-  code: "same-crs" | "unknown-crs" | "conflicting-crs" | "assumed-crs";
+  code:
+    | "same-crs"
+    | "unknown-crs"
+    | "conflicting-crs"
+    | "assumed-crs"
+    | "crs84-epsg4326-geojson-lonlat"
+    | "crs84-epsg4326-axis-order";
   message: string;
+  compatibilityDecision?: "geojson-lonlat-no-axis-swap";
 }
 
 export interface RunArtifact {

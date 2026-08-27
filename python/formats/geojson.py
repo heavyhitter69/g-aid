@@ -1,4 +1,9 @@
-"""Documented GeoJSON reader. RFC 7946 default CRS84 is not assumed."""
+"""Documented GeoJSON reader.
+
+RFC 7946 GeoJSON with no crs member is OGC:CRS84 (lon, lat degrees).
+A legacy crs member is not RFC 7946. Companion .prj / EPSG= comments are a
+G-AID custom import contract.
+"""
 
 from __future__ import annotations
 
@@ -40,20 +45,11 @@ def _closed(ring: list[tuple[float, float]]) -> bool:
     return len(ring) >= 4 and ring[0] == ring[-1]
 
 
-def _epsg_from_obj(obj: dict) -> int | None:
-    crs = obj.get("crs") or {}
-    props = crs.get("properties") if isinstance(crs, dict) else {}
-    name = (props or {}).get("name") if isinstance(props, dict) else None
-    if isinstance(name, str):
-        match = EPSG_RE.search(name)
-        if match:
-            return int(match.group(1))
-    extra = obj.get("properties") if isinstance(obj.get("properties"), dict) else {}
-    for key in ("EPSG", "crs", "CRS"):
-        match = EPSG_RE.search(str(extra.get(key) or ""))
-        if match:
-            return int(match.group(1))
-    return None
+def _epsg_from_name(name: str | None) -> int | None:
+    if not isinstance(name, str):
+        return None
+    match = EPSG_RE.search(name)
+    return int(match.group(1)) if match else None
 
 
 def _epsg_from_prj(path: str) -> int | None:
@@ -187,43 +183,106 @@ def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = Fals
     if not features:
         raise ValueError("No valid geometries after coordinate and ring checks. " + "; ".join(dict.fromkeys(errors)))
 
-    epsg = _epsg_from_obj(obj)
-    source = "geojson-crs" if epsg else None
-    if epsg is None:
-        comment = COMMENT_RE.search(text[:2000]) or EPSG_RE.search(text[:500])
-        if comment:
-            epsg = int(comment.group(1))
-            source = "epsg-comment"
-    if epsg is None:
-        epsg = _epsg_from_prj(path)
-        source = "companion-prj" if epsg else None
-    if epsg is None:
-        raise ValueError(
-            "No documented EPSG. RFC 7946 lon/lat is not assumed. I will not invent a CRS or silently reproject."
-        )
+    bbox = {"minX": min(xs), "minY": min(ys), "maxX": max(xs), "maxY": max(ys)}
+    crs_info = _resolve_crs(obj, text, path, bbox)
+    warnings.extend(crs_info["warnings"])
+    if crs_info.get("error"):
+        raise ValueError(crs_info["error"])
 
     unique_errors = list(dict.fromkeys(errors))
     return {
         "product_name": "G-AID documented GeoJSON vector layer",
         "format": "geojson",
-        "crs_epsg": epsg,
-        "crs": f"EPSG:{epsg}",
-        "crs_source": source,
+        "crs_epsg": crs_info.get("crs_epsg"),
+        "crs": crs_info["crs"],
+        "crs_source": crs_info["crs_source"],
+        "geojson_contract": crs_info["geojson_contract"],
+        "axis_order": crs_info["axis_order"],
+        "coordinate_order": crs_info["coordinate_order"],
         "location_quality": "documented",
         "geometry_types": sorted(types),
         "attribute_names": sorted(attrs),
         "feature_count": len(features),
         "features": features,
-        "bbox": {
-            "minX": min(xs),
-            "minY": min(ys),
-            "maxX": max(xs),
-            "maxY": max(ys),
-        },
+        "bbox": bbox,
         "role": role or "generic-vector",
         "role_reviewed": bool(role_reviewed),
         "source_path": path,
-        "warnings": warnings,
+        "warnings": list(dict.fromkeys(warnings)),
         "errors": unique_errors,
-        "formula": "GeoJSON Feature/FeatureCollection with documented EPSG. Overlay is not geological proof.",
+        "formula": "GeoJSON Feature/FeatureCollection with documented CRS. Overlay is not geological proof. No silent reprojection or axis swap.",
+    }
+
+
+def _geographic(bbox: dict) -> bool:
+    return (
+        abs(bbox["minX"]) <= 180
+        and abs(bbox["maxX"]) <= 180
+        and abs(bbox["minY"]) <= 90
+        and abs(bbox["maxY"]) <= 90
+    )
+
+
+def _resolve_crs(obj: dict, text: str, path: str, bbox: dict) -> dict:
+    warnings: list[str] = []
+    has_legacy = "crs" in obj and obj.get("crs") is not None
+    crs_member = obj.get("crs") if isinstance(obj.get("crs"), dict) else {}
+    props = crs_member.get("properties") if isinstance(crs_member.get("properties"), dict) else {}
+    member_epsg = _epsg_from_name(props.get("name") if isinstance(props, dict) else None)
+    prj_epsg = _epsg_from_prj(path)
+    comment = COMMENT_RE.search(text[:2000])
+    extra = obj.get("properties") if isinstance(obj.get("properties"), dict) else {}
+    prop_epsg = None
+    for key in ("EPSG", "crs", "CRS"):
+        prop_epsg = _epsg_from_name(str(extra.get(key) or ""))
+        if prop_epsg:
+            break
+
+    if has_legacy:
+        warnings.append("The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON.")
+        if member_epsg and prj_epsg and member_epsg != prj_epsg:
+            return {"error": f"Legacy crs member EPSG:{member_epsg} conflicts with companion .prj EPSG:{prj_epsg}. I will not pick one silently."}
+        if not member_epsg:
+            return {"error": "Legacy GeoJSON crs member is present but has no validated EPSG mapping. Overlay stays blocked until a user-confirmed CRS mapping exists."}
+        if member_epsg == 4326:
+            warnings.append("Legacy crs names EPSG:4326 (OGC axis order lat-lon). GeoJSON coordinate arrays stay [lon, lat]. G-AID will not silently swap axes or relabel this as OGC:CRS84.")
+        return {
+            "crs": f"EPSG:{member_epsg}",
+            "crs_epsg": member_epsg,
+            "crs_source": "legacy-crs",
+            "geojson_contract": "legacy-geojson",
+            "axis_order": "lat-lon" if member_epsg == 4326 else "east-north",
+            "coordinate_order": "lon-lat" if member_epsg == 4326 else "east-north",
+            "warnings": warnings,
+        }
+
+    custom = prj_epsg or (int(comment.group(1)) if comment else None) or prop_epsg
+    if custom:
+        warnings.append("Projected or annotated GeoJSON is a G-AID custom import contract, not standard RFC 7946 GeoJSON.")
+        if custom == 4326:
+            warnings.append("Custom import names EPSG:4326. GeoJSON coordinate arrays stay [lon, lat]. This is not OGC:CRS84 identity.")
+        return {
+            "crs": f"EPSG:{custom}",
+            "crs_epsg": custom,
+            "crs_source": "companion-prj" if prj_epsg else "epsg-comment",
+            "geojson_contract": "g-aid-custom-import",
+            "axis_order": "lat-lon" if custom == 4326 else "east-north",
+            "coordinate_order": "lon-lat" if custom == 4326 else "east-north",
+            "warnings": warnings,
+        }
+    if os.path.isfile(os.path.splitext(path)[0] + ".prj"):
+        return {"error": "Companion .prj has no EPSG authority. G-AID custom import cannot document the CRS."}
+    if not _geographic(bbox):
+        return {
+            "error": "Coordinates fall outside longitude-latitude range. RFC 7946 OGC:CRS84 does not apply. Provide a G-AID custom import (.prj or / EPSG=) or a legacy crs member with a validated EPSG."
+        }
+    warnings.append("RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (WGS 84 longitude-latitude degrees). It is not EPSG:4326.")
+    return {
+        "crs": "OGC:CRS84",
+        "crs_epsg": None,
+        "crs_source": "rfc7946",
+        "geojson_contract": "rfc7946",
+        "axis_order": "lon-lat",
+        "coordinate_order": "lon-lat",
+        "warnings": warnings,
     }

@@ -5,9 +5,9 @@
   "n_layers": 0,
   "rejected": [
     {
-      "source_path": "no-crs/clip.geojson",
+      "source_path": "projected-undocumented/utm.geojson",
       "reason": "gis_crs_required",
-      "message": "Documented EPSG is required. RFC 7946 default CRS84 was not assumed."
+      "message": "Coordinates fall outside longitude-latitude range. RFC 7946 OGC:CRS84 does not apply. Provide a G-AID custom import (.prj or / EPSG=) or a legacy crs member with a validated EPSG."
     }
   ],
   "reprojected": false,

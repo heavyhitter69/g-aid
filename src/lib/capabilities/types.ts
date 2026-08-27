@@ -192,4 +192,8 @@ export interface BoundInput {
     reviewedAt?: string;
     source: "user-assigned" | "unassigned";
   };
+  geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
+  coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
 }

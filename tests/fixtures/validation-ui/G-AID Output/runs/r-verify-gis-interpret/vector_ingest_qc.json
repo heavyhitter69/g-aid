@@ -8,7 +8,10 @@
       "checksum": "overlap/tenure.geojson",
       "crs": "EPSG:32734",
       "crs_epsg": 32734,
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "geometry_types": [
         "Polygon"
       ],
@@ -25,7 +28,8 @@
       "role": "tenure",
       "role_reviewed": true,
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON."
       ]
     },
     {
@@ -34,7 +38,10 @@
       "checksum": "overlap/samples.geojson",
       "crs": "EPSG:32734",
       "crs_epsg": 32734,
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "geometry_types": [
         "Point"
       ],
@@ -51,7 +58,8 @@
       "role": "sample-location",
       "role_reviewed": true,
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON."
       ]
     }
   ],

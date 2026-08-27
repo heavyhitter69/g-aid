@@ -1334,7 +1334,7 @@ const CAPABILITIES: ScientificCapability[] = [
     version: "1.0.0",
     title: "GIS vector ingest",
     description:
-      "Parse GeoJSON with documented EPSG into a canonical vector catalog. Shapefile and GeoPackage remain recognised-unsupported.",
+      "Parse RFC 7946 GeoJSON (OGC:CRS84), legacy-GeoJSON with a validated CRS mapping, or a G-AID custom import into a canonical vector catalog. Shapefile and GeoPackage remain recognised-unsupported.",
     domain: "gis",
     kernelNodeIds: ["vector_ingest"],
     dependsOn: [],
@@ -1343,7 +1343,7 @@ const CAPABILITIES: ScientificCapability[] = [
         role: "gis-vector",
         adapterIds: ["geojson"],
         required: true,
-        description: "Supported GeoJSON catalog records with documented EPSG and valid geometries",
+        description: "Supported GeoJSON catalog records (RFC 7946 OGC:CRS84, legacy-GeoJSON, or G-AID custom import)",
       },
     ],
     outputs: [
@@ -1351,11 +1351,13 @@ const CAPABILITIES: ScientificCapability[] = [
       { id: "vector_ingest_qc", type: "qc", description: "CRS, geometry types, attributes, roles, provenance", viewer: "json" },
     ],
     parameters: {},
-    metadataRequirements: ["documented EPSG", "valid Point/Line/Polygon geometries"],
+    metadataRequirements: ["documented CRS (OGC:CRS84 or EPSG)", "valid Point/Line/Polygon geometries"],
     scientificConstraints: [
       "Shapefile sidecars and GeoPackage are flagged, not parsed.",
       "Filename geology/tenure/fault labels are not assigned as layer roles.",
-      "RFC 7946 default CRS84 is not assumed.",
+      "RFC 7946 GeoJSON with no crs member is OGC:CRS84. It is not EPSG:4326.",
+      "Legacy crs members and companion .prj / EPSG= comments are not RFC 7946.",
+      "G-AID will not silently reproject or swap axes.",
     ],
     supportLevel: "supported",
     qcRequirements: ["crs_epsg", "geometry_types", "attribute_names", "role", "role_reviewed", "reprojected"],

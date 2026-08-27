@@ -157,6 +157,10 @@ export function collectPlanInputs(
       geometryTypes: record.geometryTypes,
       attributeNames: record.attributeNames,
       vectorRole: record.vectorRole,
+      geojsonContract: record.geojsonContract,
+      crsSource: record.crsSource,
+      axisOrder: record.axisOrder,
+      coordinateOrder: record.coordinateOrder,
     }));
   }
   void index;

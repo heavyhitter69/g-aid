@@ -8,7 +8,22 @@
       "reason": "Conflicting CRS EPSG:32734 vs EPSG:4326. Reprojection is not a registered capability."
     }
   ],
+  "crs_decisions": [
+    {
+      "left": "conflict-crs/a.geojson",
+      "right": "conflict-crs/b.geojson",
+      "code": "conflicting-crs",
+      "compatibility_decision": null,
+      "left_crs": "EPSG:32734",
+      "right_crs": "EPSG:4326",
+      "left_axis_order": "east-north",
+      "right_axis_order": "lat-lon",
+      "left_coordinate_order": "east-north",
+      "right_coordinate_order": "lon-lat"
+    }
+  ],
   "reprojected": false,
+  "axis_swap": false,
   "geological_certainty_improved": false,
   "interpretation_limit": "Overlap is a geometric table, not a prospectivity map."
 }

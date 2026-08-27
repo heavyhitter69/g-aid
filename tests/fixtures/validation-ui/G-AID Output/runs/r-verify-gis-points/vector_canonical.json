@@ -6,7 +6,10 @@
       "format": "geojson",
       "crs_epsg": 32734,
       "crs": "EPSG:32734",
-      "crs_source": "geojson-crs",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
       "location_quality": "documented",
       "geometry_types": [
         "Point"
@@ -61,10 +64,11 @@
       "role_reviewed": true,
       "source_path": "valid-points/samples.geojson",
       "warnings": [
-        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON."
       ],
       "errors": [],
-      "formula": "GeoJSON Feature/FeatureCollection with documented EPSG. Overlay is not geological proof.",
+      "formula": "GeoJSON Feature/FeatureCollection with documented CRS. Overlay is not geological proof. No silent reprojection or axis swap.",
       "catalog_id": "valid-points/samples.geojson",
       "checksum": "valid-points/samples.geojson"
     }

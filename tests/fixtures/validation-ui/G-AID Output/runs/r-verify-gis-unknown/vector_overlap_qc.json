@@ -1,10 +1,10 @@
 {
   "skipped": true,
   "reason": "gis_crs_required",
-  "message": "Spatial overlap needs a documented EPSG on every layer. RFC 7946 lon/lat is not assumed. Overlay and overlap stay blocked. I will not silently reproject.",
+  "message": "Spatial overlap needs a documented CRS on every layer (OGC:CRS84, a validated legacy mapping, or a G-AID custom import EPSG). Projected coordinates without that mapping are not RFC 7946. I will not silently reproject or swap axes.",
   "geological_certainty_improved": false,
   "reprojected": false,
   "missing_crs": [
-    "no-crs/clip.geojson"
+    "projected-undocumented/utm.geojson"
   ]
 }

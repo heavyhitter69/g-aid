@@ -5,7 +5,8 @@
   "status": "complete",
   "capabilities": [
     "gis.vector_ingest",
-    "gis.vector_view"
+    "gis.vector_view",
+    "gis.interpret"
   ],
   "product": "G-AID documented GeoJSON vector layer",
   "parameters": {}

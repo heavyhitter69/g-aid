@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "r1",
+      "properties": { "SITE": "rfc7946" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [18.39, -33.92],
+            [18.42, -33.92],
+            [18.42, -33.89],
+            [18.39, -33.89],
+            [18.39, -33.92]
+          ]
+        ]
+      }
+    }
+  ]
+}
