@@ -226,12 +226,37 @@ def vector_overlap(payload: dict) -> dict:
     with open(src, encoding="utf-8") as handle:
         canonical = json.load(handle)
     layers = canonical.get("layers") or []
+    missing_crs = [
+        layer
+        for layer in layers
+        if not str(layer.get("crs") or "").strip()
+        or str(layer.get("crs")).strip().lower() in {"unknown", "epsg:0", "crs unknown"}
+    ]
     if len(layers) < 2:
         qc = {
             "skipped": True,
             "reason": "gis_overlap_needs_two_layers",
             "message": "Spatial overlap needs at least two documented same-CRS vector layers. I will not invent a second layer.",
             "geological_certainty_improved": False,
+            "reprojected": False,
+        }
+        qc_path = write_json(os.path.join(out, "vector_overlap_qc.json"), qc)
+        write_lineage(out, node_id, "Vector overlap skipped", qc, [src], [qc_path])
+        return {
+            "artifacts": [make_artifact("artifact-vector-overlap-qc", "qc_report", "json", qc_path, node_id)],
+            "events": [{"type": "NODE_PROGRESS", "message": f"vector_overlap skipped: {qc['reason']}"}],
+        }
+    if missing_crs:
+        qc = {
+            "skipped": True,
+            "reason": "gis_crs_required",
+            "message": (
+                "Spatial overlap needs a documented EPSG on every layer. "
+                "RFC 7946 lon/lat is not assumed. I will not silently reproject."
+            ),
+            "geological_certainty_improved": False,
+            "reprojected": False,
+            "missing_crs": [layer.get("source_path") for layer in missing_crs],
         }
         qc_path = write_json(os.path.join(out, "vector_overlap_qc.json"), qc)
         write_lineage(out, node_id, "Vector overlap skipped", qc, [src], [qc_path])

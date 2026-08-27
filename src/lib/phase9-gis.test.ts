@@ -328,18 +328,24 @@ test("python kernels ingest, overlap, export, and refuse shapefile search", () =
   assert.ok(fs.existsSync(path.join(run, "vector_export_1.geojson")));
 });
 
-test("desktop verification fixtures cover points, polygons, unknown CRS, conflict, overlap, and interpretation", () => {
+test("desktop verification fixtures cover catalog, points, lines, polygons, unknown CRS, conflict, overlap, and interpretation", () => {
   const runs = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs");
   const tracks = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-points", "vector_tracks.json"), "utf8"));
   assert.equal(tracks.kind, "gis-vector");
+  const lines = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-lines", "vector_tracks.json"), "utf8"));
+  assert.ok(lines.layers[0].geometry_types.includes("LineString"));
   const poly = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-polygons", "vector_tracks.json"), "utf8"));
   assert.ok(poly.layers[0].geometry_types.includes("Polygon"));
   const unknownQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-unknown", "vector_overlap_qc.json"), "utf8"));
   assert.equal(unknownQc.skipped, true);
+  assert.equal(unknownQc.reason, "gis_crs_required");
+  const unknownIngest = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-unknown", "vector_ingest_qc.json"), "utf8"));
+  assert.equal(unknownIngest.n_layers, 0);
   const conflict = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-conflict", "vector_overlap.json"), "utf8"));
   assert.ok(conflict.blocked.length);
   const overlap = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-overlap", "vector_overlap.json"), "utf8"));
   assert.ok(overlap.rows.length);
+  assert.ok(overlap.rows[0].reason.includes("does not establish geological"));
   const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-interpret", "vector_interpretation.json"), "utf8"));
   assert.equal(interp.geological_certainty_improved, false);
   assert.ok((interp.not_established as string[]).some((line) => /Prospectivity/i.test(line)));

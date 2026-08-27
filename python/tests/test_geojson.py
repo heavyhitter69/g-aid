@@ -119,6 +119,47 @@ def test_overlap_skips_without_two_layers(tmp_path):
     assert qc["reason"] == "gis_overlap_needs_two_layers"
 
 
+def test_overlap_skips_when_crs_is_missing(tmp_path):
+    from kernels.vector import vector_overlap
+    from science.artifacts import write_json
+
+    out = tmp_path / "G-AID Output" / "runs" / "r-gis-ncrs"
+    out.mkdir(parents=True)
+    write_json(
+        str(out / "vector_canonical.json"),
+        {
+            "kind": "gis-vector",
+            "layers": [
+                {
+                    "source_path": "no-crs/clip.geojson",
+                    "crs": "",
+                    "bbox": {"minX": 18, "minY": -34, "maxX": 19, "maxY": -33},
+                    "features": [{"id": "a", "geometry_type": "Point", "coordinates": [{"x": 18.4, "y": -33.9}]}],
+                },
+                {
+                    "source_path": "valid-points/samples.geojson",
+                    "crs": "EPSG:32734",
+                    "bbox": {"minX": 260100, "minY": 6240100, "maxX": 260180, "maxY": 6240180},
+                    "features": [{"id": "s1", "geometry_type": "Point", "coordinates": [{"x": 260100, "y": 6240100}]}],
+                },
+            ],
+        },
+    )
+    payload = {
+        "parameters": {
+            "baseDir": str(FIXTURE),
+            "outDir": str(tmp_path / "G-AID Output" / "runs"),
+            "taskFolder": "r-gis-ncrs",
+            "catalogInputs": [],
+        }
+    }
+    vector_overlap(payload)
+    qc = json.loads((out / "vector_overlap_qc.json").read_text())
+    assert qc["skipped"] is True
+    assert qc["reason"] == "gis_crs_required"
+    assert qc["reprojected"] is False
+
+
 def test_conflicting_crs_is_blocked_not_reprojected(tmp_path):
     from kernels.vector import vector_ingest, vector_overlap
 

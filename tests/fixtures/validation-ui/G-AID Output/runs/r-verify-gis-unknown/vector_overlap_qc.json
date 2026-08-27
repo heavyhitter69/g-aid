@@ -1,6 +1,10 @@
 {
   "skipped": true,
-  "reason": "gis_overlap_needs_two_layers",
-  "message": "Spatial overlap needs at least two documented same-CRS vector layers. I will not invent a second layer.",
-  "geological_certainty_improved": false
+  "reason": "gis_crs_required",
+  "message": "Spatial overlap needs a documented EPSG on every layer. RFC 7946 lon/lat is not assumed. Overlay and overlap stay blocked. I will not silently reproject.",
+  "geological_certainty_improved": false,
+  "reprojected": false,
+  "missing_crs": [
+    "no-crs/clip.geojson"
+  ]
 }

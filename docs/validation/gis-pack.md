@@ -80,7 +80,8 @@ not reused for vector ingest.
    opacity, ordering, CRS status, and provenance. Same-CRS overlay and the
    overlap table are geometric coincidence only.
 
-Desktop click-through of `/workspace/verify-gis` is recorded in
+Desktop click-through of `/workspace/verify-gis` (catalog, points, lines,
+polygons, unknown CRS, conflicting CRS, overlap, interpretation) is recorded in
 `docs/validation/results/gis_desktop_ui.json`.
 
 ## CRS and geometry constraints

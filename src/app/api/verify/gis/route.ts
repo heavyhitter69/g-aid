@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import { buildProjectCatalog } from "@/lib/catalog/build";
 import { layersOverlappingVectors } from "@/lib/gis-product";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const ROOT = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs");
+const GIS_ROOT = path.join(process.cwd(), "tests/fixtures/gis-project");
 
 function read(run: string, file: string): string {
   return fs.readFileSync(path.join(ROOT, run, file), "utf8");
@@ -33,29 +35,45 @@ function featureGeometry(feature: {
   return { type: "Polygon", coordinates: [coords.map((p) => [p.x, p.y])] };
 }
 
-function tracksToGeojson(tracks: { layers?: Array<Record<string, unknown>> } | null): string | null {
-  const layer = tracks?.layers?.[0] as
-    | {
-        crs?: string;
-        features?: Array<{ id?: unknown; properties?: Record<string, unknown>; geometry_type?: string; coordinates?: Array<{ x: number; y: number }> }>;
-      }
-    | undefined;
-  if (!layer) return null;
+type TrackLayer = {
+  crs?: string;
+  source_path?: string;
+  role?: string;
+  role_reviewed?: boolean;
+  features?: Array<{
+    id?: unknown;
+    properties?: Record<string, unknown>;
+    geometry_type?: string;
+    coordinates?: Array<{ x: number; y: number }>;
+  }>;
+};
+
+function tracksToGeojson(tracks: { layers?: TrackLayer[] } | null): string | null {
+  const layers = tracks?.layers || [];
+  if (!layers.length) return null;
+  const crs = layers[0]?.crs;
   return JSON.stringify({
     type: "FeatureCollection",
-    crs: { type: "name", properties: { name: layer.crs || "EPSG:0" } },
-    features: (layer.features || []).map((feature) => ({
-      type: "Feature",
-      id: feature.id,
-      properties: feature.properties || {},
-      geometry: featureGeometry(feature),
-    })),
+    crs: { type: "name", properties: { name: crs || "EPSG:0" } },
+    features: layers.flatMap((layer) =>
+      (layer.features || []).map((feature) => ({
+        type: "Feature",
+        id: feature.id,
+        properties: {
+          ...(feature.properties || {}),
+          _g_aid_source: layer.source_path,
+          _g_aid_role: layer.role,
+          _g_aid_role_reviewed: layer.role_reviewed,
+        },
+        geometry: featureGeometry(feature),
+      }))
+    ),
   });
 }
 
 function pack(run: string) {
   const plan = JSON.parse(read(run, "plan.json")) as Record<string, unknown>;
-  const tracks = optionalJson(run, "vector_tracks.json") as { layers?: Array<Record<string, unknown>> } | null;
+  const tracks = optionalJson(run, "vector_tracks.json") as { layers?: TrackLayer[] } | null;
   return {
     runId: run,
     planHash: plan.planHash,
@@ -66,6 +84,29 @@ function pack(run: string) {
     interpretation: optionalJson(run, "vector_interpretation.json"),
     geojson: tracksToGeojson(tracks),
     plan,
+  };
+}
+
+function catalogSnapshot() {
+  const catalog = buildProjectCatalog(GIS_ROOT);
+  return {
+    root: "tests/fixtures/gis-project",
+    records: catalog.records.map((record) => ({
+      id: record.id,
+      relativePath: record.relativePath,
+      filename: record.filename,
+      supportStatus: record.supportStatus,
+      formatId: record.formatId,
+      adapterId: record.adapterId,
+      mediaClass: record.mediaClass,
+      crs: record.crs || null,
+      locationQuality: record.locationQuality,
+      vectorRole: record.vectorRole,
+      geometryTypes: record.geometryTypes,
+      attributeNames: record.attributeNames,
+      parseErrors: record.parseErrors,
+      shapefileSidecars: record.shapefileSidecars,
+    })),
   };
 }
 
@@ -85,7 +126,9 @@ export async function GET(): Promise<Response> {
   }));
   const bboxHits = layersOverlappingVectors(overlapLayers);
   return Response.json({
+    catalog: catalogSnapshot(),
     points: pack("r-verify-gis-points"),
+    lines: pack("r-verify-gis-lines"),
     polygons: pack("r-verify-gis-polygons"),
     unknownCrs: pack("r-verify-gis-unknown"),
     conflict: pack("r-verify-gis-conflict"),
