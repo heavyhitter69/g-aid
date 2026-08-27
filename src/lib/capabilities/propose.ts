@@ -41,6 +41,8 @@ export function capabilityFromStepKey(key: string): UserCapabilityId | undefined
 export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id === "grav.residual") return "residual";
   if (id === "grav.terrain_near_zone") return "nearZoneTerrain";
+  if (id === "grav.terrain_intermediate_zone") return "intermediateZoneTerrain";
+  if (id === "grav.terrain_far_zone") return "farZoneTerrain";
   if (id.startsWith("grav.")) return "gravity";
   if (id === "ert.invert2d") return "ertInvert";
   if (id.startsWith("ert.")) return "ert";
@@ -66,6 +68,21 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
       if (!ids.includes(id)) ids.push(id);
     }
     if (!ids.includes("grav.terrain_near_zone")) ids.push("grav.terrain_near_zone");
+  }
+  if (steps.intermediateZoneTerrain) {
+    for (const id of GRAVITY_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+    if (!ids.includes("grav.terrain_near_zone")) ids.push("grav.terrain_near_zone");
+    if (!ids.includes("grav.terrain_intermediate_zone")) ids.push("grav.terrain_intermediate_zone");
+  }
+  if (steps.farZoneTerrain) {
+    for (const id of GRAVITY_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+    if (!ids.includes("grav.terrain_near_zone")) ids.push("grav.terrain_near_zone");
+    if (!ids.includes("grav.terrain_intermediate_zone")) ids.push("grav.terrain_intermediate_zone");
+    if (!ids.includes("grav.terrain_far_zone")) ids.push("grav.terrain_far_zone");
   }
   if (steps.residual) {
     if (!ids.includes("grav.residual")) ids.push("grav.residual");
@@ -95,6 +112,8 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.gravity = false;
   steps.residual = false;
   steps.nearZoneTerrain = false;
+  steps.intermediateZoneTerrain = false;
+  steps.farZoneTerrain = false;
   steps.ert = false;
   steps.ertInvert = false;
   steps.radiometrics = false;
@@ -105,6 +124,19 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
       continue;
     }
     if (id === "grav.terrain_near_zone") {
+      steps.nearZoneTerrain = true;
+      steps.gravity = true;
+      continue;
+    }
+    if (id === "grav.terrain_intermediate_zone") {
+      steps.intermediateZoneTerrain = true;
+      steps.nearZoneTerrain = true;
+      steps.gravity = true;
+      continue;
+    }
+    if (id === "grav.terrain_far_zone") {
+      steps.farZoneTerrain = true;
+      steps.intermediateZoneTerrain = true;
       steps.nearZoneTerrain = true;
       steps.gravity = true;
       continue;
@@ -184,9 +216,21 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
   const completeAsk =
     /\bcomplete\s+bouguer\b/.test(m) &&
     !/\b(skip|omit|without|no)\b.{0,40}\b(terrain|complete bouguer)\b/.test(m);
-  if (terrainAsk || completeAsk) {
+  const intermediateAsk =
+    /\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km/.test(m) &&
+    !/\b(skip|omit|without|no)\b.{0,40}\b(intermediate|hayford|bowie)\b/.test(m);
+  const farAsk =
+    /\bfar[\s-]?zone\s+terrain/.test(m) &&
+    !/\b(skip|omit|without|no)\b.{0,40}\bfar[\s-]?zone\b/.test(m);
+  if (terrainAsk || completeAsk || intermediateAsk || farAsk) {
     for (const id of GRAVITY_DEFAULT) next.add(id);
     next.add("grav.terrain_near_zone");
+  }
+  if (completeAsk || intermediateAsk || farAsk) {
+    next.add("grav.terrain_intermediate_zone");
+  }
+  if (completeAsk || farAsk) {
+    next.add("grav.terrain_far_zone");
   }
 
   const ertDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(ert|resistivity)\b/.test(m);
@@ -225,8 +269,5 @@ export function unregisteredProposal(message: string): string | undefined {
   }
   if (/\bjoint inversion\b/.test(m)) return "joint-inversion";
   if (/\b3d\s+(ert|invers)/.test(m) || /\bert\s+3d\b/.test(m)) return "ert-3d";
-  if (/\b(hayford|bowie|167\s*km|far[\s-]?zone\s+terrain|intermediate[\s-]?zone\s+terrain)\b/.test(m)) {
-    return "grav.terrain_far_zone";
-  }
   return undefined;
 }

@@ -72,6 +72,10 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     applyBullardB: next.parameters.applyBullardB,
     terrainRadiusM: next.parameters.terrainRadiusM,
     useDemExtent: next.parameters.useDemExtent,
+    applyIntermediateZone: next.parameters.applyIntermediateZone || next.steps.intermediateZoneTerrain,
+    applyFarZone: next.parameters.applyFarZone || next.steps.farZoneTerrain,
+    intermediateRadiusM: next.parameters.intermediateRadiusM,
+    farRadiusM: next.parameters.farRadiusM,
   });
   return next;
 }

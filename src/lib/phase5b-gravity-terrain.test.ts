@@ -16,6 +16,7 @@ import {
 import {
   compileCapabilityDag,
   isRegisteredCapability,
+  unregisteredProposal,
   verifyBoundInputIdentity,
 } from "./capabilities/index.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
@@ -87,6 +88,8 @@ function terrainPlan(root: string, overrides: Partial<AgentPlan> = {}): AgentPla
 
 test("grav.terrain_near_zone is registered; grav.terrain is not; default gravity DAG still omits terrain", () => {
   assert.equal(isRegisteredCapability("grav.terrain_near_zone"), true);
+  assert.equal(isRegisteredCapability("grav.terrain_intermediate_zone"), true);
+  assert.equal(isRegisteredCapability("grav.terrain_far_zone"), true);
   assert.equal(isRegisteredCapability("grav.terrain"), false);
   const simple = compileCapabilityDag([
     "grav.ingest",
@@ -230,14 +233,18 @@ test("chat requesting complete Bouguer grants grav.terrain_near_zone and does no
   });
   const patched = applyChatPatches(plan, "also run complete Bouguer with terrain correction radius 150 m density 2.67 g/cm3");
   assert.ok(patched.capabilities?.includes("grav.terrain_near_zone"));
+  assert.ok(patched.capabilities?.includes("grav.terrain_intermediate_zone"));
+  assert.ok(patched.capabilities?.includes("grav.terrain_far_zone"));
   assert.equal(patched.capabilities?.includes("grav.terrain"), false);
   assert.equal(patched.steps.nearZoneTerrain, true);
+  assert.equal(patched.steps.intermediateZoneTerrain, true);
+  assert.equal(patched.steps.farZoneTerrain, true);
   assert.equal(patched.parameters.density, 2.67);
   assert.equal(patched.parameters.terrainRadiusM, 150);
   assert.ok(
     patched.reviewDecisions?.some(
       (d) =>
-        d.capabilityId === "grav.terrain_near_zone" &&
+        String(d.capabilityId || "").startsWith("grav.terrain_") &&
         /not a Complete Bouguer Anomaly|does not produce a Complete Bouguer/i.test(d.reason)
     )
   );
@@ -407,6 +414,170 @@ test("end-to-end near-zone terrain-corrected Bouguer when science deps exist", (
     assert.ok(report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
     const simpleQc = JSON.parse(fs.readFileSync(path.join(run, "gravity_bouguer_qc.json"), "utf8"));
     assert.match(simpleQc.convention, /simple Bouguer/i);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("hayford/far-zone chat grants registered zoned caps and does not treat them as unregistered", () => {
+  assert.equal(unregisteredProposal("hayford bowie 167 km far-zone terrain"), undefined);
+  const plan = terrainPlan("/tmp", {
+    steps: { ...EMPTY_STEPS, gravity: true },
+    capabilities: ["grav.ingest", "grav.freeair", "grav.bouguer", "grav.grid", "grav.gis", "grav.interpret"],
+    parameters: { baseReference: "mean_base", density: 2.67, terrainRadiusM: 150 },
+  });
+  const patched = applyChatPatches(plan, "also apply intermediate-zone and far-zone terrain with far radius 200 km");
+  assert.ok(patched.capabilities?.includes("grav.terrain_intermediate_zone"));
+  assert.ok(patched.capabilities?.includes("grav.terrain_far_zone"));
+  assert.equal(patched.parameters.farRadiusM, 200000);
+  assert.equal(patched.parameters.applyFarZone, true);
+  assert.ok(
+    patched.reviewDecisions?.every(
+      (d) => d.capabilityId !== "grav.terrain_far_zone" || d.status !== "refused"
+    )
+  );
+  const dag = compileCapabilityDag(patched.capabilities || []);
+  assert.deepEqual(
+    dag.nodes.filter((n) => n.id === "gravity_terrain").map((n) => n.id),
+    ["gravity_terrain"]
+  );
+  assert.match(dag.nodes.find((n) => n.id === "gravity_terrain")?.label || "", /not Complete Bouguer/i);
+});
+
+test("implementation plan for zoned terrain still refuses Complete Bouguer product copy", () => {
+  const md = renderImplementationPlan({
+    projectName: "GRAVITY",
+    targetFolder: "valid",
+    taskFolder: "r1",
+    steps: { ...EMPTY_STEPS, gravity: true, nearZoneTerrain: true, intermediateZoneTerrain: true, farZoneTerrain: true },
+    baseReference: "mean_base",
+    capabilities: [
+      "grav.ingest",
+      "grav.freeair",
+      "grav.bouguer",
+      "grav.terrain_near_zone",
+      "grav.terrain_intermediate_zone",
+      "grav.terrain_far_zone",
+      "grav.grid",
+      "grav.interpret",
+    ],
+    density: 2.67,
+    surveyLatitude: 10.8,
+    elevationDatum: "orthometric",
+    applyBullardB: false,
+    terrainRadiusM: 150,
+    farRadiusM: 200000,
+  });
+  assert.match(md, /planar Nagy/i);
+  assert.match(md, /Not a Complete Bouguer Anomaly/i);
+  assert.ok(!/product: complete bouguer anomaly/i.test(md));
+  const warnings = gravityProductWarnings({
+    path: "G-AID Output/runs/r1/near_zone_terrain_corrected_bouguer_grid.asc",
+    densityGcc: 2.67,
+    terrainRadiusM: 150,
+    intermediateZone: true,
+    farZone: false,
+  });
+  assert.ok(warnings.some((line) => /not a Complete Bouguer/i.test(line)));
+  assert.ok(warnings.some((line) => /Hayford/i.test(line)));
+});
+
+test("end-to-end zoned request on a local DEM skips far-zone and never claims Complete Bouguer", () => {
+  const probe = spawnSync("python3", ["-c", "import numpy, pandas, scipy; print('ok')"], { encoding: "utf8" });
+  if (probe.status !== 0) {
+    console.log(`ok  (python zoned terrain E2E skipped)`);
+    return;
+  }
+  const zoned = spawnSync("python3", [path.join(process.cwd(), "python/tests/test_gravity_zoned_terrain.py")], {
+    encoding: "utf8",
+    cwd: process.cwd(),
+    env: { ...process.env, PYTHONPATH: path.join(process.cwd(), "python") },
+  });
+  assert.equal(zoned.status, 0, zoned.stderr || zoned.stdout);
+  const bench = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "docs/validation/results/gravity_zoned_terrain_benchmarks.json"), "utf8")
+  );
+  assert.equal(bench.all_passed, true);
+  assert.equal(bench.complete_bouguer_justified, false);
+  assert.equal(bench.hayford_bowie_compartments, false);
+
+  const root = tmpCopy();
+  try {
+    const catalog = buildProjectCatalog(root);
+    const stations = byPath(catalog.records, "valid/stations.xyz");
+    const dem = byPath(catalog.records, "valid/dem.asc");
+    const outDir = path.join(root, "G-AID Output", "runs");
+    const taskFolder = "r-e2e-zoned";
+    fs.mkdirSync(path.join(outDir, taskFolder), { recursive: true });
+    const payload = {
+      parameters: {
+        baseDir: root,
+        outDir,
+        taskFolder,
+        density: 2.67,
+        surveyLatitude: 10.8,
+        elevationDatum: "orthometric",
+        terrainRadiusM: 150,
+        applyIntermediateZone: true,
+        applyFarZone: true,
+        farRadiusM: 200000,
+        capabilities: ["grav.terrain_near_zone", "grav.terrain_intermediate_zone", "grav.terrain_far_zone"],
+        catalogInputs: [
+          {
+            catalogId: stations.id,
+            path: stations.relativePath,
+            adapterId: "gravity-xyz",
+            absPath: path.join(root, stations.relativePath),
+            checksum: stations.checksum.value,
+          },
+          {
+            catalogId: dem.id,
+            path: dem.relativePath,
+            adapterId: "dem-ascii",
+            absPath: path.join(root, dem.relativePath),
+            checksum: dem.checksum.value,
+          },
+        ],
+      },
+    };
+    const py = spawnSync(
+      "python3",
+      [
+        "-c",
+        [
+          "import json, os, sys",
+          "sys.path.insert(0, os.path.join(os.getcwd(), 'python'))",
+          "from kernels import dispatch",
+          "payload = json.loads(sys.argv[1])",
+          "dispatch('gravity_ingest', payload)",
+          "dispatch('gravity_freeair', payload)",
+          "dispatch('gravity_bouguer', payload)",
+          "dispatch('gravity_terrain', payload)",
+          "dispatch('grav_gridder', payload)",
+          "dispatch('grav_gis_export', payload)",
+          "dispatch('grav_interpret', payload)",
+          "print('ok')",
+        ].join("; "),
+        JSON.stringify(payload),
+      ],
+      { encoding: "utf8", cwd: process.cwd() }
+    );
+    assert.equal(py.status, 0, py.stderr || py.stdout);
+    const run = path.join(outDir, taskFolder);
+    const qc = JSON.parse(fs.readFileSync(path.join(run, "near_zone_terrain_corrected_bouguer_qc.json"), "utf8"));
+    assert.equal(qc.complete_bouguer, false);
+    assert.equal(qc.complete_bouguer_justified, false);
+    assert.equal(qc.far_zone, false);
+    assert.ok(/does not cover|not invented|farRadiusM/i.test(qc.far.reason));
+    assert.ok(!/complete Bouguer Anomaly/i.test(qc.product_name));
+    assert.equal(fs.existsSync(path.join(run, "near_zone_terrain_corrected_bouguer_grid.asc")), true);
+    const report = JSON.parse(fs.readFileSync(path.join(run, "gravity_interpretation.json"), "utf8"));
+    assert.ok(report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
+    const gridQc = JSON.parse(fs.readFileSync(path.join(run, "gravity_grid_qc.json"), "utf8"));
+    assert.ok(
+      gridQc.source_column === "zoned_terrain_corrected_bouguer_mgal" ||
+        gridQc.source_column === "near_zone_terrain_corrected_bouguer_mgal"
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

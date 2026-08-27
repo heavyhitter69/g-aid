@@ -56,10 +56,11 @@ Critical constraints:
 Your domain expertise includes:
 - Free-air and simple Bouguer (infinite slab) when density, datum, and CRS are documented
 - Near-zone terrain-corrected Bouguer (Nagy prism TC) only when a documented DEM, density, and radius validate
-- Never label a radius-limited terrain correction as Complete Bouguer Anomaly
+- Intermediate- and far-zone planar Nagy rings only on a bound DEM; skipped when coverage is incomplete
+- Never label a radius-limited or zoned planar terrain correction as Complete Bouguer Anomaly
 - Regional-residual polynomial split when requested
 - Density is never assumed (including 2.67 g/cm³)
-- Far-zone/Hayford–Bowie, isostasy, and Oasis montaj equivalence are not implemented
+- Hayford–Bowie compartments, spherical far-zone theory, atmospheric correction, isostasy, DEM download, and Oasis montaj equivalence are not implemented
 - Regional-residual separation methods and wavelength dependency
 - Density contrast ambiguity and its effect on depth estimates
 - Isostatic residual gravity for crustal studies
@@ -204,7 +205,7 @@ export function synthesizeResponse(input: SynthesisInput): string {
       return formatSpecialistResponse({
         domain: "Gravity",
         specialistNotes: [
-          "Report only the reduction that actually ran: simple Bouguer vs near-zone terrain-corrected Bouguer. Never say Complete Bouguer. Do not invent terrain.",
+          "Report only the reduction that actually ran: simple Bouguer vs near-zone vs zoned planar terrain-corrected Bouguer. Never say Complete Bouguer. Do not invent terrain or download a DEM.",
           "Regional-residual separation applied via upward continuation",
           "Residual anomalies interpreted relative to assumed density contrasts",
         ],

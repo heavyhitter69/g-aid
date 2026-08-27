@@ -1,7 +1,12 @@
-/** Honest gravity product names. Never label near-zone TC as Complete Bouguer. */
+/** Honest gravity product names. Never label zoned planar TC as Complete Bouguer. */
 
 export const NEAR_ZONE_TERRAIN_CAPABILITY = "grav.terrain_near_zone" as const;
+export const INTERMEDIATE_ZONE_TERRAIN_CAPABILITY = "grav.terrain_intermediate_zone" as const;
+export const FAR_ZONE_TERRAIN_CAPABILITY = "grav.terrain_far_zone" as const;
 export const NEAR_ZONE_TERRAIN_STEP = "nearZoneTerrain" as const;
+export const INTERMEDIATE_ZONE_TERRAIN_STEP = "intermediateZoneTerrain" as const;
+export const FAR_ZONE_TERRAIN_STEP = "farZoneTerrain" as const;
+export const HAYFORD_BOWIE_OUTER_M = 166700;
 
 export const NEAR_ZONE_PRODUCT_NAME = "near-zone terrain-corrected Bouguer anomaly";
 export const NEAR_ZONE_CSV = "near_zone_terrain_corrected_bouguer.csv";
@@ -14,6 +19,12 @@ export const NEAR_ZONE_STATEMENTS = [
   "Terrain correction is limited to the configured DEM extent or radius. Cells outside that window are ignored.",
   "Far-zone and intermediate-zone terrain effects are not included. Hayford–Bowie compartments are not implemented.",
   "This anomaly is not equivalent to a fully regional or commercial Complete Bouguer product.",
+] as const;
+
+export const ZONED_TERRAIN_STATEMENTS = [
+  "Intermediate-zone terrain is planar Nagy on the bound DEM, clipped to DEM coverage. Hayford–Bowie compartments are not implemented.",
+  "Far-zone terrain is applied only when a bound DEM covers the requested radius beyond 166.7 km. G-AID does not download ETOPO/SRTM.",
+  "Atmospheric correction, spherical-Earth far-zone theory, and global terrain coverage are excluded. This is not a Complete Bouguer Anomaly.",
 ] as const;
 
 export function isNearZoneTerrainPath(path: string): boolean {
@@ -36,6 +47,11 @@ export function gravityProductWarnings(options: {
   demCellSizeM?: number;
   coverageFraction?: number;
   elevationDatum?: string;
+  intermediateZone?: boolean;
+  farZone?: boolean;
+  intermediateReason?: string;
+  farReason?: string;
+  completeBouguer?: boolean;
 }): string[] {
   const n = options.path.replace(/\\/g, "/").toLowerCase();
   if (!isNearZoneTerrainPath(n) && !/gravity_terrain|complete_bouguer/.test(n)) return [];
@@ -63,14 +79,30 @@ export function gravityProductWarnings(options: {
   const datum = options.elevationDatum
     ? `Vertical datum: ${options.elevationDatum}.`
     : "Vertical datum must be documented on stations and DEM.";
+  const zoned = options.intermediateZone === true || options.farZone === true;
+  const zoneLines = zoned
+    ? [
+        options.intermediateZone
+          ? options.intermediateReason || ZONED_TERRAIN_STATEMENTS[0]
+          : "Intermediate-zone terrain was not applied (incomplete DEM coverage or not requested).",
+        options.farZone
+          ? options.farReason || ZONED_TERRAIN_STATEMENTS[1]
+          : "Far-zone terrain was not applied. Missing global DEM coverage is not a silent pass.",
+        ZONED_TERRAIN_STATEMENTS[2],
+      ]
+    : [...NEAR_ZONE_STATEMENTS];
+  const product = zoned
+    ? "Product: zoned terrain-corrected Bouguer anomaly (planar Nagy; not Complete Bouguer)."
+    : `Product: ${NEAR_ZONE_PRODUCT_NAME}.`;
   return [
-    `Product: ${NEAR_ZONE_PRODUCT_NAME}.`,
-    ...NEAR_ZONE_STATEMENTS,
+    product,
+    ...zoneLines,
     bullard,
     density,
     radius,
     dem,
     coverage,
     datum,
+    "Complete Bouguer Anomaly is not scientifically justified in G-AID product copy for this convention.",
   ];
 }

@@ -33,6 +33,8 @@ function runPython(script: string) {
 
 test("grav.terrain is not a live capability id", () => {
   assert.equal(isRegisteredCapability("grav.terrain_near_zone"), true);
+  assert.equal(isRegisteredCapability("grav.terrain_intermediate_zone"), true);
+  assert.equal(isRegisteredCapability("grav.terrain_far_zone"), true);
   assert.equal(isRegisteredCapability("grav.terrain"), false);
 });
 
@@ -57,6 +59,20 @@ test("independent gravity terrain benchmarks pass and refuse Complete Bouguer na
   assert.equal(report.not_complete_bouguer, true);
   assert.equal(report.far_zone, false);
   assert.match(report.product_name, /near-zone terrain-corrected Bouguer/i);
+});
+
+test("zoned terrain benchmarks pass and still refuse Complete Bouguer naming", () => {
+  runPython(path.join(process.cwd(), "python/tests/test_gravity_zoned_terrain.py"));
+  const report = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "docs/validation/results/gravity_zoned_terrain_benchmarks.json"), "utf8")
+  );
+  assert.equal(report.all_passed, true);
+  assert.equal(report.not_complete_bouguer, true);
+  assert.equal(report.complete_bouguer_justified, false);
+  assert.equal(report.hayford_bowie_compartments, false);
+  assert.equal(report.spherical_earth, false);
+  assert.equal(report.atmospheric_correction, false);
+  assert.equal(report.dem_download, false);
 });
 
 test("ERT historical Gaussian kernel still fails two-layer recovery (case preserved)", () => {

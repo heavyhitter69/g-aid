@@ -107,7 +107,8 @@ provenance is recorded in `results/radiometrics_desktop_ui.json`.
 
 ## Next recommended complete pack
 
-**Far-zone / intermediate-zone gravity terrain** is the only honest path toward
-a Complete Bouguer Anomaly. GPR is the next unsupported method with existing
-stubs. Do **not** begin topography-aware ERT, and do **not** promote
-`ert.invert2d` to production until its stated recovery gates are met.
+**Far-zone / intermediate-zone gravity terrain** has been started on the shared
+catalog/DAG (see `gravity-zoned-terrain.md`). Complete Bouguer is still **not**
+justified. **GPR** is the next unsupported method with existing stubs. Do
+**not** begin topography-aware ERT, and do **not** promote `ert.invert2d` to
+production until its stated recovery gates are met.

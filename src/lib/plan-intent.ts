@@ -37,6 +37,17 @@ export function intentToSteps(
     next.gravity = true;
     next.nearZoneTerrain = true;
   }
+  if (/\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km|\bcomplete\s+bouguer\b/.test(m)) {
+    next.gravity = true;
+    next.nearZoneTerrain = true;
+    next.intermediateZoneTerrain = true;
+  }
+  if (/\bfar[\s-]?zone\s+terrain|\bcomplete\s+bouguer\b/.test(m)) {
+    next.gravity = true;
+    next.nearZoneTerrain = true;
+    next.intermediateZoneTerrain = true;
+    next.farZoneTerrain = true;
+  }
   if (intent === "resistivity" || /\bert\b|\bpseudosection\b|\bresistivity\b/.test(m)) {
     next.ert = true;
     next.ertInvert =

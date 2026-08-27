@@ -49,6 +49,11 @@ export function validateCapabilityContracts(options: {
     columnMappingReviewed?: boolean;
     terrainRadiusM?: number;
     useDemExtent?: boolean;
+    applyIntermediateZone?: boolean;
+    applyFarZone?: boolean;
+    intermediateRadiusM?: number;
+    farRadiusM?: number;
+    outerCellSizeM?: number;
     radioMapping?: {
       x: string;
       y: string;
@@ -224,6 +229,9 @@ export function validateCapabilityContracts(options: {
 
   if (expanded.includes("grav.terrain_near_zone")) {
     issues.push(...terrainContractIssues(options, gravityInputs));
+  }
+  if (expanded.includes("grav.terrain_intermediate_zone") || expanded.includes("grav.terrain_far_zone")) {
+    issues.push(...outerZoneContractIssues(options, gravityInputs));
   }
 
   const ertInputs = [...boundSupported(options.inputs, "ert-dat"), ...boundSupported(options.inputs, "ert-csv")];
@@ -443,7 +451,7 @@ function terrainContractIssues(
       level: "blocker",
       code: "terrain_radius_required",
       message:
-        "Near-zone terrain-corrected Bouguer needs a terrain radius in metres, or an explicit request to use the DEM extent. Far-zone and intermediate-zone terrain are not implemented. This is not a Complete Bouguer Anomaly.",
+        "Near-zone terrain-corrected Bouguer needs a terrain radius in metres, or an explicit request to use the DEM extent. This is not a Complete Bouguer Anomaly.",
     });
   }
 
@@ -469,6 +477,70 @@ function terrainContractIssues(
         code: "dem_insufficient_coverage",
         message:
           "DEM extent does not cover the gravity stations plus the near-zone radius. I will not invent terrain outside the grid.",
+      });
+    }
+  }
+
+  return issues;
+}
+
+const HAYFORD_BOWIE_OUTER_M = 166700;
+
+function outerZoneContractIssues(
+  options: Parameters<typeof validateCapabilityContracts>[0],
+  gravityInputs: BoundInput[]
+): ContractIssue[] {
+  const issues: ContractIssue[] = [];
+  const expanded = expandCapabilityIds(options.capabilityIds.filter(Boolean));
+  const wantIntermediate = expanded.includes("grav.terrain_intermediate_zone");
+  const wantFar = expanded.includes("grav.terrain_far_zone");
+  const catalog = options.catalog || null;
+  const boundDem = boundSupported(options.inputs, "dem-ascii");
+  const demRecords = catalogRecordsForInputs(boundDem, catalog);
+  const dem = demRecords[0] || null;
+  const demBbox = dem?.bbox || boundDem[0]?.bbox;
+  const stationBbox =
+    catalogRecordsForInputs(gravityInputs, catalog).find((record) => record.bbox)?.bbox ||
+    gravityInputs.find((item) => item.bbox)?.bbox;
+
+  if (wantIntermediate) {
+    issues.push({
+      level: "warning",
+      code: "intermediate_zone_clipped",
+      message:
+        "Intermediate-zone terrain is planar Nagy on the bound DEM, clipped to DEM coverage (default outer radius 166.7 km). Hayford–Bowie compartments are not implemented. This is not a Complete Bouguer Anomaly.",
+    });
+  }
+
+  if (wantFar) {
+    const farRadius = options.parameters.farRadiusM;
+    if (!(typeof farRadius === "number" && Number.isFinite(farRadius) && farRadius > HAYFORD_BOWIE_OUTER_M)) {
+      issues.push({
+        level: "warning",
+        code: "far_radius_required",
+        message:
+          "Far-zone terrain needs farRadiusM greater than 166.7 km. G-AID will not assume a global radius or download ETOPO/SRTM. Far-zone will be skipped until that radius is documented. This is not a Complete Bouguer Anomaly.",
+      });
+    } else if (stationBbox && demBbox) {
+      const needed = {
+        minX: stationBbox.minX - farRadius,
+        minY: stationBbox.minY - farRadius,
+        maxX: stationBbox.maxX + farRadius,
+        maxY: stationBbox.maxY + farRadius,
+      };
+      if (!bboxContains(demBbox, needed)) {
+        issues.push({
+          level: "warning",
+          code: "far_zone_dem_insufficient",
+          message: `Bound DEM does not cover farRadiusM ${farRadius} m beyond the stations. Far-zone terrain will not be applied or invented. Missing global DEM coverage is not a silent pass.`,
+        });
+      }
+    } else {
+      issues.push({
+        level: "warning",
+        code: "far_zone_dem_unverified",
+        message:
+          "Far-zone terrain is requested. A local survey DEM almost certainly cannot cover 166.7 km. Far-zone will be skipped unless the bound DEM actually covers farRadiusM. G-AID does not download a global DEM. This is not a Complete Bouguer Anomaly.",
       });
     }
   }

@@ -1,0 +1,78 @@
+{
+  "product_name": "zoned terrain-corrected Bouguer anomaly (planar Nagy; not Complete Bouguer)",
+  "not_complete_bouguer": true,
+  "complete_bouguer_justified": false,
+  "kernel": "Nagy 1966 rectangular prisms, planar near/intermediate/far annuli on a bound DEM",
+  "hayford_bowie_compartments": false,
+  "spherical_earth": false,
+  "atmospheric_correction": false,
+  "dem_download": false,
+  "cases": [
+    {
+      "name": "annulus_equals_disk_difference",
+      "tc_full_mgal": 6.50380176463222,
+      "tc_inner_mgal": 4.749833110058777,
+      "tc_ring_mgal": 1.7539686545734434,
+      "delta_mgal": 0.0,
+      "tolerance_mgal": 1e-06,
+      "pass": true,
+      "oracle": "Additivity of disjoint planar Nagy annuli (same DEM, same density)"
+    },
+    {
+      "name": "cylinder_on_axis_vs_prism_ring",
+      "tc_mgal": 0.4587748160677461,
+      "cylinder_annulus_mgal": 0.4703776244981137,
+      "relative_error": 0.02466700758299808,
+      "tolerance_relative": 0.25,
+      "pass": true,
+      "oracle": "On-axis vertical cylinder closed form 2\u03c0G\u03c1[(z2\u2212\u221a(R\u00b2+z2\u00b2))\u2212(z1\u2212\u221a(R\u00b2+z1\u00b2))]"
+    },
+    {
+      "name": "flat_plateau_intermediate_zero",
+      "intermediate_tc_mgal": 0.0,
+      "applied": true,
+      "complete_bouguer": false,
+      "pass": true,
+      "oracle": "Zero mass difference on a constant-height DEM"
+    },
+    {
+      "name": "intermediate_applied_covering_dem",
+      "intermediate_tc_mgal": 1.8054102718169214,
+      "effective_radius_m": 400.0,
+      "complete_bouguer": false,
+      "pass": true,
+      "oracle": "Coverage \u2265 0.95 inside R_near\u2013R_int on a bound plateau DEM"
+    },
+    {
+      "name": "intermediate_skipped_near_only_dem",
+      "reason": "Bound DEM does not extend beyond the near-zone radius 300.0 m. Intermediate-zone terrain was not invented.",
+      "complete_bouguer": false,
+      "pass": true,
+      "oracle": "Bound DEM does not extend beyond the near-zone radius"
+    },
+    {
+      "name": "far_skipped_without_covering_dem",
+      "reason": "Bound DEM half-span 551.5 m does not cover farRadiusM 200000.0 m. Far-zone terrain was not invented. G-AID does not download a global DEM.",
+      "complete_bouguer": false,
+      "pass": true,
+      "oracle": "No DEM download; incomplete far ring is a skip, not a silent pass"
+    },
+    {
+      "name": "far_skipped_without_radius",
+      "reason": "farRadiusM is required. G-AID will not assume a global terrain radius or download ETOPO/SRTM.",
+      "complete_bouguer": false,
+      "pass": true,
+      "oracle": "farRadiusM is required; no global default"
+    },
+    {
+      "name": "far_applied_covering_coarse_dem",
+      "far_tc_mgal": 0.0002496619900360542,
+      "complete_bouguer": false,
+      "spherical_earth": false,
+      "hayford_bowie_compartments": false,
+      "pass": true,
+      "oracle": "Planar Nagy annulus beyond 166.7 km on a bound DEM that actually covers 180 km"
+    }
+  ],
+  "all_passed": true
+}
