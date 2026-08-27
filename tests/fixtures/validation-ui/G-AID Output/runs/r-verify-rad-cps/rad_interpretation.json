@@ -1,0 +1,139 @@
+{
+  "observations": [
+    "Radiometric measurements were ingested under the G-AID RAD 1.0 already-corrected contract.",
+    "Quantity: count_rate. G-AID did not apply height, stripping, dead-time, or concentration conversion.",
+    "Ternary computed: False. A ternary is a colour composite, not a lithology map.",
+    "Units K=cps, eU=cps, eTh=cps, TC=cps."
+  ],
+  "assumptions": [
+    "Channel values are as supplied in the declared units from the catalog record or versioned artifact metadata.",
+    "Correction history is the contractor/survey declaration; it was not re-applied.",
+    "Filenames are not a source of quantity or units."
+  ],
+  "uncertainty": [
+    "Equivalent concentrations are non-unique with respect to source geometry, attenuation, and residual stripping.",
+    "Gridding interpolates. It is not a measurement."
+  ],
+  "recommendations": [
+    "Do not treat K, eU, eTh, ratios, or a ternary as mineralisation, lithology, alteration, or a drill target."
+  ],
+  "not_established": [
+    "Mineralisation is not established.",
+    "Lithology is not established.",
+    "Alteration is not established.",
+    "Drill targets are not established.",
+    "Raw spectrometer corrections were not performed."
+  ],
+  "qc": {
+    "rad_ingest_qc.json": {
+      "files": [
+        {
+          "path": "/workspace/tests/fixtures/radio-project/count-rate/stations.csv",
+          "n": 16,
+          "n_lines": 4,
+          "quantity": "count_rate",
+          "crs_epsg": 32630,
+          "channels": {
+            "k": "cps",
+            "eu": "cps",
+            "eth": "cps",
+            "tc": "cps"
+          },
+          "units_unknown": false,
+          "correction_history": "live-time and altitude already applied by contractor; delivered as count rates",
+          "platform": "airborne",
+          "instrument": "RSX-5",
+          "acquisition_date": "2024-06-12",
+          "mapping": {
+            "x": "X",
+            "y": "Y",
+            "line": "Line",
+            "k": "K",
+            "eu": "eU",
+            "eth": "eTh",
+            "tc": "TC"
+          },
+          "assumptions": "None. CRS, quantity, units, and correction history came from the RAD 1.0 contract or a reviewed mapping.",
+          "not_raw_spectrum": true,
+          "corrections_applied_in_g_aid": false,
+          "catalogId": "cat-r-verify-rad-cps"
+        }
+      ],
+      "n": 16,
+      "line_qc": {
+        "n": 16,
+        "n_lines": 4,
+        "duplicate_xy_line": 0,
+        "x_span_m": 600.0,
+        "y_span_m": 600.0
+      },
+      "quantity": "count_rate",
+      "units_k": "cps",
+      "units_eu": "cps",
+      "units_eth": "cps",
+      "units_tc": "cps",
+      "units_unknown": false,
+      "channels": [
+        "k",
+        "eu",
+        "eth",
+        "tc"
+      ],
+      "corrections_applied_in_g_aid": false,
+      "not_raw_spectrum": true,
+      "assumptions": "None. Already-corrected values as supplied. G-AID did not height-correct, strip, or convert concentrations. Units came from the catalog contract, not from filenames."
+    },
+    "rad_grid_qc.json": {
+      "channels": [
+        "k",
+        "eu",
+        "eth",
+        "tc"
+      ],
+      "quantity": "count_rate",
+      "units": {
+        "k": "cps",
+        "eu": "cps",
+        "eth": "cps",
+        "tc": "cps"
+      },
+      "units_unknown": false,
+      "interpolation": "Thin-plate spline = 2-D minimum curvature (Duchon 1977 / Briggs 1974)",
+      "not_a_geological_map": true,
+      "units_source": "catalog record / versioned artifact metadata, not filename"
+    },
+    "rad_ternary_qc.json": {
+      "justified": false,
+      "quantity": "count_rate",
+      "units_k": "cps",
+      "units_eu": "cps",
+      "units_eth": "cps",
+      "assignment": {
+        "R": "K %",
+        "G": "eTh ppm",
+        "B": "eU ppm"
+      },
+      "skipped": true,
+      "not_mineralisation": true,
+      "not_lithology": true,
+      "reason": "Ternary needs Quantity=concentration. quantity=count_rate."
+    },
+    "rad_ratio_qc.json": {
+      "skipped": true,
+      "reason": "Concentration ratios need Quantity=concentration.",
+      "quantity": "count_rate",
+      "units_k": "cps",
+      "units_eu": "cps",
+      "units_eth": "cps"
+    }
+  },
+  "quantity": "count_rate",
+  "units_k": "cps",
+  "units_eu": "cps",
+  "units_eth": "cps",
+  "units_tc": "cps",
+  "interpretation_limit": "Already-corrected radiometric maps and ratios are not geology.",
+  "affirmative_language_allowed": false,
+  "interpretation_blocked": false,
+  "corrections_applied_in_g_aid": false
+}

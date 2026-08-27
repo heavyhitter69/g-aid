@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "path": "/workspace/tests/fixtures/radio-project/count-rate/stations.csv",
+      "n": 16,
+      "n_lines": 4,
+      "quantity": "count_rate",
+      "crs_epsg": 32630,
+      "channels": {
+        "k": "cps",
+        "eu": "cps",
+        "eth": "cps",
+        "tc": "cps"
+      },
+      "units_unknown": false,
+      "correction_history": "live-time and altitude already applied by contractor; delivered as count rates",
+      "platform": "airborne",
+      "instrument": "RSX-5",
+      "acquisition_date": "2024-06-12",
+      "mapping": {
+        "x": "X",
+        "y": "Y",
+        "line": "Line",
+        "k": "K",
+        "eu": "eU",
+        "eth": "eTh",
+        "tc": "TC"
+      },
+      "assumptions": "None. CRS, quantity, units, and correction history came from the RAD 1.0 contract or a reviewed mapping.",
+      "not_raw_spectrum": true,
+      "corrections_applied_in_g_aid": false,
+      "catalogId": "cat-r-verify-rad-cps"
+    }
+  ],
+  "n": 16,
+  "line_qc": {
+    "n": 16,
+    "n_lines": 4,
+    "duplicate_xy_line": 0,
+    "x_span_m": 600.0,
+    "y_span_m": 600.0
+  },
+  "quantity": "count_rate",
+  "units_k": "cps",
+  "units_eu": "cps",
+  "units_eth": "cps",
+  "units_tc": "cps",
+  "units_unknown": false,
+  "channels": [
+    "k",
+    "eu",
+    "eth",
+    "tc"
+  ],
+  "corrections_applied_in_g_aid": false,
+  "not_raw_spectrum": true,
+  "assumptions": "None. Already-corrected values as supplied. G-AID did not height-correct, strip, or convert concentrations. Units came from the catalog contract, not from filenames."
+}

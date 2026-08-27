@@ -1,0 +1,12 @@
+{
+  "quantity": "count_rate",
+  "units": {
+    "k": "cps",
+    "eu": "cps",
+    "eth": "cps",
+    "tc": "cps"
+  },
+  "value_channel": "tc",
+  "value_units": "cps",
+  "crs_epsg": 32630
+}

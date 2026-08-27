@@ -1,0 +1,31 @@
+{
+  "node_id": "rad_ternary",
+  "formula": "Linear stretch between the 2.0th and 98.0th percentiles of each channel, clipped to [0,1].",
+  "parameters": {
+    "justified": true,
+    "quantity": "concentration",
+    "units_k": "%K",
+    "units_eu": "ppm eU",
+    "units_eth": "ppm eTh",
+    "assignment": {
+      "R": "K %",
+      "G": "eTh ppm",
+      "B": "eU ppm"
+    },
+    "skipped": false,
+    "not_mineralisation": true,
+    "not_lithology": true,
+    "source": "grids",
+    "formula": "Linear stretch between the 2.0th and 98.0th percentiles of each channel, clipped to [0,1].",
+    "p_lo": 2.0,
+    "p_hi": 98.0
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-conc/rad_canonical.csv"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-conc/rad_ternary.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-conc/rad_ternary_qc.json"
+  ],
+  "created_at": "2026-08-27T12:37:29.361390Z"
+}

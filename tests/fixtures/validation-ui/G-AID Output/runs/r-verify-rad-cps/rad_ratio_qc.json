@@ -1,0 +1,8 @@
+{
+  "skipped": true,
+  "reason": "Concentration ratios need Quantity=concentration.",
+  "quantity": "count_rate",
+  "units_k": "cps",
+  "units_eu": "cps",
+  "units_eth": "cps"
+}

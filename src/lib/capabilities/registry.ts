@@ -745,10 +745,10 @@ const CAPABILITIES: ScientificCapability[] = [
     ],
     outputs: [{ id: "rad_ternary", type: "report", description: "Ternary RGB JSON", viewer: "json" }],
     parameters: {},
-    metadataRequirements: ["Quantity=concentration", "K, eU, eTh"],
+    metadataRequirements: ["Quantity=concentration", "K, eU, eTh", "documented %K / ppm eU / ppm eTh units"],
     scientificConstraints: [
       "Ternary is a percentile colour stretch (R=K, G=eTh, B=eU), not a classified lithology map.",
-      "Not computed for count-rate or incomplete K-U-Th sets.",
+      "Not computed for count-rate, unknown units, or incomplete K-U-Th sets.",
     ],
     supportLevel: "supported",
     qcRequirements: ["justified", "assignment", "formula"],
@@ -774,7 +774,7 @@ const CAPABILITIES: ScientificCapability[] = [
     ],
     outputs: [{ id: "rad_ratios", type: "table", description: "Ratio table", viewer: "table" }],
     parameters: {},
-    metadataRequirements: ["Quantity=concentration", "paired channels"],
+    metadataRequirements: ["Quantity=concentration", "paired channels", "documented concentration units"],
     scientificConstraints: [
       "Ratios are arithmetic on declared concentrations. Denominators near zero are clipped.",
       "A ratio is not a lithology or alteration index.",

@@ -30,6 +30,12 @@ Required contract:
 **Count-rate** tables can be ingested, gridded, exported, and interpreted.
 Ternary RGB and concentration ratios are **skipped** (not justified).
 
+Displayed radiometric layers obtain quantity and units from the **bound catalog
+record** or **versioned artifact metadata** (`.meta.json`, QC JSON, GeoJSON
+`units`/`quantity`, ternary `channel_units`). Filenames are **not** a unit
+source. If quantity or units are unavailable, the map shows `unknown` and
+ternary, ratios, unit-specific legends, and interpretation claims are blocked.
+
 ### Recognised, not processed
 
 | Input | Adapter | Why |
@@ -52,9 +58,9 @@ plus tests:
 | Capability | Kernel | Notes |
 |---|---|---|
 | `rad.ingest` | `rad_ingest` | Strict ingest/QC, line QC |
-| `rad.grid` | `rad_grid` | Minimum-curvature interpolation of present channels |
-| `rad.ternary` | `rad_ternary` | R=K, G=eTh, B=eU; 2–98 percentile stretch; concentration only |
-| `rad.ratios` | `rad_ratios` | eU/eTh, eU/K, eTh/K; concentration only |
+| `rad.grid` | `rad_grid` | Minimum-curvature interpolation of present channels; units from ingest metadata |
+| `rad.ternary` | `rad_ternary` | R=K, G=eTh, B=eU; 2–98 percentile stretch; concentration with documented units only |
+| `rad.ratios` | `rad_ratios` | eU/eTh, eU/K, eTh/K; concentration with documented units only |
 | `rad.gis` | `rad_gis_export` | Sample GeoJSON at the documented EPSG |
 | `rad.interpret` | `rad_interpret` | Evidence-bound limits; no mineralisation/lithology/alteration/drill claims |
 

@@ -14,6 +14,7 @@ import {
   mapValueUnits,
   overlayDecision,
   parseGeojson,
+  parseGridSidecarMeta,
   pointsFromVector,
   provenanceLabel,
   runIdFromPath,
@@ -92,7 +93,7 @@ export function VisualizationStudio() {
       formatId: isRadioTernaryPath(path) ? "rad-ternary" : "ert-section",
       mediaClass: "section",
       runId: runIdFromPath(path),
-      units: isRadioTernaryPath(path) ? "RGB stretch" : "ohm.m",
+      units: isRadioTernaryPath(path) ? "unknown" : "ohm.m",
       representation: "full",
     }));
     return [...mapped, ...extraLayers];
@@ -182,12 +183,10 @@ export function VisualizationStudio() {
         }
         const companion = companionAsciiPath(active.path);
         if (companion && companion !== active.path) {
-          return window.gaidDesktop
-            ?.readWorkspaceFile(workspaceRoot, companion)
-            .then((ascii) => {
-              if (cancelled) return;
-              setFileContent(active.path, ascii?.text || "");
-            });
+          return window.gaidDesktop?.readWorkspaceFile(workspaceRoot, companion).then((ascii) => {
+            if (cancelled) return;
+            setFileContent(active.path, ascii?.text || "");
+          });
         }
         setFileContent(active.path, "");
       })
@@ -196,6 +195,25 @@ export function VisualizationStudio() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, workspaceRoot, fileContents, setFileContent]);
+
+  useEffect(() => {
+    if (!active || !workspaceRoot || !window.gaidDesktop?.readWorkspaceFile) return;
+    if (!/\.asc$/i.test(active.path)) return;
+    const metaPath = active.path.replace(/\.asc$/i, ".meta.json");
+    if (fileContents[metaPath] !== undefined) return;
+    let cancelled = false;
+    void window.gaidDesktop
+      .readWorkspaceFile(workspaceRoot, metaPath)
+      .then((result) => {
+        if (!cancelled) setFileContent(metaPath, result?.text || "");
+      })
+      .catch(() => {
+        if (!cancelled) setFileContent(metaPath, "");
       });
     return () => {
       cancelled = true;
@@ -289,20 +307,6 @@ export function VisualizationStudio() {
     active?.formatId === "geojson"
       ? "GeoJSON is drawn as vector overlay on a placeholder extent grid, not as elevation or a DEM."
       : "";
-  const warnings = [
-    overlayDecisionResult && !overlayDecisionResult.allowed ? overlayDecisionResult.message : "",
-    active?.reason && active.displayStatus !== "viewable" ? active.reason : "",
-    raster?.previewNote,
-    vector?.data.previewNote,
-    geojsonExtentNote,
-    raster?.preview || vector?.data.preview ? "This view is a preview/overview — not the full dataset." : "",
-    ...(active ? gravityProductWarnings({ path: active.path }) : []),
-    ...(active ? radioProductWarnings({ path: active.path }) : []),
-    ...(active?.warnings || []),
-    "A visual overlay does not prove geological, mineral, or geophysical causation.",
-  ].filter(Boolean);
-
-  const units = mapValueUnits(active?.path || "", active?.formatId, active?.units);
 
   const section = useMemo(() => {
     if (!active || !text || !isErtSectionPath(active.path)) return null;
@@ -317,6 +321,37 @@ export function VisualizationStudio() {
       return null;
     }
   }, [active, text]);
+
+  const sidecar = useMemo(() => {
+    if (!active || !/\.asc$/i.test(active.path)) return {};
+    const metaPath = active.path.replace(/\.asc$/i, ".meta.json");
+    const sidecarText = fileContents[metaPath];
+    return sidecarText ? parseGridSidecarMeta(sidecarText) : {};
+  }, [active, fileContents]);
+
+  const quantity = raster?.quantity || sidecar.quantity || ternary?.quantity || "";
+  const recordedUnits = raster?.units || sidecar.units || ternary?.units || active?.units;
+  const units = mapValueUnits(active?.path || "", active?.formatId, recordedUnits);
+
+  const warnings = [
+    overlayDecisionResult && !overlayDecisionResult.allowed ? overlayDecisionResult.message : "",
+    active?.reason && active.displayStatus !== "viewable" ? active.reason : "",
+    raster?.previewNote,
+    vector?.data.previewNote,
+    geojsonExtentNote,
+    raster?.preview || vector?.data.preview ? "This view is a preview/overview — not the full dataset." : "",
+    ...(active ? gravityProductWarnings({ path: active.path }) : []),
+    ...(active
+      ? radioProductWarnings({
+          path: active.path,
+          formatId: active.formatId,
+          quantity,
+          units,
+        })
+      : []),
+    ...(active?.warnings || []),
+    "A visual overlay does not prove geological, mineral, or geophysical causation.",
+  ].filter(Boolean);
 
   function moveLayer(id: string, dir: -1 | 1) {
     setLayerOrder((current) => {

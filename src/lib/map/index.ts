@@ -13,7 +13,8 @@ export type {
 export { PREVIEW_POLICY, previewNote } from "./preview.ts";
 export { crsFromEpsg, crsFromGeojson, crsFromPrj, overlayDecision, parseEpsg } from "./crs.ts";
 export { encodeGaidGeoTiff, parseGaidGeoTiff, companionAsciiPath } from "./geotiff.ts";
-export { inspectRaster, parseEsriAscii } from "./ascii.ts";
+export { inspectRaster, parseAsciiCommentMeta, parseEsriAscii, parseGridSidecarMeta } from "./ascii.ts";
+export type { AsciiCommentMeta } from "./ascii.ts";
 export { linesFromVector, parseGeojson, pointsFromVector } from "./geojson.ts";
 export {
   displayAdapterFor,
@@ -26,7 +27,9 @@ export {
   buildMapLayers,
   layerSpecFromArtifact,
   layerSpecFromCatalogRecord,
+  isRadiometricMapPath,
   mapValueUnits,
+  unitsUnknown,
   runArtifactsFromPaths,
   runIdFromPath,
   selectLayerById,

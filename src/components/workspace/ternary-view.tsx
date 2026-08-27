@@ -11,7 +11,7 @@ export function TernaryView({ ternary }: { ternary: RadioTernaryGrid }) {
     <div className="h-full flex flex-col bg-[#1e1e1e] text-[#cccccc] p-4 gap-3 overflow-auto">
       <header>
         <p className="text-[10px] uppercase tracking-wide text-[#858585]">Radiometric workspace</p>
-        <h2 className="text-sm font-medium">K-eTh-eU ternary (not lithology)</h2>
+        <h2 className="text-sm font-medium" data-testid="ternary-heading">K-eTh-eU ternary (not lithology)</h2>
         <p className="text-[11px] text-[#9d9d9d] mt-1">
           R={ternary.assignment.R}, G={ternary.assignment.G}, B={ternary.assignment.B}. Stretch: {ternary.p_lo}–{ternary.p_hi} percentile. Source: {ternary.source}.
         </p>

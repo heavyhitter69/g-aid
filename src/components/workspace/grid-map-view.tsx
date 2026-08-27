@@ -486,7 +486,7 @@ export function GridMapView({
       <div className="h-[45px] border-b border-[#2b2b2b] shrink-0 flex items-center justify-between px-3 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <MapIcon className="h-4 w-4 text-[#4ec9b0] shrink-0" />
-          <span className="text-[#cccccc] text-[13px] font-medium truncate">{title}</span>
+          <span className="text-[#cccccc] text-[13px] font-medium truncate" data-testid="map-title">{title}</span>
           {crsLabel ? <span className="text-[10px] text-[#858585] font-mono truncate">{crsLabel}</span> : null}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-[#cccccc] shrink-0">
@@ -533,7 +533,7 @@ export function GridMapView({
         </div>
       </div>
       {warnings?.length ? (
-        <div className="px-3 py-1.5 bg-[#3a2a12] text-[#f0c674] text-[11px] leading-snug border-b border-[#2b2b2b]">
+        <div className="px-3 py-1.5 bg-[#3a2a12] text-[#f0c674] text-[11px] leading-snug border-b border-[#2b2b2b]" data-testid="map-warnings">
           {warnings.join(" ")}
         </div>
       ) : null}
@@ -595,7 +595,7 @@ export function GridMapView({
         <canvas ref={viewRef} className="absolute inset-0 w-full h-full" />
       </div>
       <div className="px-4 py-1.5 border-t border-[#2b2b2b] text-[11px] text-[#858585] font-mono flex justify-between gap-3">
-        <span>
+        <span data-testid="colorbar-units">
           {lo.toFixed(2)} – {hi.toFixed(2)} {units}
         </span>
         <span className="truncate">{cursor || "Scroll to zoom · drag to pan · double-click to fit · Shift-click two points for a profile"}</span>

@@ -1,0 +1,8 @@
+{
+  "skipped": true,
+  "reason": "Concentration ratios need documented %K / ppm eU / ppm eTh units. Unknown units block ratios.",
+  "quantity": "concentration",
+  "units_k": "unknown",
+  "units_eu": "unknown",
+  "units_eth": "unknown"
+}

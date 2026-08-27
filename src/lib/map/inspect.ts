@@ -29,7 +29,7 @@ export function sampleProfile(
   return {
     samples,
     interpolation: "nearest-neighbour",
-    units: source.units || grid.units || "unknown",
+    units: source.units && source.units.trim().toLowerCase() !== "unknown" ? source.units : grid.units || source.units || "unknown",
     crs: source.crs,
     sourceId: source.id,
     sourcePath: source.path,

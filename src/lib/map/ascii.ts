@@ -1,14 +1,63 @@
 import type { RasterGrid } from "./types.ts";
 import { PREVIEW_POLICY, previewNote } from "./preview.ts";
 
+export interface AsciiCommentMeta {
+  units?: string;
+  quantity?: string;
+  channel?: string;
+}
+
+function isCommentLine(raw: string): boolean {
+  return raw.startsWith("/") || raw.startsWith("#") || raw.startsWith(";") || raw.startsWith("\\");
+}
+
+export function parseAsciiCommentMeta(text: string): AsciiCommentMeta {
+  const out: AsciiCommentMeta = {};
+  for (const line of text.split(/\r?\n/)) {
+    const raw = line.trim();
+    if (!raw || !isCommentLine(raw)) continue;
+    const body = raw.replace(/^[\\/#;]+\s*/, "");
+    const match = body.match(/^(Units|Quantity|Channel)\s*[=:]\s*(.+)$/i);
+    if (!match) continue;
+    const key = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (key === "units") out.units = value;
+    else if (key === "quantity") out.quantity = value;
+    else if (key === "channel") out.channel = value;
+  }
+  return out;
+}
+
+export function parseGridSidecarMeta(text: string): AsciiCommentMeta {
+  try {
+    const raw = JSON.parse(text) as Record<string, unknown>;
+    const units = typeof raw.units === "string" ? raw.units : undefined;
+    const quantity = typeof raw.quantity === "string" ? raw.quantity : undefined;
+    const channel = typeof raw.channel === "string" ? raw.channel : undefined;
+    return { units, quantity, channel };
+  } catch {
+    return {};
+  }
+}
+
 export function parseEsriAscii(text: string, options?: { byteLength?: number }): RasterGrid | null {
   if (options?.byteLength && options.byteLength > PREVIEW_POLICY.maxAsciiBytes) {
     return null;
   }
   const lines = text.split(/\r?\n/);
+  const comments = parseAsciiCommentMeta(text);
   const meta: Record<string, number> = {};
   let i = 0;
-  while (i < lines.length && i < 12) {
+  while (i < lines.length) {
+    const raw = lines[i].trim();
+    if (!raw || isCommentLine(raw)) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  let headerCount = 0;
+  while (i < lines.length && headerCount < 12) {
     const parts = lines[i].trim().split(/\s+/);
     if (parts.length < 2) break;
     const key = parts[0].toLowerCase();
@@ -17,6 +66,7 @@ export function parseEsriAscii(text: string, options?: { byteLength?: number }):
     }
     meta[key] = parseFloat(parts[1]);
     i += 1;
+    headerCount += 1;
   }
   const ncols = meta.ncols;
   const nrows = meta.nrows;
@@ -54,6 +104,12 @@ export function parseEsriAscii(text: string, options?: { byteLength?: number }):
   const cell = meta.cellsize ?? 1;
   const xll = meta.xllcorner ?? meta.xllcenter ?? 0;
   const yll = meta.yllcorner ?? meta.yllcenter ?? 0;
+  const shared = {
+    nodata: meta.nodata_value ?? -9999,
+    units: comments.units,
+    quantity: comments.quantity,
+    channel: comments.channel,
+  };
   if (step === 1) {
     return {
       ncols,
@@ -61,8 +117,8 @@ export function parseEsriAscii(text: string, options?: { byteLength?: number }):
       xllcorner: xll,
       yllcorner: yll,
       cellsize: cell,
-      nodata: meta.nodata_value ?? -9999,
       values,
+      ...shared,
     };
   }
   return {
@@ -71,10 +127,10 @@ export function parseEsriAscii(text: string, options?: { byteLength?: number }):
     xllcorner: xll,
     yllcorner: yll,
     cellsize: cell * step,
-    nodata: meta.nodata_value ?? -9999,
     values,
     preview: true,
     previewNote: previewNote("subsampled-grid"),
+    ...shared,
   };
 }
 

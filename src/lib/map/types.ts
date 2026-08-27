@@ -44,6 +44,8 @@ export interface RasterGrid {
   nodata: number;
   values: Float64Array;
   units?: string;
+  quantity?: string;
+  channel?: string;
   preview?: boolean;
   previewNote?: string;
 }

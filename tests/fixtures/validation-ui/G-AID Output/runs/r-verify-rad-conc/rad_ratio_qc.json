@@ -1,0 +1,17 @@
+{
+  "formula": "eU/eTh (ppm/ppm); eU/K (ppm/%); eTh/K (ppm/%). Denominator clipped at eps.",
+  "skipped": false,
+  "n": 16,
+  "quantity": "concentration",
+  "units_k": "%K",
+  "units_eu": "ppm eU",
+  "units_eth": "ppm eTh",
+  "units_eu_eth": "ppm eU / ppm eTh",
+  "units_eu_k": "ppm eU / %K",
+  "units_eth_k": "ppm eTh / %K",
+  "not_lithology": true,
+  "not_alteration": true,
+  "n_eth_clipped": 0,
+  "n_k_clipped_eu": 0,
+  "n_k_clipped_eth": 0
+}

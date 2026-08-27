@@ -98,6 +98,89 @@ def test_parse_valid_concentration_contract():
     assert qc["crs_epsg"] == 32630
     assert qc["corrections_applied_in_g_aid"] is False
     assert "k" in df.columns and "eu" in df.columns and "eth" in df.columns
+    assert df["units_k"].iloc[0] == "%K"
+    assert df["units_eu"].iloc[0] == "ppm eU"
+    assert qc["units_unknown"] is False
+
+
+def test_missing_units_stored_unknown_not_invented(tmp_path):
+    src = tmp_path / "stations.csv"
+    src.write_text(
+        "\n".join(
+            [
+                "/ EPSG=32630",
+                "/ Quantity=concentration",
+                "/ CorrectionHistory=contractor height and stripping",
+                "/ Platform=airborne",
+                "X,Y,Line,K,eU,eTh,TC",
+                "450000,1200000,L1,1.5,1.2,8.0,40.0",
+                "450200,1200000,L1,1.7,1.5,8.4,42.0",
+                "450400,1200000,L1,1.9,1.8,8.8,44.0",
+                "450600,1200000,L1,2.1,2.1,9.2,46.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    df, qc = parse_radiometric_table(str(src))
+    assert df["units_k"].iloc[0] == "unknown"
+    assert df["units_eu"].iloc[0] == "unknown"
+    assert qc["units_unknown"] is True
+    assert qc["channels"]["k"] == "unknown"
+
+
+def test_unknown_units_block_ternary_and_ratios(tmp_path):
+    from kernels.radiometrics import rad_grid, rad_ingest, rad_interpret, rad_ratios, rad_ternary
+
+    src = tmp_path / "stations.csv"
+    src.write_text(
+        "\n".join(
+            [
+                "/ EPSG=32630",
+                "/ Quantity=concentration",
+                "/ CorrectionHistory=contractor height and stripping",
+                "/ Platform=airborne",
+                "X,Y,Line,K,eU,eTh,TC",
+                "450000,1200000,L1,1.5,1.2,8.0,40.0",
+                "450200,1200000,L1,1.7,1.5,8.4,42.0",
+                "450400,1200200,L2,1.9,1.8,8.8,44.0",
+                "450600,1200200,L2,2.1,2.1,9.2,46.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "G-AID Output" / "runs" / "r-unknown"
+    out.mkdir(parents=True)
+    payload = {
+        "parameters": {
+            "outDir": str(tmp_path / "G-AID Output" / "runs"),
+            "taskFolder": "r-unknown",
+            "cellSizeM": 200,
+            "catalogInputs": [
+                {
+                    "catalogId": "u1",
+                    "path": str(src),
+                    "adapterId": "radiometric-csv",
+                    "absPath": str(src),
+                }
+            ],
+        }
+    }
+    rad_ingest(payload)
+    rad_grid(payload)
+    rad_ternary(payload)
+    rad_ratios(payload)
+    rad_interpret(payload)
+    qc_t = json.loads((out / "rad_ternary_qc.json").read_text(encoding="utf-8"))
+    qc_r = json.loads((out / "rad_ratio_qc.json").read_text(encoding="utf-8"))
+    meta = json.loads((out / "rad_k_grid.meta.json").read_text(encoding="utf-8"))
+    interp = json.loads((out / "rad_interpretation.json").read_text(encoding="utf-8"))
+    assert qc_t["skipped"] is True
+    assert qc_r["skipped"] is True
+    assert meta["units"] == "unknown"
+    assert meta["quantity"] == "concentration"
+    assert interp["interpretation_blocked"] is True
 
 
 def test_write_benchmark_record():

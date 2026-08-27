@@ -23,9 +23,10 @@ import {
   verifyBoundInputIdentity,
 } from "./capabilities/index.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
-import { buildMapLayers, mapValueUnits, selectLayerByPath } from "./map/index.ts";
+import { buildMapLayers, mapValueUnits, parseEsriAscii, parseGridSidecarMeta, selectLayerByPath } from "./map/index.ts";
 import { layerLabel } from "./raster-layers.ts";
 import { isRadioTernaryPath, parseRadioTernaryJson } from "./radio/ternary.ts";
+import { radioProductWarnings } from "./radio-product.ts";
 import type { CatalogRecord } from "./catalog/types.ts";
 
 const fixtureSrc = path.join(process.cwd(), "tests/fixtures/radio-project");
@@ -262,7 +263,7 @@ test("versioned run layout binds catalog ids for radiometrics", () => {
   }
 });
 
-test("radiometric ASCII grids open as map layers with channel units, not nT", () => {
+test("radiometric ASCII grids open as map layers with catalog/artifact units, never filename %K/cps", () => {
   const root = tmpCopy();
   try {
     const runId = "r-rad-map";
@@ -270,7 +271,23 @@ test("radiometric ASCII grids open as map layers with channel units, not nT", ()
     fs.mkdirSync(runDir, { recursive: true });
     fs.writeFileSync(
       path.join(runDir, "rad_k_grid.asc"),
-      ["ncols 3", "nrows 2", "xllcorner 450000", "yllcorner 1200000", "cellsize 200", "NODATA_value -9999", "1 2 3", "4 5 6"].join("\n")
+      [
+        "/ Units=%K",
+        "/ Quantity=concentration",
+        "/ Channel=k",
+        "ncols 3",
+        "nrows 2",
+        "xllcorner 450000",
+        "yllcorner 1200000",
+        "cellsize 200",
+        "NODATA_value -9999",
+        "1 2 3",
+        "4 5 6",
+      ].join("\n")
+    );
+    fs.writeFileSync(
+      path.join(runDir, "rad_k_grid.meta.json"),
+      JSON.stringify({ name: "k", units: "%K", quantity: "concentration", channel: "k", crs_epsg: 32630 })
     );
     fs.writeFileSync(path.join(runDir, "plan.json"), JSON.stringify({ runId, intent: "radiometrics", planHash: "rad-hash", status: "complete" }));
     const catalog = buildProjectCatalog(root);
@@ -281,11 +298,21 @@ test("radiometric ASCII grids open as map layers with channel units, not nT", ()
     const grid = selectLayerByPath(layers, `G-AID Output/runs/${runId}/rad_k_grid.asc`);
     assert.ok(grid);
     assert.equal(grid.displayStatus, "viewable");
-    assert.equal(grid.units, "%K");
-    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_eu_grid.asc"), "ppm eU");
-    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_eth_grid.asc"), "ppm eTh");
-    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_tc_grid.asc"), "nGy/h");
+    assert.equal(grid.units, "unknown");
+    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_k_grid.asc"), "unknown");
+    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_eu_grid.asc"), "unknown");
+    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_eth_grid.asc"), "unknown");
+    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_tc_grid.asc"), "unknown");
     assert.notEqual(mapValueUnits("G-AID Output/runs/r1/rad_k_grid.asc"), "nT");
+    assert.notEqual(mapValueUnits("G-AID Output/runs/r1/rad_k_grid.asc"), "%K");
+    assert.equal(mapValueUnits("G-AID Output/runs/r1/rad_k_grid.asc", "esri-ascii-grid", "%K"), "%K");
+    const parsed = parseEsriAscii(fs.readFileSync(path.join(runDir, "rad_k_grid.asc"), "utf8"));
+    assert.ok(parsed);
+    assert.equal(parsed.units, "%K");
+    assert.equal(parsed.quantity, "concentration");
+    const sidecar = parseGridSidecarMeta(fs.readFileSync(path.join(runDir, "rad_k_grid.meta.json"), "utf8"));
+    assert.equal(sidecar.units, "%K");
+    assert.equal(layerLabel("rad_k_grid.asc"), "K channel");
     assert.match(layerLabel("rad_ternary.json"), /ternary/i);
     assert.equal(isRadioTernaryPath("G-AID Output/runs/r1/rad_ternary.json"), true);
     const ternary = parseRadioTernaryJson(
@@ -298,9 +325,19 @@ test("radiometric ASCII grids open as map layers with channel units, not nT", ()
         formula: "stretch",
         p_lo: 2,
         p_hi: 98,
+        quantity: "concentration",
+        channel_units: { k: "%K", eu: "ppm eU", eth: "ppm eTh" },
+        units: "dimensionless 0–1 stretch",
       })
     );
     assert.equal(ternary.assignment.R, "K %");
+    assert.equal(ternary.quantity, "concentration");
+    const blocked = radioProductWarnings({
+      path: "G-AID Output/runs/r1/rad_k_grid.asc",
+      units: "unknown",
+      quantity: "unknown",
+    });
+    assert.ok(blocked.some((line) => /unknown/i.test(line)));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -389,6 +426,8 @@ test("end-to-end radiometric ingest through the Python runtime when science deps
     const ingestQc = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "rad_ingest_qc.json"), "utf8"));
     assert.equal(ingestQc.quantity, "concentration");
     assert.equal(ingestQc.corrections_applied_in_g_aid, false);
+    assert.equal(ingestQc.units_k, "%K");
+    assert.equal(ingestQc.units_unknown, false);
 
     const rest = spawnSync(
       "python3",
@@ -426,6 +465,22 @@ test("end-to-end radiometric ingest through the Python runtime when science deps
     assert.ok(report.not_established.some((line: string) => /drill/i.test(line)));
     assert.equal(report.corrections_applied_in_g_aid, false);
     assert.equal(report.affirmative_language_allowed, false);
+    assert.equal(report.interpretation_blocked, false);
+    const gridQc = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "rad_grid_qc.json"), "utf8"));
+    assert.equal(gridQc.units.k, "%K");
+    assert.equal(gridQc.units.eu, "ppm eU");
+    const meta = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "rad_k_grid.meta.json"), "utf8"));
+    assert.equal(meta.units, "%K");
+    assert.equal(meta.quantity, "concentration");
+    const stations = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "rad_stations.geojson"), "utf8"));
+    assert.equal(stations.quantity, "concentration");
+    assert.equal(stations.units.k, "%K");
+    assert.notEqual(stations.features[0].properties.units, "concentration");
+    const ternaryJson = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "rad_ternary.json"), "utf8"));
+    assert.equal(ternaryJson.quantity, "concentration");
+    assert.equal(ternaryJson.channel_units.k, "%K");
+    const ratioQc = JSON.parse(fs.readFileSync(path.join(outDir, taskFolder, "rad_ratio_qc.json"), "utf8"));
+    assert.equal(ratioQc.units_eu_k, "ppm eU / %K");
 
     const refuse = spawnSync(
       "python3",
@@ -489,9 +544,94 @@ test("end-to-end radiometric ingest through the Python runtime when science deps
     assert.equal(crTernary.skipped, true);
     const crRatio = JSON.parse(fs.readFileSync(path.join(outDir, crFolder, "rad_ratio_qc.json"), "utf8"));
     assert.equal(crRatio.skipped, true);
+
+    const unknownFolder = "r-e2e-rad-unknown";
+    fs.mkdirSync(path.join(outDir, unknownFolder), { recursive: true });
+    const header = fs.readFileSync(path.join(root, "valid/stations.csv"), "utf8");
+    const stripped = header
+      .split("\n")
+      .filter((line) => !/^\/\s*Units(K|U|Th|TC)?=/i.test(line))
+      .join("\n");
+    const unknownSrc = path.join(root, "unknown-units.csv");
+    fs.writeFileSync(unknownSrc, stripped);
+    const unknownPayload = {
+      parameters: {
+        baseDir: root,
+        outDir,
+        taskFolder: unknownFolder,
+        catalogInputs: [
+          {
+            catalogId: "synthetic-unknown",
+            path: "unknown-units.csv",
+            adapterId: "radiometric-csv",
+            absPath: unknownSrc,
+          },
+        ],
+      },
+    };
+    const unknownRun = spawnSync(
+      "python3",
+      [
+        "-c",
+        [
+          "import json, os, sys",
+          "root = os.getcwd()",
+          "sys.path.insert(0, os.path.join(root, 'python'))",
+          "from kernels import dispatch",
+          "payload = json.loads(sys.argv[1])",
+          "dispatch('rad_ingest', payload)",
+          "dispatch('rad_grid', payload)",
+          "dispatch('rad_ternary', payload)",
+          "dispatch('rad_ratios', payload)",
+          "dispatch('rad_interpret', payload)",
+          "print('ok')",
+        ].join("\n"),
+        JSON.stringify(unknownPayload),
+      ],
+      { encoding: "utf8", cwd: process.cwd() }
+    );
+    assert.equal(unknownRun.status, 0, unknownRun.stderr || unknownRun.stdout);
+    const unknownIngest = JSON.parse(fs.readFileSync(path.join(outDir, unknownFolder, "rad_ingest_qc.json"), "utf8"));
+    assert.equal(unknownIngest.units_k, "unknown");
+    assert.equal(unknownIngest.units_unknown, true);
+    const unknownGrid = JSON.parse(fs.readFileSync(path.join(outDir, unknownFolder, "rad_k_grid.meta.json"), "utf8"));
+    assert.equal(unknownGrid.units, "unknown");
+    const unknownTernary = JSON.parse(fs.readFileSync(path.join(outDir, unknownFolder, "rad_ternary_qc.json"), "utf8"));
+    assert.equal(unknownTernary.skipped, true);
+    const unknownRatio = JSON.parse(fs.readFileSync(path.join(outDir, unknownFolder, "rad_ratio_qc.json"), "utf8"));
+    assert.equal(unknownRatio.skipped, true);
+    const unknownReport = JSON.parse(fs.readFileSync(path.join(outDir, unknownFolder, "rad_interpretation.json"), "utf8"));
+    assert.equal(unknownReport.interpretation_blocked, true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("validation-ui radiometric fixtures keep metadata units and skip ternary on count-rate/unknown", () => {
+  const root = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs");
+  const concMeta = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-conc", "rad_k_grid.meta.json"), "utf8"));
+  assert.equal(concMeta.units, "%K");
+  assert.equal(concMeta.quantity, "concentration");
+  const concGrid = parseEsriAscii(fs.readFileSync(path.join(root, "r-verify-rad-conc", "rad_k_grid.asc"), "utf8"));
+  assert.ok(concGrid && concGrid.ncols > 0);
+  const ternary = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-conc", "rad_ternary.json"), "utf8"));
+  assert.equal(ternary.quantity, "concentration");
+  assert.equal(ternary.channel_units.k, "%K");
+  const cpsTernary = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-cps", "rad_ternary_qc.json"), "utf8"));
+  const cpsRatio = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-cps", "rad_ratio_qc.json"), "utf8"));
+  assert.equal(cpsTernary.skipped, true);
+  assert.equal(cpsRatio.skipped, true);
+  const unknownMeta = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-unknown", "rad_k_grid.meta.json"), "utf8"));
+  assert.equal(unknownMeta.units, "unknown");
+  const unknownInterp = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-unknown", "rad_interpretation.json"), "utf8"));
+  assert.equal(unknownInterp.interpretation_blocked, true);
+  const concPlan = JSON.parse(fs.readFileSync(path.join(root, "r-verify-rad-conc", "plan.json"), "utf8"));
+  assert.equal(concPlan.runId, "r-verify-rad-conc");
+  assert.equal(concPlan.parentRunId, "r-verify-rad-parent");
+  assert.ok(concPlan.planHash);
+  assert.equal(layerLabel("rad_k_grid.asc"), "K channel");
+  assert.equal(mapValueUnits("G-AID Output/runs/r-verify-rad-conc/rad_k_grid.asc"), "unknown");
+  assert.equal(mapValueUnits("G-AID Output/runs/r-verify-rad-conc/rad_k_grid.asc", "esri-ascii-grid", concMeta.units), "%K");
 });
 
 if (failed) {

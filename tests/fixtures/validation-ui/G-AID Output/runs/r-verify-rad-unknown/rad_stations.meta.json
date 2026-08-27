@@ -1,0 +1,12 @@
+{
+  "quantity": "concentration",
+  "units": {
+    "k": "unknown",
+    "eu": "unknown",
+    "eth": "unknown",
+    "tc": "unknown"
+  },
+  "value_channel": "tc",
+  "value_units": "unknown",
+  "crs_epsg": 32630
+}

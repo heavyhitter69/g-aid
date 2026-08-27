@@ -1,0 +1,47 @@
+{
+  "node_id": "rad_ingest",
+  "formula": "G-AID RAD 1.0 ingest",
+  "parameters": {
+    "files": [
+      {
+        "path": "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-unknown-src.csv",
+        "n": 16,
+        "n_lines": 4,
+        "quantity": "concentration",
+        "crs_epsg": 32630,
+        "channels": {
+          "k": "unknown",
+          "eu": "unknown",
+          "eth": "unknown",
+          "tc": "unknown"
+        },
+        "units_unknown": true,
+        "correction_history": "contractor height, stripping, NASVD; delivered as equivalent concentrations",
+        "platform": "airborne",
+        "instrument": "RSX-5",
+        "acquisition_date": "2024-06-12",
+        "mapping": {
+          "x": "X",
+          "y": "Y",
+          "line": "Line",
+          "k": "K",
+          "eu": "eU",
+          "eth": "eTh",
+          "tc": "TC"
+        },
+        "assumptions": "None. CRS, quantity, units, and correction history came from the RAD 1.0 contract or a reviewed mapping.",
+        "not_raw_spectrum": true,
+        "corrections_applied_in_g_aid": false,
+        "catalogId": "cat-r-verify-rad-unknown"
+      }
+    ]
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-unknown-src.csv"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-unknown/rad_canonical.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-rad-unknown/rad_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T12:37:29.384441Z"
+}

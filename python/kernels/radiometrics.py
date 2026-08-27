@@ -11,6 +11,35 @@ import pandas as pd
 from science.artifacts import make_artifact, task_dir, write_json, write_lineage
 
 
+def _cell_str(frame, column: str, default: str = "unknown") -> str:
+    if column not in frame.columns or frame.empty:
+        return default
+    value = str(frame[column].iloc[0]).strip()
+    if not value or value.lower() in {"nan", "none", "null", "n/a"}:
+        return default
+    return value
+
+
+def _units_known(units: str) -> bool:
+    return bool(units) and units.strip().lower() not in {"", "unknown", "nan", "none", "n/a", "null"}
+
+
+def _channel_units(frame, col: str) -> str:
+    return _cell_str(frame, f"units_{col}")
+
+
+def _concentration_units_ok(units_k: str, units_eu: str, units_eth: str) -> bool:
+    if not (_units_known(units_k) and _units_known(units_eu) and _units_known(units_eth)):
+        return False
+    k = units_k.lower()
+    eu = units_eu.lower()
+    eth = units_eth.lower()
+    k_ok = "%" in k or "percent" in k
+    eu_ok = "ppm" in eu
+    eth_ok = "ppm" in eth
+    return k_ok and eu_ok and eth_ok
+
+
 def _params(payload: dict) -> dict:
     return payload.get("parameters") or {}
 
@@ -85,17 +114,31 @@ def rad_ingest(payload: dict) -> dict:
     lqc = line_qc(combined["line"].to_numpy(), combined["x"].to_numpy(), combined["y"].to_numpy())
     path = os.path.join(out, "rad_canonical.csv")
     combined.to_csv(path, index=False)
+    quantity = _cell_str(combined, "quantity")
+    units_k = _channel_units(combined, "k")
+    units_eu = _channel_units(combined, "eu")
+    units_eth = _channel_units(combined, "eth")
+    units_tc = _channel_units(combined, "tc")
     qc_path = write_json(
         os.path.join(out, "rad_ingest_qc.json"),
         {
             "files": qc_files,
             "n": int(len(combined)),
             "line_qc": lqc,
-            "quantity": combined["quantity"].iloc[0],
+            "quantity": quantity,
+            "units_k": units_k,
+            "units_eu": units_eu,
+            "units_eth": units_eth,
+            "units_tc": units_tc,
+            "units_unknown": any(
+                not _units_known(u)
+                for col, u in (("k", units_k), ("eu", units_eu), ("eth", units_eth), ("tc", units_tc))
+                if col in combined.columns
+            ),
             "channels": [c for c in ("k", "eu", "eth", "tc") if c in combined.columns],
             "corrections_applied_in_g_aid": False,
             "not_raw_spectrum": True,
-            "assumptions": "None. Already-corrected values as supplied. G-AID did not height-correct, strip, or convert concentrations.",
+            "assumptions": "None. Already-corrected values as supplied. G-AID did not height-correct, strip, or convert concentrations. Units came from the catalog contract, not from filenames.",
         },
     )
     write_lineage(out, node_id, "G-AID RAD 1.0 ingest", {"files": qc_files}, [f["path"] for f in qc_files], [path, qc_path])
@@ -108,7 +151,7 @@ def rad_ingest(payload: dict) -> dict:
     }
 
 
-def _grid_channel(df: pd.DataFrame, col: str, units: str, out: str, params: dict, node_id: str, src: str) -> list[dict]:
+def _grid_channel(df: pd.DataFrame, col: str, units: str, quantity: str, out: str, params: dict, node_id: str, src: str) -> list[dict]:
     from science.crs import CRS
     from science.gis import export_grid_bundle
     from science.grid import minimum_curvature
@@ -122,13 +165,26 @@ def _grid_channel(df: pd.DataFrame, col: str, units: str, out: str, params: dict
         dx=float(dx) if dx else None,
         tension=float(params.get("gridTension") or 0.25),
         crs_epsg=epsg,
-        units=units,
+        units=units or "unknown",
         name=col,
     )
+    grid.metadata["quantity"] = quantity
+    grid.metadata["channel"] = col
     crs = CRS(epsg, f"EPSG:{epsg}", "projected" if epsg != 4326 else "geographic")
     stem = f"rad_{col}_grid"
     paths = export_grid_bundle(grid, out, stem, crs)
-    np.savez(os.path.join(out, f"{stem}.npz"), values=grid.masked(), x0=grid.x0, y0=grid.y0, dx=grid.dx, dy=grid.dy, crs=epsg)
+    np.savez(
+        os.path.join(out, f"{stem}.npz"),
+        values=grid.masked(),
+        x0=grid.x0,
+        y0=grid.y0,
+        dx=grid.dx,
+        dy=grid.dy,
+        crs=epsg,
+        units=np.array(units or "unknown"),
+        quantity=np.array(quantity or "unknown"),
+        channel=np.array(col),
+    )
     artifacts = [make_artifact(f"artifact-rad-grid-{col}-{ext}", "grid", ext, p, node_id, [src]) for ext, p in paths.items()]
     return artifacts
 
@@ -139,28 +195,25 @@ def rad_grid(payload: dict) -> dict:
     params = _params(payload)
     src = _find(out, "rad_canonical.csv")
     df = pd.read_csv(src)
-    quantity = str(df["quantity"].iloc[0])
-    unit_map = {
-        "k": "%K" if quantity == "concentration" else "cps",
-        "eu": "ppm eU" if quantity == "concentration" else "cps",
-        "eth": "ppm eTh" if quantity == "concentration" else "cps",
-        "tc": "nGy/h" if quantity == "concentration" else "cps",
-    }
+    quantity = _cell_str(df, "quantity")
+    units = {col: _channel_units(df, col) for col in ("k", "eu", "eth", "tc") if col in df.columns}
     artifacts = []
     gridded = []
     for col in ("k", "eu", "eth", "tc"):
         if col not in df.columns:
             continue
-        artifacts.extend(_grid_channel(df, col, unit_map[col], out, params, node_id, src))
+        artifacts.extend(_grid_channel(df, col, units[col], quantity, out, params, node_id, src))
         gridded.append(col)
     if not gridded:
         raise ValueError("No radiometric channels to grid.")
     qc = {
         "channels": gridded,
         "quantity": quantity,
-        "units": {c: unit_map[c] for c in gridded},
+        "units": {c: units[c] for c in gridded},
+        "units_unknown": any(not _units_known(units[c]) for c in gridded),
         "interpolation": "Thin-plate spline = 2-D minimum curvature (Duchon 1977 / Briggs 1974)",
         "not_a_geological_map": True,
+        "units_source": "catalog record / versioned artifact metadata, not filename",
     }
     qc_path = write_json(os.path.join(out, "rad_grid_qc.json"), qc)
     write_lineage(out, node_id, qc["interpolation"], qc, [src], [qc_path])
@@ -177,21 +230,35 @@ def rad_ternary(payload: dict) -> dict:
     out = _out(payload)
     src = _find(out, "rad_canonical.csv")
     df = pd.read_csv(src)
-    quantity = str(df["quantity"].iloc[0])
+    quantity = _cell_str(df, "quantity")
+    units_k = _channel_units(df, "k")
+    units_eu = _channel_units(df, "eu")
+    units_eth = _channel_units(df, "eth")
     missing = [c for c in ("k", "eu", "eth") if c not in df.columns]
+    units_ok = _concentration_units_ok(units_k, units_eu, units_eth)
     qc = {
-        "justified": quantity == "concentration" and not missing,
+        "justified": quantity == "concentration" and not missing and units_ok,
         "quantity": quantity,
+        "units_k": units_k,
+        "units_eu": units_eu,
+        "units_eth": units_eth,
         "assignment": {"R": "K %", "G": "eTh ppm", "B": "eU ppm"},
         "skipped": False,
         "not_mineralisation": True,
         "not_lithology": True,
     }
-    if quantity != "concentration" or missing:
+    if quantity != "concentration" or missing or not units_ok:
         qc["skipped"] = True
-        qc["reason"] = (
-            f"Ternary needs concentration K, eU, and eTh. quantity={quantity}, missing={missing}."
-        )
+        qc["justified"] = False
+        if quantity != "concentration":
+            qc["reason"] = f"Ternary needs Quantity=concentration. quantity={quantity}."
+        elif missing:
+            qc["reason"] = f"Ternary needs concentration K, eU, and eTh. missing={missing}."
+        else:
+            qc["reason"] = (
+                "Ternary needs documented concentration units (%K, ppm eU, ppm eTh). "
+                f"units_k={units_k}, units_eu={units_eu}, units_eth={units_eth}."
+            )
         qc_path = write_json(os.path.join(out, "rad_ternary_qc.json"), qc)
         return {
             "artifacts": [make_artifact("artifact-rad-ternary-qc", "qc_report", "json", qc_path, node_id, [src])],
@@ -229,6 +296,8 @@ def rad_ternary(payload: dict) -> dict:
         "p_hi": rgb["p_hi"],
         "assignment": rgb["assignment"],
         "formula": rgb["formula"],
+        "quantity": quantity,
+        "channel_units": {"k": units_k, "eu": units_eu, "eth": units_eth},
         "units": "dimensionless 0–1 stretch",
         "not_mineralisation": True,
     }
@@ -252,12 +321,23 @@ def rad_ratios(payload: dict) -> dict:
     out = _out(payload)
     src = _find(out, "rad_canonical.csv")
     df = pd.read_csv(src)
-    quantity = str(df["quantity"].iloc[0])
-    if quantity != "concentration":
+    quantity = _cell_str(df, "quantity")
+    units_k = _channel_units(df, "k")
+    units_eu = _channel_units(df, "eu")
+    units_eth = _channel_units(df, "eth")
+    if quantity != "concentration" or not _concentration_units_ok(units_k, units_eu, units_eth):
+        reason = (
+            "Concentration ratios need Quantity=concentration."
+            if quantity != "concentration"
+            else "Concentration ratios need documented %K / ppm eU / ppm eTh units. Unknown units block ratios."
+        )
         qc = {
             "skipped": True,
-            "reason": "Concentration ratios need Quantity=concentration.",
+            "reason": reason,
             "quantity": quantity,
+            "units_k": units_k,
+            "units_eu": units_eu,
+            "units_eth": units_eth,
         }
         qc_path = write_json(os.path.join(out, "rad_ratio_qc.json"), qc)
         return {
@@ -279,6 +359,13 @@ def rad_ratios(payload: dict) -> dict:
         "formula": ratios["formula"],
         "skipped": False,
         "n": int(len(work)),
+        "quantity": quantity,
+        "units_k": units_k,
+        "units_eu": units_eu,
+        "units_eth": units_eth,
+        "units_eu_eth": f"{units_eu} / {units_eth}",
+        "units_eu_k": f"{units_eu} / {units_k}",
+        "units_eth_k": f"{units_eth} / {units_k}",
         "not_lithology": True,
         "not_alteration": True,
         "n_eth_clipped": ratios.get("n_eth_clipped", 0),
@@ -310,11 +397,35 @@ def rad_gis_export(payload: dict) -> dict:
     if col is None:
         raise ValueError("No radiometric channel for GIS export.")
     path = os.path.join(out, "rad_stations.geojson")
-    units = str(df["quantity"].iloc[0])
-    props = [{"value": float(v), "channel": col, "quantity": units} for v in df[col]]
-    write_geojson_points(df["x"], df["y"], props, path, crs_epsg=epsg)
+    quantity = _cell_str(df, "quantity")
+    channel_units = _channel_units(df, col)
+    all_units = {
+        "k": _channel_units(df, "k"),
+        "eu": _channel_units(df, "eu"),
+        "eth": _channel_units(df, "eth"),
+        "tc": _channel_units(df, "tc"),
+    }
+    props = [
+        {"value": float(v), "channel": col, "quantity": quantity, "units": channel_units}
+        for v in df[col]
+    ]
+    write_geojson_points(
+        df["x"],
+        df["y"],
+        props,
+        path,
+        crs_epsg=epsg,
+        collection={"quantity": quantity, "units": all_units, "value_channel": col, "value_units": channel_units},
+    )
+    meta_path = write_json(
+        os.path.join(out, "rad_stations.meta.json"),
+        {"quantity": quantity, "units": all_units, "value_channel": col, "value_units": channel_units, "crs_epsg": epsg},
+    )
     return {
-        "artifacts": [make_artifact("artifact-rad-stations", "vector", "geojson", path, node_id, [src])],
+        "artifacts": [
+            make_artifact("artifact-rad-stations", "vector", "geojson", path, node_id, [src]),
+            make_artifact("artifact-rad-stations-meta", "qc_report", "json", meta_path, node_id, [src]),
+        ],
         "events": [{"type": "NODE_PROGRESS", "message": f"Wrote rad_stations.geojson (EPSG:{epsg})."}],
     }
 
@@ -330,15 +441,30 @@ def rad_interpret(payload: dict) -> dict:
                 qcs[name] = json.load(handle)
     ingest = qcs.get("rad_ingest_qc.json") or {}
     ternary = qcs.get("rad_ternary_qc.json") or {}
+    quantity = ingest.get("quantity") or "unknown"
+    units_unknown = bool(ingest.get("units_unknown")) or str(quantity).lower() in {"", "unknown", "none"}
+    not_established = [
+        "Mineralisation is not established.",
+        "Lithology is not established.",
+        "Alteration is not established.",
+        "Drill targets are not established.",
+        "Raw spectrometer corrections were not performed.",
+    ]
+    if units_unknown:
+        not_established.append(
+            "Channel quantity/units are unknown; unit-specific legend, ternary, ratio, and interpretation claims are blocked."
+        )
     report = {
         "observations": [
             "Radiometric measurements were ingested under the G-AID RAD 1.0 already-corrected contract.",
-            f"Quantity: {ingest.get('quantity')}. G-AID did not apply height, stripping, dead-time, or concentration conversion.",
+            f"Quantity: {quantity}. G-AID did not apply height, stripping, dead-time, or concentration conversion.",
             f"Ternary computed: {bool(ternary) and not ternary.get('skipped')}. A ternary is a colour composite, not a lithology map.",
+            f"Units K={ingest.get('units_k', 'unknown')}, eU={ingest.get('units_eu', 'unknown')}, eTh={ingest.get('units_eth', 'unknown')}, TC={ingest.get('units_tc', 'unknown')}.",
         ],
         "assumptions": [
-            "Channel values are as supplied in the declared units.",
+            "Channel values are as supplied in the declared units from the catalog record or versioned artifact metadata.",
             "Correction history is the contractor/survey declaration; it was not re-applied.",
+            "Filenames are not a source of quantity or units.",
         ],
         "uncertainty": [
             "Equivalent concentrations are non-unique with respect to source geometry, attenuation, and residual stripping.",
@@ -347,16 +473,16 @@ def rad_interpret(payload: dict) -> dict:
         "recommendations": [
             "Do not treat K, eU, eTh, ratios, or a ternary as mineralisation, lithology, alteration, or a drill target.",
         ],
-        "not_established": [
-            "Mineralisation is not established.",
-            "Lithology is not established.",
-            "Alteration is not established.",
-            "Drill targets are not established.",
-            "Raw spectrometer corrections were not performed.",
-        ],
+        "not_established": not_established,
         "qc": qcs,
+        "quantity": quantity,
+        "units_k": ingest.get("units_k", "unknown"),
+        "units_eu": ingest.get("units_eu", "unknown"),
+        "units_eth": ingest.get("units_eth", "unknown"),
+        "units_tc": ingest.get("units_tc", "unknown"),
         "interpretation_limit": "Already-corrected radiometric maps and ratios are not geology.",
         "affirmative_language_allowed": False,
+        "interpretation_blocked": units_unknown,
         "corrections_applied_in_g_aid": False,
     }
     path = write_json(os.path.join(out, "rad_interpretation.json"), report)

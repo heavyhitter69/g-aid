@@ -78,10 +78,10 @@ export function layerLabel(pathOrStem: string): string {
   if (base.includes("seismic")) return "Seismic section";
   if (base.includes("gpr")) return "GPR section";
   if (base.includes("pseudosection") || base.includes("pseudo")) return "Pseudosection";
-  if (base.includes("rad_k_grid")) return "Potassium (%K)";
-  if (base.includes("rad_eu_grid")) return "Equivalent uranium (ppm eU)";
-  if (base.includes("rad_eth_grid")) return "Equivalent thorium (ppm eTh)";
-  if (base.includes("rad_tc_grid")) return "Total count";
+  if (base.includes("rad_k_grid")) return "K channel";
+  if (base.includes("rad_eu_grid")) return "eU channel";
+  if (base.includes("rad_eth_grid")) return "eTh channel";
+  if (base.includes("rad_tc_grid")) return "TC channel";
   if (base.includes("rad_ternary")) return "K-eTh-eU ternary (not lithology)";
   return base.replace(/_/g, " ");
 }

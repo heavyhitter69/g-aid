@@ -187,18 +187,20 @@ def parse_radiometric_table(path: str, mapping: dict | None = None, overrides: d
     channels = {}
     if used.get("k"):
         out["k"] = num(used["k"])
-        channels["k"] = meta.get("unitsK") or ("%K" if quantity == "concentration" else "cps")
+        channels["k"] = (meta.get("unitsK") or "").strip() or "unknown"
     if used.get("eu"):
         out["eu"] = num(used["eu"])
-        channels["eu"] = meta.get("unitsU") or ("ppm eU" if quantity == "concentration" else "cps")
+        channels["eu"] = (meta.get("unitsU") or "").strip() or "unknown"
     if used.get("eth"):
         out["eth"] = num(used["eth"])
-        channels["eth"] = meta.get("unitsTh") or ("ppm eTh" if quantity == "concentration" else "cps")
+        channels["eth"] = (meta.get("unitsTh") or "").strip() or "unknown"
     if used.get("tc"):
         out["tc"] = num(used["tc"])
-        channels["tc"] = meta.get("unitsTc") or meta.get("units") or ("nGy/h" if quantity == "concentration" else "cps")
+        channels["tc"] = (meta.get("unitsTc") or meta.get("units") or "").strip() or "unknown"
     out["crs_epsg"] = int(epsg)
     out["quantity"] = quantity
+    for col, unit in channels.items():
+        out[f"units_{col}"] = unit
     finite = np.isfinite(out["x"]) & np.isfinite(out["y"])
     for col in ("k", "eu", "eth", "tc"):
         if col in out.columns:
@@ -216,6 +218,7 @@ def parse_radiometric_table(path: str, mapping: dict | None = None, overrides: d
         "quantity": quantity,
         "crs_epsg": int(epsg),
         "channels": channels,
+        "units_unknown": any(str(v).strip().lower() in {"", "unknown", "none", "n/a"} for v in channels.values()),
         "correction_history": history,
         "platform": meta.get("platform"),
         "instrument": meta.get("instrument"),

@@ -296,23 +296,35 @@ export function validateCapabilityContracts(options: {
           "Radiometric column names differ from X, Y, Line, K, eU, eTh, TC. Confirm a column mapping before Proceed. I will not guess columns.",
       });
     }
-    if (expanded.includes("rad.ternary")) {
+    if (expanded.includes("rad.ternary") || expanded.includes("rad.ratios")) {
       const quantity = records.find((record) => record.radioQuantity)?.radioQuantity;
       const mapping = records.find((record) => record.radioMapping)?.radioMapping;
       const hasKuth = Boolean(mapping?.k && mapping?.eu && mapping?.eth);
+      const unitsBlob = records.map((record) => record.units || "").join(" ");
+      const unitsMissing = records.some((record) => !record.units || /unknown/i.test(record.units));
       if (quantity && quantity !== "concentration") {
         issues.push({
           level: "warning",
           code: "ternary_not_justified",
           message:
-            "Ternary K-eTh-eU display needs Quantity=concentration. Count-rate ternary will be skipped. I will not treat cps as concentrations.",
+            "Ternary K-eTh-eU display and concentration ratios need Quantity=concentration. Count-rate ternary/ratios will be skipped. I will not treat cps as concentrations.",
         });
       } else if (mapping && !hasKuth) {
         issues.push({
           level: "warning",
           code: "ternary_not_justified",
           message:
-            "Ternary needs concentration K, eU, and eTh. Incomplete channel sets skip the ternary. I will not invent a missing window.",
+            "Ternary and ratios need concentration K, eU, and eTh. Incomplete channel sets skip those products. I will not invent a missing window.",
+        });
+      } else if (
+        records.length &&
+        (unitsMissing || (hasKuth && (!/%/.test(unitsBlob) || !/ppm/i.test(unitsBlob))))
+      ) {
+        issues.push({
+          level: "warning",
+          code: "radio_units_unknown",
+          message:
+            "Radiometric quantity/units are missing from the catalog record. Unit-specific legend, ternary, ratios, and interpretation claims are blocked until metadata is documented. I will not infer %K or cps from filenames.",
         });
       }
     }

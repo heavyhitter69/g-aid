@@ -1,0 +1,16 @@
+{
+  "justified": false,
+  "quantity": "concentration",
+  "units_k": "unknown",
+  "units_eu": "unknown",
+  "units_eth": "unknown",
+  "assignment": {
+    "R": "K %",
+    "G": "eTh ppm",
+    "B": "eU ppm"
+  },
+  "skipped": true,
+  "not_mineralisation": true,
+  "not_lithology": true,
+  "reason": "Ternary needs documented concentration units (%K, ppm eU, ppm eTh). units_k=unknown, units_eu=unknown, units_eth=unknown."
+}
