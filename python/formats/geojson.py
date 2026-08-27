@@ -185,9 +185,9 @@ def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = Fals
 
     bbox = {"minX": min(xs), "minY": min(ys), "maxX": max(xs), "maxY": max(ys)}
     crs_info = _resolve_crs(obj, text, path, bbox)
-    warnings.extend(crs_info["warnings"])
     if crs_info.get("error"):
         raise ValueError(crs_info["error"])
+    warnings.extend(crs_info.get("warnings") or [])
 
     unique_errors = list(dict.fromkeys(errors))
     return {
