@@ -1,0 +1,20 @@
+{
+  "kind": "gpr-radargram",
+  "vertical_axis": "two-way time ns \u2014 not depth",
+  "sampling_hz": 499999999.99999994,
+  "nyquist_hz": 249999999.99999997,
+  "bandpass_applied": true,
+  "bandpass_adjusted": true,
+  "bandpass_refused": false,
+  "requested_filter_hz": [
+    80000000.0,
+    800000000.0
+  ],
+  "applied_filter_hz": [
+    80000000.0,
+    200000000.0
+  ],
+  "refusal_reason": null,
+  "adjustment_reason": "Antenna default 0.2\u20132.0 \u00d7 AntennaMHz (80\u2013800 MHz) is not Nyquist-safe (Nyquist 250 MHz). Applied documented safe high-cut 0.8 \u00d7 Nyquist = 200 MHz. This is not a silent clamp to 0.999 Nyquist.",
+  "geological_certainty_improved": false
+}

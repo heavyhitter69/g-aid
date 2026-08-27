@@ -1,0 +1,13 @@
+{
+  "runId": "r-verify-gis-points",
+  "planHash": "fixture-r-verify-gis-points",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.interpret"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}

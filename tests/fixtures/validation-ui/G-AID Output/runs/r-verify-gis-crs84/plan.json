@@ -1,0 +1,12 @@
+{
+  "runId": "r-verify-gis-crs84",
+  "planHash": "fixture-r-verify-gis-crs84",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}

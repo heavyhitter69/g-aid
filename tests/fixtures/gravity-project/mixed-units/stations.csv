@@ -1,0 +1,7 @@
+# EPSG=32630
+# Units=mGal
+# ElevationDatum=orthometric
+X,Y,Gravity,Elevation,Station
+450000,1200000,978100.10,120.0,ST01
+450200,1200000,9.781,121.0,ST02
+450400,1200000,978100.20,119.0,ST03

@@ -1,0 +1,73 @@
+{
+  "kind": "gis-overlap",
+  "rows": [
+    {
+      "left_path": "overlap/tenure.shp",
+      "right_path": "overlap/samples.shp",
+      "left_id": "T1",
+      "right_id": "1",
+      "left_role": "tenure",
+      "right_role": "sample-location",
+      "crs": "EPSG:32734",
+      "compatibility_decision": "",
+      "relation": "contains",
+      "location": "interior",
+      "engine": "g-aid-evenodd-segment",
+      "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+      "precision": "ieee754-float64 epsilon=1e-9 approximation=none",
+      "reason": "Geometric contains. Point lies in the filled polygon interior (exterior ring minus holes). Both layers use EPSG:32734. Spatial overlap does not establish geological, mineral, or causal relationships."
+    },
+    {
+      "left_path": "overlap/tenure.shp",
+      "right_path": "overlap/samples.shp",
+      "left_id": "T1",
+      "right_id": "2",
+      "left_role": "tenure",
+      "right_role": "sample-location",
+      "crs": "EPSG:32734",
+      "compatibility_decision": "",
+      "relation": "contains",
+      "location": "interior",
+      "engine": "g-aid-evenodd-segment",
+      "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+      "precision": "ieee754-float64 epsilon=1e-9 approximation=none",
+      "reason": "Geometric contains. Point lies in the filled polygon interior (exterior ring minus holes). Both layers use EPSG:32734. Spatial overlap does not establish geological, mineral, or causal relationships."
+    }
+  ],
+  "blocked": [],
+  "crs_decisions": [
+    {
+      "left": "overlap/tenure.shp",
+      "right": "overlap/samples.shp",
+      "code": "same-crs",
+      "compatibility_decision": null,
+      "left_crs": "EPSG:32734",
+      "right_crs": "EPSG:32734",
+      "left_axis_order": "east-north",
+      "right_axis_order": "east-north",
+      "left_coordinate_order": "east-north",
+      "right_coordinate_order": "east-north"
+    }
+  ],
+  "skipped_features": [],
+  "reprojected": false,
+  "axis_swap": false,
+  "exterior_ring_only": false,
+  "engine": "g-aid-evenodd-segment",
+  "engine_version": "1.0",
+  "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+  "precision": {
+    "model": "ieee754-float64",
+    "epsilon": 1e-09,
+    "on_boundary": "collinear-and-within-segment",
+    "approximation": "none"
+  },
+  "supported_relations": [
+    "contains",
+    "within",
+    "intersects",
+    "on-boundary",
+    "disjoint",
+    "not-evaluated"
+  ]
+}

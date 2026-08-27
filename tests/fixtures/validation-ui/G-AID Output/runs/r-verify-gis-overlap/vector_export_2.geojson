@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "s1",
+      "properties": {
+        "SAMPLE_ID": "IN",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": "legacy-geojson",
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "sample-location",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260150.0,
+          6240150.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "s2",
+      "properties": {
+        "SAMPLE_ID": "OUT",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": "legacy-geojson",
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "sample-location",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          261000.0,
+          6241000.0
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
+}

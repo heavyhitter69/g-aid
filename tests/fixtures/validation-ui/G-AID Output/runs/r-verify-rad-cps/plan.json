@@ -1,0 +1,16 @@
+{
+  "runId": "r-verify-rad-cps",
+  "parentRunId": "r-verify-rad-parent",
+  "planHash": "fixture-verify-rad-cps",
+  "intent": "radiometrics",
+  "status": "complete",
+  "capabilities": [
+    "rad.ingest",
+    "rad.grid",
+    "rad.ternary",
+    "rad.ratios",
+    "rad.gis",
+    "rad.interpret"
+  ],
+  "product": "already-corrected count-rate radiometrics"
+}

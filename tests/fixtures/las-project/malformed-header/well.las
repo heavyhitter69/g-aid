@@ -1,0 +1,8 @@
+~VERSION INFORMATION
+VERS.                 2.0         : CWLS LOG ASCII STANDARD - VERSION 2.0
+WRAP.                 NO
+~WELL INFORMATION
+WELL.                BAD          : WELL
+~CURVE INFORMATION
+DEPT.M
+GR.GAPI

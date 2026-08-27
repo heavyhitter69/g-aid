@@ -7,6 +7,7 @@ import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
 import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
 import { writeWindowSession } from "@/lib/window-session";
+import type { ProjectCatalog } from "@/lib/catalog/types";
 
 function folderNameFromRoot(root: string): string {
   const trimmed = root.replace(/[\\/]+$/, "");
@@ -51,7 +52,26 @@ export function applyWorkspaceIndex(index: WorkspaceIndex): void {
     activeFile: null,
     activeWorkbenchTabId: null,
     workspaceView: "dashboard",
+    projectCatalog: null,
   });
+}
+
+export async function refreshProjectCatalog(root?: string): Promise<ProjectCatalog | null> {
+  const workspaceRoot = root || useAppStore.getState().workspaceRoot;
+  if (!workspaceRoot) return null;
+  try {
+    const response = await fetch("/api/workspace/catalog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ root: workspaceRoot }),
+    });
+    if (!response.ok) return null;
+    const catalog = (await response.json()) as ProjectCatalog;
+    useAppStore.getState().setProjectCatalog(catalog);
+    return catalog;
+  } catch {
+    return null;
+  }
 }
 
 /** Re-index the open folder without closing tabs or wiping file contents. */
@@ -76,6 +96,7 @@ export async function refreshWorkspaceIndex(): Promise<boolean> {
     merged.filter((f) => f.type === "file").length
   );
   store.setProjectFiles(merged);
+  await refreshProjectCatalog(index.root);
   return true;
 }
 
@@ -288,6 +309,7 @@ export async function openWorkspaceAt(root: string): Promise<boolean> {
   if (!window.gaidDesktop?.indexWorkspace) return false;
   const index = await window.gaidDesktop.indexWorkspace(root);
   applyWorkspaceIndex(index);
+  await refreshProjectCatalog(index.root);
   return true;
 }
 

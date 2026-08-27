@@ -56,14 +56,48 @@ def get_handler(node_id: str):
         "gis_export": gis_export,
         "lineament_extractor": lineament_extractor,
         "euler_deconvolution": euler_deconvolution_node,
-        "gravity_reduce": gravity_reduce,
+        "gravity_ingest": gravity_ingest,
+        "gravity_freeair": gravity_freeair,
+        "gravity_bouguer": gravity_bouguer,
+        "gravity_terrain": gravity_terrain,
+        "grav_gridder": grav_gridder,
         "regional_residual": regional_residual,
+        "grav_gis_export": grav_gis_export,
+        "grav_interpret": grav_interpret,
+        "gravity_reduce": gravity_reduce,
+        "ert_ingest": ert_ingest,
         "ert_pseudosection": ert_pseudosection,
         "ert_invert": ert_invert,
+        "ert_gis_export": ert_gis_export,
+        "ert_interpret": ert_interpret,
+        "rad_ingest": rad_ingest,
+        "rad_grid": rad_grid,
+        "rad_ternary": rad_ternary,
+        "rad_ratios": rad_ratios,
+        "rad_gis_export": rad_gis_export,
+        "rad_interpret": rad_interpret,
         "seismic_process": seismic_process,
         "radiometric_correct": radiometric_correct,
+        "gpr_ingest": gpr_ingest,
         "gpr_process": gpr_process,
+        "gpr_migrate": gpr_migrate,
+        "gpr_gis_export": gpr_gis_export,
+        "gpr_interpret": gpr_interpret,
         "las_ingest": las_ingest,
+        "borehole_view": borehole_view,
+        "borehole_map_collar": borehole_map_collar,
+        "borehole_interpret": borehole_interpret,
+        "vector_ingest": vector_ingest,
+        "vector_view": vector_view,
+        "vector_overlap": vector_overlap,
+        "vector_export": vector_export,
+        "vector_interpret": vector_interpret,
+        "geochem_ingest": geochem_ingest,
+        "geochem_qc": geochem_qc,
+        "geochem_map_points": geochem_map_points,
+        "geochem_summary": geochem_summary,
+        "geochem_display_transform": geochem_display_transform,
+        "geochem_interpret": geochem_interpret,
         "crs_reproject": crs_reproject,
         "xyz_ingest": xyz_ingest,
     }
@@ -707,140 +741,114 @@ def euler_deconvolution_node(payload: dict) -> dict:
     }
 
 
-def gravity_reduce(payload: dict) -> dict:
-    if not step_enabled(payload, "gravity", default=True):
-        return skipped("gravity_reduce", "not in plan")
-    from science.gravity import latitude_free_air_bouguer, terrain_correction_prisms
-    from science.gis import read_ascii_grid
+def gravity_ingest(payload: dict) -> dict:
+    from kernels.gravity import gravity_ingest as impl
+    return impl(payload)
 
-    node_id = "gravity_reduce"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath") or _find(out, "gravity_canonical.csv", "xyz_canonical.csv")
-    df = pd.read_csv(src)
-    lat_col = "y" if "y" in df.columns else None
-    if lat_col is None:
-        raise ValueError("Gravity reduction needs latitude in column y")
-    gcol = "value" if "value" in df.columns else "g_obs"
-    hcol = "z" if "z" in df.columns else "height"
-    density = float(_params(payload).get("density") or 2.67)
-    reduced = latitude_free_air_bouguer(df[gcol], df[lat_col], df[hcol], density_gcc=density)
-    for key, val in reduced.items():
-        if key != "density_gcc":
-            df[key] = val
-    events = []
-    formula = "Somigliana + 0.3086h − 2πGρh + Bullard B (Moritz 2000; LaFehr 1991)"
-    dem_path = _params(payload).get("demPath")
-    if not dem_path:
-        base = str(_params(payload).get("baseDir") or "")
-        for root in (out, base):
-            if not root:
-                continue
-            for name in ("dem.asc", "DEM.asc"):
-                cand = os.path.join(root, name)
-                if os.path.isfile(cand):
-                    dem_path = cand
-                    break
-            if dem_path:
-                break
-    if dem_path and os.path.isfile(dem_path):
-        from science.crs import project_points
-        dem = read_ascii_grid(dem_path)
-        east, north, _crs = project_points(df["x"], df["y"])
-        tc = terrain_correction_prisms(east, north, df[hcol].to_numpy(), dem, density)
-        df["terrain_mgal"] = tc
-        df["bouguer_mgal"] = df["bouguer_mgal"].to_numpy() + tc
-        formula += "; Nagy 1966 prism terrain"
-        events.append({"type": "NODE_PROGRESS", "message": f"Terrain correction from {os.path.basename(dem_path)}."})
-    path = os.path.join(out, "gravity_reduced.csv")
-    df.to_csv(path, index=False)
-    write_json(os.path.join(out, "gravity_qc.json"), {"density_gcc": density, "formula": formula, "dem": dem_path})
-    return {
-        "artifacts": [make_artifact("artifact-grav-1", "processed_dataset", "csv", path, node_id, [src])],
-        "events": events + [{"type": "NODE_PROGRESS", "message": f"Bouguer reduction at {density} g/cm³."}],
-    }
+
+def gravity_freeair(payload: dict) -> dict:
+    from kernels.gravity import gravity_freeair as impl
+    return impl(payload)
+
+
+def gravity_bouguer(payload: dict) -> dict:
+    from kernels.gravity import gravity_bouguer as impl
+    return impl(payload)
+
+
+def gravity_terrain(payload: dict) -> dict:
+    from kernels.gravity import gravity_terrain as impl
+    return impl(payload)
+
+
+def grav_gridder(payload: dict) -> dict:
+    from kernels.gravity import grav_gridder as impl
+    return impl(payload)
+
+
+def grav_gis_export(payload: dict) -> dict:
+    from kernels.gravity import grav_gis_export as impl
+    return impl(payload)
+
+
+def grav_interpret(payload: dict) -> dict:
+    from kernels.gravity import grav_interpret as impl
+    return impl(payload)
+
+
+def gravity_reduce(payload: dict) -> dict:
+    raise ValueError(
+        "gravity_reduce is not on the live DAG. Use gravity_freeair/gravity_bouguer. "
+        "Density is never defaulted to 2.67."
+    )
 
 
 def regional_residual(payload: dict) -> dict:
-    if not step_enabled(payload, "residual", default=True):
-        return skipped("regional_residual", "not in plan")
-    from science.crs import CRS, project_points
-    from science.fft_filters import upward_continue
-    from science.gis import export_grid_bundle
-    from science.gravity import polynomial_regional
-    from science.grid import minimum_curvature
+    from kernels.gravity import regional_residual as impl
+    return impl(payload)
 
-    node_id = "regional_residual"
-    out = task_dir(payload)
-    src = _find(out, "gravity_reduced.csv")
-    df = pd.read_csv(src)
-    east, north, crs = project_points(df["x"], df["y"])
-    grid = minimum_curvature(east, north, df["bouguer_mgal"].to_numpy(), crs_epsg=crs.epsg, units="mGal", name="bouguer")
-    method = str(_params(payload).get("method") or "upward_continuation")
-    if method == "polynomial":
-        regional, residual = polynomial_regional(grid, order=int(_params(payload).get("polyOrder") or 2))
-    else:
-        height = float(_params(payload).get("continuation_height") or _params(payload).get("continuationHeightM") or 5000)
-        regional = upward_continue(grid, height)
-        residual = grid.copy_with(grid.masked() - regional.masked(), name="residual", units="mGal")
-    artifacts = []
-    for g in (grid, regional, residual):
-        paths = export_grid_bundle(g, out, g.name, crs)
-        artifacts.append(make_artifact(f"artifact-{g.name}", "grid", "tif", paths["tif"], node_id))
-    return {"artifacts": artifacts, "events": [{"type": "NODE_PROGRESS", "message": f"Regional-residual via {method}."}]}
+
+def ert_ingest(payload: dict) -> dict:
+    from kernels.ert import ert_ingest as impl
+    return impl(payload)
 
 
 def ert_pseudosection(payload: dict) -> dict:
-    if not step_enabled(payload, "ert", default=True):
-        return skipped("ert_pseudosection", "not in plan")
-    from science.ert import parse_res2dinv_dat, pseudosection_xyz
-
-    node_id = "ert_pseudosection"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("ERT pseudosection needs parameters.inputPath to a Res2DInv .dat")
-    parsed = parse_res2dinv_dat(src)
-    x, z, rho = pseudosection_xyz(parsed["measurements"])
-    df = pd.DataFrame({"x": x, "z": z, "rhoa_ohm_m": rho, "a": [m["a"] for m in parsed["measurements"]], "n": [m["n"] for m in parsed["measurements"]]})
-    path = os.path.join(out, "ert_pseudosection.csv")
-    df.to_csv(path, index=False)
-    write_json(os.path.join(out, "ert_survey.json"), {"title": parsed["title"], "array": parsed["array"], "n": len(df), "formula": "ρa = K ΔV/I (Telford et al. 1990); pseudo-depth n·a/2"})
-    return {"artifacts": [make_artifact("artifact-ert-pseudo", "section", "csv", path, node_id, [src])], "events": [{"type": "NODE_PROGRESS", "message": f"Pseudosection {len(df)} points, array={parsed['array']}."}]}
+    from kernels.ert import ert_pseudosection as impl
+    return impl(payload)
 
 
 def ert_invert(payload: dict) -> dict:
-    if not step_enabled(payload, "ertInvert", default=True):
-        return skipped("ert_invert", "not in plan")
-    from science.ert import invert_2d_smooth, occam_1d, parse_res2dinv_dat
+    from kernels.ert import ert_invert as impl
+    return impl(payload)
 
-    node_id = "ert_invert"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("ERT inversion needs parameters.inputPath")
-    parsed = parse_res2dinv_dat(src)
-    mode = str(_params(payload).get("ertMode") or "2d")
-    if mode == "1d":
-        m = parsed["measurements"]
-        result = occam_1d(np.array([x["a"] * x["n"] for x in m]), np.array([x["rhoa"] for x in m]))
-        path = write_json(os.path.join(out, "ert_1d_model.json"), result)
-    else:
-        result = invert_2d_smooth(
-            parsed["measurements"],
-            max_iter=int(_params(payload).get("max_iterations") or 8),
-            lam=float(_params(payload).get("damping_factor") or 0.2),
-        )
-        path = write_json(os.path.join(out, "ert_2d_model.json"), result)
-        # also write CSV section
-        z = result["z_m"]
-        x = result["x_m"]
-        rho = np.array(result["resistivity_ohm_m"])
-        rows = [{"x": x[j], "z": z[i], "resistivity_ohm_m": float(rho[i, j])} for i in range(len(z)) for j in range(len(x))]
-        pd.DataFrame(rows).to_csv(os.path.join(out, "ert_2d_model.csv"), index=False)
-    return {
-        "artifacts": [make_artifact("artifact-ert-inv", "section", "json", path, node_id, [src], {"misfit_percent": result.get("misfit_percent") or result.get("rms")})],
-        "events": [{"type": "NODE_PROGRESS", "message": f"ERT inversion misfit={result.get('misfit_percent') or result.get('rms')}."}],
-    }
+
+def ert_gis_export(payload: dict) -> dict:
+    from kernels.ert import ert_gis_export as impl
+    return impl(payload)
+
+
+def ert_interpret(payload: dict) -> dict:
+    from kernels.ert import ert_interpret as impl
+    return impl(payload)
+
+
+def rad_ingest(payload: dict) -> dict:
+    from kernels.radiometrics import rad_ingest as impl
+    return impl(payload)
+
+
+def rad_grid(payload: dict) -> dict:
+    from kernels.radiometrics import rad_grid as impl
+    return impl(payload)
+
+
+def rad_ternary(payload: dict) -> dict:
+    from kernels.radiometrics import rad_ternary as impl
+    return impl(payload)
+
+
+def rad_ratios(payload: dict) -> dict:
+    from kernels.radiometrics import rad_ratios as impl
+    return impl(payload)
+
+
+def rad_gis_export(payload: dict) -> dict:
+    from kernels.radiometrics import rad_gis_export as impl
+    return impl(payload)
+
+
+def rad_interpret(payload: dict) -> dict:
+    from kernels.radiometrics import rad_interpret as impl
+    return impl(payload)
+
+
+def radiometric_correct(payload: dict) -> dict:
+    raise ValueError(
+        "radiometric_correct is not a live capability. Height correction, stripping, NASVD, "
+        "dead-time, background, and concentration conversion are not implemented as a supported "
+        "pack. Use rad.ingest for already-corrected G-AID RAD 1.0 tables."
+    )
 
 
 def seismic_process(payload: dict) -> dict:
@@ -900,89 +908,104 @@ def seismic_process(payload: dict) -> dict:
     return {"artifacts": [make_artifact("artifact-segy", "seismic", "json", path, node_id, [src], qc)], "events": events}
 
 
-def radiometric_correct(payload: dict) -> dict:
-    if not step_enabled(payload, "radiometrics", default=True):
-        return skipped("radiometric_correct", "not in plan")
-    from science.radiometrics import MU_K, MU_TC, MU_TH, MU_U, height_correct, nasvd, strip_windows
-
-    node_id = "radiometric_correct"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath") or _find(out, "radiometric_canonical.csv")
-    df = pd.read_csv(src)
-    h = df["z"] if "z" in df.columns else df.get("height", 0)
-    href = float(_params(payload).get("hRefM") or 0.0)
-    events = []
-    if "tc" in df.columns:
-        df["tc_hc"] = height_correct(df["tc"], h, MU_TC, href)
-    for col, mu in (("k", MU_K), ("u", MU_U), ("th", MU_TH)):
-        if col in df.columns:
-            df[f"{col}_hc"] = height_correct(df[col], h, mu, href)
-    if all(c in df.columns for c in ("k", "u", "th")):
-        stripped = strip_windows(df.get("k_hc", df["k"]), df.get("u_hc", df["u"]), df.get("th_hc", df["th"]))
-        df["k_stripped"] = stripped["k"]
-        df["u_stripped"] = stripped["u"]
-        df["th_stripped"] = stripped["th"]
-    spec_cols = [c for c in df.columns if str(c).startswith("ch")]
-    if len(spec_cols) >= 16:
-        result = nasvd(df[spec_cols].to_numpy(), int(_params(payload).get("nasvdComponents") or 8))
-        write_json(os.path.join(out, "nasvd_qc.json"), {k: v for k, v in result.items() if k != "reconstructed"})
-        events.append({"type": "NODE_PROGRESS", "message": "NASVD reconstruction written."})
-    path = os.path.join(out, "radiometric_corrected.csv")
-    df.to_csv(path, index=False)
-    return {"artifacts": [make_artifact("artifact-rad-1", "processed_dataset", "csv", path, node_id, [src])], "events": events + [{"type": "NODE_PROGRESS", "message": "Radiometric height correction (IAEA TECDOC-1363)."}]}
+def gpr_ingest(payload: dict) -> dict:
+    from kernels.gpr import gpr_ingest as impl
+    return impl(payload)
 
 
 def gpr_process(payload: dict) -> dict:
-    if not step_enabled(payload, "gpr", default=True):
-        return skipped("gpr_process", "not in plan")
-    from formats import parse_dzt
-    from science.gpr import process_section
-    from science.gis import write_ascii_grid
-    from science.grid import Grid
+    from kernels.gpr import gpr_process as impl
+    return impl(payload)
 
-    node_id = "gpr_process"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("GPR processing needs parameters.inputPath (.dzt)")
-    dzt = parse_dzt(src)
-    vel = _params(payload).get("velocityMs")
-    result = process_section(dzt["traces"], dzt["dt_s"], dzt["dx_m"], float(vel) if vel else None)
-    np.savez(
-        os.path.join(out, "gpr_processed.npz"),
-        dewow=result["dewow"],
-        bandpassed=result["bandpassed"],
-        migrated=result["migrated"] if result["migrated"] is not None else np.array([]),
-        dt=dzt["dt_s"],
-        dx=dzt["dx_m"],
-    )
-    section = result["bandpassed"]
-    ntr, ns = np.atleast_2d(section).shape
-    step_t = max(1, ntr // 400)
-    step_s = max(1, ns // 500)
-    preview = np.atleast_2d(section)[::step_t, ::step_s]
-    write_ascii_grid(
-        Grid(values=preview.T, x0=0.0, y0=0.0, dx=float(dzt["dx_m"]) * step_t, dy=float(dzt["dt_s"]) * step_s, crs_epsg=0, units="amp", name="gpr_section"),
-        os.path.join(out, "gpr_section.asc"),
-    )
-    qc = {"time_zero_sample": result["time_zero_sample"], "n_traces": dzt["n_traces"], "dt_s": dzt["dt_s"], "formula": result["formula"]}
-    path = write_json(os.path.join(out, "gpr_qc.json"), qc)
-    return {"artifacts": [make_artifact("artifact-gpr", "section", "json", path, node_id, [src])], "events": [{"type": "NODE_PROGRESS", "message": f"GPR {dzt['n_traces']} traces processed."}]}
+
+def gpr_migrate(payload: dict) -> dict:
+    from kernels.gpr import gpr_migrate as impl
+    return impl(payload)
+
+
+def gpr_gis_export(payload: dict) -> dict:
+    from kernels.gpr import gpr_gis_export as impl
+    return impl(payload)
+
+
+def gpr_interpret(payload: dict) -> dict:
+    from kernels.gpr import gpr_interpret as impl
+    return impl(payload)
 
 
 def las_ingest(payload: dict) -> dict:
-    from formats import parse_las
+    from kernels.borehole import las_ingest as impl
+    return impl(payload)
 
-    node_id = "las_ingest"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("LAS ingest needs parameters.inputPath")
-    parsed = parse_las(src)
-    path = os.path.join(out, "well_log.csv")
-    parsed["data"].to_csv(path, index=False)
-    write_json(os.path.join(out, "well_log_meta.json"), {"well": parsed["well"], "curves": parsed["curves"], "null": parsed["null"]})
-    return {"artifacts": [make_artifact("artifact-las", "well-log", "csv", path, node_id, [src])], "events": [{"type": "NODE_PROGRESS", "message": f"LAS well '{parsed['well']}' curves={parsed['curves']}."}]}
+
+def borehole_view(payload: dict) -> dict:
+    from kernels.borehole import borehole_view as impl
+    return impl(payload)
+
+
+def borehole_map_collar(payload: dict) -> dict:
+    from kernels.borehole import borehole_map_collar as impl
+    return impl(payload)
+
+
+def borehole_interpret(payload: dict) -> dict:
+    from kernels.borehole import borehole_interpret as impl
+    return impl(payload)
+
+
+def vector_ingest(payload: dict) -> dict:
+    from kernels.vector import vector_ingest as impl
+    return impl(payload)
+
+
+def vector_view(payload: dict) -> dict:
+    from kernels.vector import vector_view as impl
+    return impl(payload)
+
+
+def vector_overlap(payload: dict) -> dict:
+    from kernels.vector import vector_overlap as impl
+    return impl(payload)
+
+
+def vector_export(payload: dict) -> dict:
+    from kernels.vector import vector_export as impl
+    return impl(payload)
+
+
+def vector_interpret(payload: dict) -> dict:
+    from kernels.vector import vector_interpret as impl
+    return impl(payload)
+
+
+def geochem_ingest(payload: dict) -> dict:
+    from kernels.geochem import geochem_ingest as impl
+    return impl(payload)
+
+
+def geochem_qc(payload: dict) -> dict:
+    from kernels.geochem import geochem_qc as impl
+    return impl(payload)
+
+
+def geochem_map_points(payload: dict) -> dict:
+    from kernels.geochem import geochem_map_points as impl
+    return impl(payload)
+
+
+def geochem_summary(payload: dict) -> dict:
+    from kernels.geochem import geochem_summary as impl
+    return impl(payload)
+
+
+def geochem_display_transform(payload: dict) -> dict:
+    from kernels.geochem import geochem_display_transform as impl
+    return impl(payload)
+
+
+def geochem_interpret(payload: dict) -> dict:
+    from kernels.geochem import geochem_interpret as impl
+    return impl(payload)
 
 
 def crs_reproject(payload: dict) -> dict:

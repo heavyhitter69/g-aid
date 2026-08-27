@@ -1,0 +1,14 @@
+{
+  "node_id": "geochem_qc",
+  "formula": "Geochemistry QC",
+  "parameters": {
+    "n_censored": 0
+  },
+  "inputs": [
+    "geochem_canonical.json"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-valid/geochem_qc.json"
+  ],
+  "created_at": "2026-08-27T18:26:11.378535Z"
+}

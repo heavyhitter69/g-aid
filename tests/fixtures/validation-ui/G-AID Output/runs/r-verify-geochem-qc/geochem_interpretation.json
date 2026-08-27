@@ -1,0 +1,219 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "observations": [
+    "1 documented geochemistry table(s) were ingested (6 samples).",
+    "Sample medium recorded as: soil.",
+    "Documented units: ppm.",
+    "Au_ppm: n=6, n_censored=1, uncensored min/median/max=0.08/0.12/0.21 ppm.",
+    "Cu_ppm: n=6, n_censored=1, uncensored min/median/max=1.2/38.0/47.0 ppm."
+  ],
+  "analytical_limitations": [
+    "Lab method, detection limits, and qualifiers constrain what the numbers mean.",
+    "Coverage is the sample locations present in the bound files, not a complete survey."
+  ],
+  "assumptions": [
+    "G-AID GEOCHEM 1.0 comment contract (CRS, Medium, documented element units) was required.",
+    "Below-detection values are censored observations, not zeros.",
+    "Display transforms, when present, are user-approved and do not replace canonical values."
+  ],
+  "uncertainty": [
+    "Sample medium and sampling density bias the observed range.",
+    "Detection-limit treatment excludes censored values from min/max/median.",
+    "Spatial association with faults, geology, gravity, magnetics, or radiometrics is not causal evidence."
+  ],
+  "recommendations": [
+    "Do not treat high values as ore, economic grade, mineralisation confirmation, or drill targets.",
+    "Do not compare elements with unknown or mixed units.",
+    "Keep anomaly detection, prospectivity, targeting, resource estimation, and ML classification out of this pack."
+  ],
+  "not_established": [
+    "Ore is not established.",
+    "Economic grade is not established.",
+    "Mineralisation is not established.",
+    "Drill targets are not established.",
+    "Anomaly detection is not established.",
+    "Prospectivity is not established.",
+    "Resource or reserve estimates are not established.",
+    "Causal relationships from overlay are not established."
+  ],
+  "geological_certainty_improved": false,
+  "qc": {
+    "geochem_ingest_qc.json": {
+      "product_name": "G-AID documented geochemical sample table",
+      "format": "geochem-csv",
+      "tables": [
+        {
+          "source_path": "qc/assays.csv",
+          "catalog_id": "cat-r-verify-geochem-qc",
+          "checksum": null,
+          "crs": "EPSG:32734",
+          "crs_epsg": 32734,
+          "medium": "soil",
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "n": 6,
+          "units": [
+            "ppm"
+          ],
+          "mixed_units": false,
+          "detection_limit_treatment": "censored",
+          "replaced_bdl_with_zero": false,
+          "imputed": false,
+          "log_transformed": false,
+          "kind": "raw"
+        }
+      ],
+      "n_tables": 1,
+      "replaced_bdl_with_zero": false,
+      "imputed": false,
+      "log_transformed": false
+    },
+    "geochem_qc.json": {
+      "product_name": "G-AID documented geochemical sample table",
+      "n_tables": 1,
+      "n_samples": 6,
+      "n_values": 12,
+      "n_censored": 2,
+      "duplicate_sample_ids": [],
+      "duplicate_locations": [
+        {
+          "x": 260100.0,
+          "y": 6240100.0,
+          "n": 2
+        }
+      ],
+      "mixed_units": false,
+      "invalid_numeric": 0,
+      "missing_sample_metadata": 0,
+      "replaced_bdl_with_zero": false,
+      "imputed": false,
+      "log_transformed": false,
+      "qa_qc": {
+        "applied": true,
+        "blanks": {
+          "n": 1,
+          "ids": [
+            "BLK-1"
+          ]
+        },
+        "standards": {
+          "n": 1,
+          "ids": [
+            "STD-1"
+          ],
+          "expected": [
+            "STD-1:Au_ppm=0.20"
+          ]
+        },
+        "field_duplicates": {
+          "n": 1,
+          "ids": [
+            "S-101-FD"
+          ]
+        },
+        "lab_duplicates": {
+          "n": 1,
+          "ids": [
+            "S-102-LD"
+          ]
+        },
+        "note": "Counts only. Recovery statistics require documented expected values per standard ID; no silent pass/fail is invented."
+      },
+      "kind": "raw"
+    },
+    "geochem_summary.json": {
+      "product_name": "G-AID documented geochemical sample table",
+      "elements": [
+        {
+          "key": "Au_ppm",
+          "symbol": "Au",
+          "units": "ppm",
+          "n": 6,
+          "n_censored": 1,
+          "n_uncensored": 5,
+          "min": 0.08,
+          "max": 0.21,
+          "median": 0.12,
+          "mean": 0.126,
+          "kind": "raw",
+          "log_transformed": false
+        },
+        {
+          "key": "Cu_ppm",
+          "symbol": "Cu",
+          "units": "ppm",
+          "n": 6,
+          "n_censored": 1,
+          "n_uncensored": 5,
+          "min": 1.2,
+          "max": 47.0,
+          "median": 38.0,
+          "mean": 33.44,
+          "kind": "raw",
+          "log_transformed": false
+        }
+      ],
+      "selected": [
+        {
+          "key": "Au_ppm",
+          "symbol": "Au",
+          "units": "ppm",
+          "n": 6,
+          "n_censored": 1,
+          "n_uncensored": 5,
+          "min": 0.08,
+          "max": 0.21,
+          "median": 0.12,
+          "mean": 0.126,
+          "kind": "raw",
+          "log_transformed": false
+        },
+        {
+          "key": "Cu_ppm",
+          "symbol": "Cu",
+          "units": "ppm",
+          "n": 6,
+          "n_censored": 1,
+          "n_uncensored": 5,
+          "min": 1.2,
+          "max": 47.0,
+          "median": 38.0,
+          "mean": 33.44,
+          "kind": "raw",
+          "log_transformed": false
+        }
+      ],
+      "comparisons": [
+        {
+          "left": "Au_ppm",
+          "right": "Cu_ppm",
+          "blocked": false,
+          "reason": "Documented same-unit observation pair. Not a mineralisation index or ratio product."
+        }
+      ],
+      "kind": "raw",
+      "derived": false,
+      "display_only": false,
+      "log_transformed": false,
+      "note": "Statistics use uncensored values only. Censored below-detection samples are counted, not zeroed."
+    },
+    "geochem_points.meta.json": {
+      "product_name": "G-AID documented geochemical sample table",
+      "crs": "EPSG:32734",
+      "n_features": 12,
+      "elements": [
+        "Au_ppm",
+        "Cu_ppm"
+      ],
+      "skipped_no_crs": [],
+      "visual_scale": "raw observation (not an anomaly score)",
+      "kind": "raw",
+      "warnings": [
+        "Assay values are observations, not ore or drill targets.",
+        "Qualifiers, units, source, and filter state are map attributes.",
+        "Below-detection samples remain censored (value null)."
+      ]
+    }
+  },
+  "interpretation_limit": "High assay values are observations. Overlay and familiar element names do not prove mineralisation."
+}

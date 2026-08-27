@@ -1,0 +1,12 @@
+{
+  "quantity": "concentration",
+  "units": {
+    "k": "%K",
+    "eu": "ppm eU",
+    "eth": "ppm eTh",
+    "tc": "nGy/h"
+  },
+  "value_channel": "tc",
+  "value_units": "nGy/h",
+  "crs_epsg": 32630
+}

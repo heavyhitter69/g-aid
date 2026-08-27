@@ -1,0 +1,17 @@
+{
+  "runId": "r-verify-geochem-mixed",
+  "planHash": "fixture-r-verify-geochem-mixed",
+  "intent": "geochemistry",
+  "status": "complete",
+  "capabilities": [
+    "geochem.ingest",
+    "geochem.qc",
+    "geochem.map_points",
+    "geochem.summary",
+    "geochem.interpret"
+  ],
+  "product": "G-AID documented geochemical sample table",
+  "parameters": {
+    "elements": "Au_ppm,Fe_pct"
+  }
+}

@@ -262,18 +262,18 @@ export async function streamOrchestra(
 
   const preamble = {
     agentId: "orchestrator-agent",
-    confidence: isAnalysis ? 0.95 : 0,
-    showConfidence: isAnalysis,
+    confidence: 0,
+    showConfidence: false,
     capabilityTrace: [
       think ? "G-AID (Thinking)" : "G-AID (Fast)",
       ...(willLookup ? ["Plugins"] : []),
     ],
-    rulesMatched: isAnalysis ? ["langgraph_routing"] : [],
-    epistemicTypesProduced: isAnalysis ? ["interpretation", "recommendation"] : [],
+    rulesMatched: [],
+    epistemicTypesProduced: [],
     confidenceProvenance: {
-      dataQualityScore: isAnalysis ? 0.9 : 0,
-      crossMethodAgreement: isAnalysis ? 0.8 : 0,
-      geologicalConsistency: isAnalysis ? 0.85 : 0,
+      dataQualityScore: 0,
+      crossMethodAgreement: 0,
+      geologicalConsistency: 0,
       computedByKernel: "g-aid-orchestra",
     },
   };

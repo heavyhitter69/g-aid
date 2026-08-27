@@ -1,0 +1,7 @@
+source_path,sample_id,x,y,medium,qc_flag,batch,date,lab,method,crs,kind,Au_ppm,Au_ppm_qual,Au_ppm_dl,Au_ppm_censored,Cu_ppm,Cu_ppm_qual,Cu_ppm_dl,Cu_ppm_censored
+qc/assays.csv,S-101,260100.0,6240100.0,soil,sample,B2,,ALS,ICP-MS,EPSG:32734,raw,0.12,,,False,45.0,,,False
+qc/assays.csv,BLK-1,260101.0,6240101.0,soil,blank,B2,,ALS,ICP-MS,EPSG:32734,raw,,<,0.01,True,,<,0.5,True
+qc/assays.csv,STD-1,260102.0,6240102.0,soil,standard,B2,,ALS,ICP-MS,EPSG:32734,raw,0.21,,,False,1.2,,,False
+qc/assays.csv,S-101-FD,260100.0,6240100.0,soil,field_duplicate,B2,,ALS,ICP-MS,EPSG:32734,raw,0.13,,,False,47.0,,,False
+qc/assays.csv,S-102,260140.0,6240140.0,soil,sample,B2,,ALS,ICP-MS,EPSG:32734,raw,0.08,,,False,38.0,,,False
+qc/assays.csv,S-102-LD,260141.0,6240141.0,soil,lab_duplicate,B2,,ALS,ICP-MS,EPSG:32734,raw,0.09,,,False,36.0,,,False

@@ -1,0 +1,292 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GIS vector layer",
+  "layers": [
+    {
+      "source_path": "topology/hole-polygon.shp",
+      "catalog_id": "hole-polygon",
+      "crs": "EPSG:32734",
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "source_format": "shapefile",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "tenure",
+      "role_reviewed": true,
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "ID",
+        "UNIT"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240100.0,
+        "maxX": 260500.0,
+        "maxY": 6240400.0
+      },
+      "features": [
+        {
+          "id": "H1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240200.0
+            },
+            {
+              "x": 260320.0,
+              "y": 6240200.0
+            },
+            {
+              "x": 260320.0,
+              "y": 6240300.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240300.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240200.0
+            }
+          ],
+          "rings": [
+            [
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              }
+            ],
+            [
+              {
+                "x": 260220.0,
+                "y": 6240200.0
+              },
+              {
+                "x": 260320.0,
+                "y": 6240200.0
+              },
+              {
+                "x": 260320.0,
+                "y": 6240300.0
+              },
+              {
+                "x": 260220.0,
+                "y": 6240300.0
+              },
+              {
+                "x": 260220.0,
+                "y": 6240200.0
+              }
+            ]
+          ],
+          "parts": [
+            [
+              [
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                }
+              ],
+              [
+                {
+                  "x": 260220.0,
+                  "y": 6240200.0
+                },
+                {
+                  "x": 260320.0,
+                  "y": 6240200.0
+                },
+                {
+                  "x": 260320.0,
+                  "y": 6240300.0
+                },
+                {
+                  "x": 260220.0,
+                  "y": 6240300.0
+                },
+                {
+                  "x": 260220.0,
+                  "y": 6240200.0
+                }
+              ]
+            ]
+          ],
+          "topology": {
+            "engine": "g-aid-evenodd-segment",
+            "engine_version": "1.0",
+            "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+            "valid": true,
+            "part_count": 1,
+            "hole_count": 1,
+            "classification": "nesting-containment"
+          },
+          "properties": {
+            "ID": "H1",
+            "UNIT": "licence-with-hole"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "topology_engine": "g-aid-evenodd-segment",
+      "origin": "source"
+    },
+    {
+      "source_path": "topology/hole-points.shp",
+      "catalog_id": "hole-points",
+      "crs": "EPSG:32734",
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "source_format": "shapefile",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "sample-location",
+      "role_reviewed": true,
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "ID",
+        "SAMPLE_ID"
+      ],
+      "feature_count": 4,
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240150.0,
+        "maxX": 260270.0,
+        "maxY": 6240250.0
+      },
+      "features": [
+        {
+          "id": "shell",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260150.0,
+              "y": 6240150.0
+            }
+          ],
+          "properties": {
+            "ID": "shell",
+            "SAMPLE_ID": "IN-SHELL"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "hole",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260270.0,
+              "y": 6240250.0
+            }
+          ],
+          "properties": {
+            "ID": "hole",
+            "SAMPLE_ID": "IN-HOLE"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "ebound",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240250.0
+            }
+          ],
+          "properties": {
+            "ID": "ebound",
+            "SAMPLE_ID": "ON-EXTERIOR"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "hbound",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260220.0,
+              "y": 6240250.0
+            }
+          ],
+          "properties": {
+            "ID": "hbound",
+            "SAMPLE_ID": "ON-HOLE"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "topology_engine": "g-aid-evenodd-segment",
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

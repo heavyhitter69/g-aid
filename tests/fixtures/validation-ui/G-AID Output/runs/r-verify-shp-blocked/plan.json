@@ -1,0 +1,11 @@
+{
+  "runId": "r-verify-shp-blocked",
+  "planHash": "fixture-r-verify-shp-blocked",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest"
+  ],
+  "product": "G-AID documented GIS vector layer",
+  "parameters": {}
+}

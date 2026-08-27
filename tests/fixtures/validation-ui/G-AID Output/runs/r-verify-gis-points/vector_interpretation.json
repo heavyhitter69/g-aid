@@ -1,0 +1,42 @@
+{
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "observations": [
+    "1 documented GeoJSON layer(s) were ingested as source geometry.",
+    "Observed geometry types: Point.",
+    "valid-points/samples.geojson: 2 feature(s), CRS EPSG:32734, contract=legacy-geojson, axis_order=east-north, role=sample-location (reviewed=True)."
+  ],
+  "user_supplied_curve_meaning": [
+    "No attribute meanings were supplied. Field names remain unknown semantics."
+  ],
+  "assumptions": [
+    "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (lon, lat degrees). It is not EPSG:4326.",
+    "A legacy GeoJSON crs member is not the RFC 7946 CRS mechanism.",
+    "Companion .prj or / EPSG= annotations are a G-AID custom import contract, not standard RFC 7946.",
+    "OGC:CRS84 vs EPSG:4326 overlay, when allowed, uses stored GeoJSON [lon, lat] without an axis swap.",
+    "User-assigned roles are catalog labels, not geological confirmation."
+  ],
+  "uncertainty": [
+    "Spatial overlap is geometric coincidence.",
+    "A fault line, geology polygon, tenure boundary, occurrence, alteration label, or sample point remains source information."
+  ],
+  "recommendations": [
+    "Do not generate mineral targets, prospectivity maps, resource/reserve claims, or drill recommendations from overlays.",
+    "Assign layer roles explicitly. Do not infer geology from filenames.",
+    "Keep shapefile and GeoPackage out of processing until a tested parser exists."
+  ],
+  "not_established": [
+    "Geological interpretation is not established.",
+    "Mineral targeting is not established.",
+    "Prospectivity is not established.",
+    "Resource or reserve estimates are not established.",
+    "Drill recommendations are not established.",
+    "Causal relationships from overlay are not established.",
+    "Shapefile or GeoPackage ingest is not established."
+  ],
+  "geological_certainty_improved": false,
+  "qc": {
+    "vector_ingest_qc.json": true,
+    "vector_overlap_qc.json": {}
+  },
+  "interpretation_limit": "Observed vectors are source layers. Overlay and mnemonic-like field names do not prove geology."
+}

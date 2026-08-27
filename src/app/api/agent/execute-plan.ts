@@ -1,11 +1,26 @@
 import fs from "fs";
 import path from "path";
-import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
 import { workStepFromEvent } from "@/lib/work-steps";
+import { checkNodeInTasks } from "@/lib/tasks-tick";
+import { ertStepsEnabled, gprStepsEnabled, gravityStepsEnabled, magneticStepsEnabled, radiometricsStepsEnabled, validatePlan } from "@/lib/plan-spec";
+import {
+  allocateApprovedRun,
+  appendRunLog,
+  checksumPlanInputs,
+  hashPlan,
+  planHashMatches,
+  RUN_PLAN_MD,
+  RUN_TASKS_MD,
+  writeFrozenPlanJson,
+  writeRunFile,
+} from "@/lib/run-layout";
+import { loadProjectCatalog } from "@/lib/catalog";
+import { compiledNodeIds } from "@/lib/capabilities/compile";
+import { catalogInputsPayload, verifyBoundInputIdentity } from "@/lib/capabilities/inputs";
+import { dagForPlan } from "@/lib/capabilities";
 import {
   generateTasksMarkdown,
-  checkPhaseInTasks,
   getPendingPlan,
   clearPendingPlan,
   setPendingPlan,
@@ -26,16 +41,12 @@ const encoder = new TextEncoder();
 const enc = (s: string) => encoder.encode(s);
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function uniquifyFolder(outputDir: string, name: string): string {
-  let candidate = name.replace(/[\\/]+/g, " ").trim() || "results";
-  const base = candidate;
-  let n = 2;
-  while (fs.existsSync(path.join(outputDir, candidate))) {
-    candidate = `${base} ${n}`;
-    n += 1;
-  }
-  return candidate;
-}
+const RUN_DOC_SKIP = new Set([
+  "implementation plan.md",
+  "implementation-plan.md",
+  "tasks.md",
+  "plan.json",
+]);
 
 function relativeToWorkspace(workspaceRoot: string, absPath: string): string {
   return path.relative(workspaceRoot, absPath).replace(/\\/g, "/");
@@ -46,47 +57,31 @@ function collectTaskFiles(
   outputDir: string,
   taskFolder: string
 ): ProjectFileUpdate[] {
-  const skip = new Set(["implementation-plan.md", "tasks.md"]);
   const taskDir = path.join(outputDir, taskFolder);
   const projectFilesUpdates: ProjectFileUpdate[] = [];
   if (!fs.existsSync(taskDir)) return projectFilesUpdates;
-  for (const fName of fs.readdirSync(taskDir)) {
-    if (skip.has(fName.toLowerCase())) continue;
-    const filePath = path.join(taskDir, fName);
-    if (!fs.statSync(filePath).isFile()) continue;
-    const rel = relativeToWorkspace(workspaceRoot, filePath);
-    projectFilesUpdates.push({
-      id: rel,
-      name: fName,
-      type: "file",
-      path: rel,
-    });
-  }
-  return projectFilesUpdates;
-}
 
-function findWorkspaceFile(root: string, exts: string[]): string | undefined {
-  if (!root || !fs.existsSync(root)) return undefined;
-  const stack = [root];
-  while (stack.length) {
-    const dir = stack.pop()!;
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const filePath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (["g-aid output", ".git", "node_modules", ".venv"].includes(entry.name.toLowerCase())) continue;
-        stack.push(full);
-      } else if (exts.some((ext) => entry.name.toLowerCase().endsWith(ext))) {
-        return full;
+        if (entry.name === "logs") continue;
+        walk(filePath);
+        continue;
       }
+      if (!entry.isFile()) continue;
+      if (RUN_DOC_SKIP.has(entry.name.toLowerCase())) continue;
+      const rel = relativeToWorkspace(workspaceRoot, filePath);
+      projectFilesUpdates.push({
+        id: rel,
+        name: entry.name,
+        type: "file",
+        path: rel,
+      });
     }
-  }
-  return undefined;
+  };
+  walk(taskDir);
+  return projectFilesUpdates;
 }
 
 function tasksUpdate(content: string, open = false): ProjectFileUpdate {
@@ -101,36 +96,49 @@ function tasksUpdate(content: string, open = false): ProjectFileUpdate {
   };
 }
 
-const NODE_PHASE: Record<string, string> = {
-  file_discovery: "Phase 1: Data Discovery",
-  flight_path_cleaner: "Phase 2: Flight Path Cleaning",
-  time_synchronizer: "Phase 3: Time Synchronization",
-  diurnal_corrector: "Phase 4: Diurnal Correction",
-  qc_engine: "Phase 5: Quality Control",
-  excel_export_adapter: "Phase 5: Quality Control",
-  report_export_adapter: "Phase 5: Quality Control",
-  igrf_corrector: "IGRF removal",
-  heading_lag_corrector: "Heading and lag correction",
-  tie_line_leveler: "Tie-line levelling",
-  mag_gridder: "Minimum-curvature gridding",
-  grid_microleveller: "2-D microlevelling",
-  rtp_filter: "RTP",
-  fft_derivatives: "MAGMAP",
-  map_composer: "Report maps",
-  lineament_extractor: "Lineament extraction",
-  gis_export: "GIS export",
-  microleveller: "Microlevelling",
-  euler_deconvolution: "Euler deconvolution",
-  gravity_reduce: "Gravity reduction",
-  regional_residual: "Regional-residual separation",
-  ert_pseudosection: "ERT pseudosection",
-  ert_invert: "ERT inversion",
-  seismic_process: "Seismic processing",
-  radiometric_correct: "Radiometric corrections",
-  gpr_process: "GPR processing",
-  xyz_ingest: "Gravity reduction",
-  las_ingest: "Write products to",
-};
+function tickFromEvent(
+  content: string,
+  event: { type?: string; nodeId?: string; message?: string; payload?: { skipped?: boolean; artifacts?: { path?: string }[] } }
+): string | null {
+  if (event.type !== "NODE_COMPLETED" || !event.nodeId) return null;
+  const artifacts = event.payload?.artifacts || [];
+  const skipped =
+    Boolean(event.payload?.skipped) ||
+    (/skipped:/i.test(event.message || "") && artifacts.length === 0);
+  if (skipped) return checkNodeInTasks(content, event.nodeId, "skipped");
+  const hasFiles = artifacts.some((artifact) => {
+    const filePath = artifact?.path;
+    return typeof filePath === "string" && filePath.length > 0 && fs.existsSync(filePath);
+  });
+  if (!hasFiles && artifacts.length === 0) return null;
+  return checkNodeInTasks(content, event.nodeId, "complete");
+}
+
+function persistRunDocs(pending: AgentPlan, tasksContent: string): void {
+  try {
+    writeRunFile(pending, RUN_PLAN_MD, pending.plan || "");
+    writeRunFile(pending, RUN_TASKS_MD, tasksContent);
+    writeFrozenPlanJson(pending);
+  } catch {
+    /* checklist still runs */
+  }
+}
+
+function logEvent(pending: AgentPlan, event: { type?: string; nodeId?: string; message?: string }): void {
+  try {
+    appendRunLog(
+      pending,
+      JSON.stringify({
+        at: new Date().toISOString(),
+        type: event.type,
+        nodeId: event.nodeId,
+        message: event.message,
+      })
+    );
+  } catch {
+    /* logs are best-effort */
+  }
+}
 
 async function runDiurnalPipeline(
   pending: AgentPlan,
@@ -139,7 +147,13 @@ async function runDiurnalPipeline(
   tasksContent: { current: string }
 ): Promise<{ files: ProjectFileUpdate[]; ok: boolean }> {
   const { MagneticPreprocessingPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
-  const pipeline = new MagneticPreprocessingPipeline();
+  const dag = dagForPlan(pending);
+  const nodeIds = compiledNodeIds(dag);
+  if (!nodeIds.length) {
+    enqueue("- ❌ **No compiled processing nodes.** Unregistered methods are not executed.\n");
+    return { files: [], ok: false };
+  }
+  const pipeline = new MagneticPreprocessingPipeline(nodeIds);
   const pipelineParams = {
     projectName: pending.projectName,
     targetFolder: pending.targetFolder || "",
@@ -152,28 +166,72 @@ async function runDiurnalPipeline(
     inclination: pending.parameters.inclination,
     declination: pending.parameters.declination,
     inputPath: pending.parameters.inputPath,
+    surveyLatitude: pending.parameters.surveyLatitude,
+    elevationDatum: pending.parameters.elevationDatum,
+    gravityUnits: pending.parameters.gravityUnits,
+    crsEpsg: pending.parameters.crsEpsg,
+    applyBullardB: pending.parameters.applyBullardB,
+    terrainRadiusM: pending.parameters.terrainRadiusM,
+    useDemExtent: pending.parameters.useDemExtent,
+    applyIntermediateZone: pending.parameters.applyIntermediateZone || pending.steps.intermediateZoneTerrain,
+    applyFarZone: pending.parameters.applyFarZone || pending.steps.farZoneTerrain,
+    intermediateRadiusM: pending.parameters.intermediateRadiusM,
+    farRadiusM: pending.parameters.farRadiusM,
+    outerCellSizeM: pending.parameters.outerCellSizeM,
+    gravityMapping: pending.parameters.gravityMapping,
+    columnMapping: pending.parameters.gravityMapping,
+    columnMappingReviewed: pending.parameters.columnMappingReviewed,
+    radioMapping: pending.parameters.radioMapping,
+    geochemMapping: pending.parameters.geochemMapping,
+    displayTransform: pending.parameters.displayTransform,
+    displayTransformApproved: pending.parameters.displayTransformApproved,
+    approved: pending.parameters.approved || pending.parameters.displayTransformApproved,
+    displayElement: pending.parameters.displayElement,
+    radioQuantity: (pending.inputs || []).find((item) => item.radioQuantity)?.radioQuantity,
+    correctionHistory: (pending.inputs || []).find((item) => item.correctionHistory)?.correctionHistory,
+    velocityMs: pending.parameters.velocityMs,
+    fLowHz: pending.parameters.fLowHz,
+    fHighHz: pending.parameters.fHighHz,
+    applyDewow: pending.parameters.applyDewow,
+    dewowWindow: pending.parameters.dewowWindow,
+    applyTimeZero: pending.parameters.applyTimeZero,
+    timeZeroThreshold: pending.parameters.timeZeroThreshold,
+    applySecGain: pending.parameters.applySecGain,
+    secPower: pending.parameters.secPower,
+    secExp: pending.parameters.secExp,
+    applyBandpass: pending.parameters.applyBandpass,
+    filterOrder: pending.parameters.filterOrder,
+    selectedCurves: pending.parameters.selectedCurves,
+    collarCrsConfirmed: pending.parameters.collarCrsConfirmed,
     steps: pending.steps,
+    runId: pending.runId,
+    parentRunId: pending.parentRunId,
+    planHash: pending.planHash,
+    capabilities: pending.capabilities,
+    dagNodeIds: nodeIds,
+    catalogInputs: catalogInputsPayload(pending.workspaceRoot, pending.inputs || []),
   };
 
   const checked = new Set<string>();
   let failed = false;
   const ok = await pipeline.runPipeline([], async (event) => {
+    logEvent(pending, event);
     if (event.type === "NODE_PROGRESS") {
       const step = workStepFromEvent(event.nodeId, event.message || "");
       if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
-      const phase = event.nodeId ? NODE_PHASE[event.nodeId] : undefined;
-      if (phase && !checked.has(phase)) {
-        checked.add(phase);
-        tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
-        onTasks(tasksContent.current);
-      }
     } else if (event.type === "NODE_COMPLETED" && event.nodeId) {
-      enqueue(`\x02${JSON.stringify({ type: "work_step", id: event.nodeId, done: true })}\n`);
-      const phase = NODE_PHASE[event.nodeId];
-      if (phase && !checked.has(phase)) {
-        checked.add(phase);
-        tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
-        onTasks(tasksContent.current);
+      const skipped = Boolean(event.payload?.skipped) || /skipped:/i.test(event.message || "");
+      if (!skipped) {
+        enqueue(`\x02${JSON.stringify({ type: "work_step", id: event.nodeId, done: true })}\n`);
+      }
+      if (!checked.has(event.nodeId)) {
+        const next = tickFromEvent(tasksContent.current, event);
+        if (next) {
+          checked.add(event.nodeId);
+          tasksContent.current = next;
+          onTasks(tasksContent.current);
+          persistRunDocs(pending, tasksContent.current);
+        }
       }
     } else if (event.type === "QC_WARNING") {
       enqueue(`\x02${JSON.stringify({
@@ -194,14 +252,39 @@ async function runDiurnalPipeline(
   };
 }
 
-export function streamPlanDecision(sessionId: string, decision: "approve" | "reject"): ReadableStream<Uint8Array> {
+function freezeApprovedPlan(pending: AgentPlan): AgentPlan {
+  const dag = dagForPlan(pending);
+  const withDag: AgentPlan = {
+    ...pending,
+    dag,
+    capabilities: dag.requestedCapabilityIds,
+  };
+  const allocated = allocateApprovedRun(withDag);
+  const approvedAt = new Date().toISOString();
+  const withHash: AgentPlan = {
+    ...allocated,
+    status: "approved",
+    approvedAt,
+    inputs: checksumPlanInputs(allocated),
+  };
+  withHash.planHash = hashPlan(withHash);
+  fs.mkdirSync(path.join(withHash.outputDir, withHash.taskFolder), { recursive: true });
+  persistRunDocs(withHash, generateTasksMarkdown(withHash));
+  return withHash;
+}
+
+export function streamPlanDecision(
+  sessionId: string,
+  decision: "approve" | "reject",
+  workspaceRoot?: string
+): ReadableStream<Uint8Array> {
   return new ReadableStream({
     async start(controller) {
       const enqueue = (s: string) => controller.enqueue(enc(s));
-      const pending = getPendingPlan(sessionId);
+      const pending = getPendingPlan(sessionId, workspaceRoot);
       try {
         if (!pending) {
-          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0 })}\n`);
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
           enqueue("No pending implementation plan found for this chat. Ask G-AID to plan the analysis first.");
           enqueue(`\n\x02${JSON.stringify({ type: "execution_failed" })}\n`);
           controller.close();
@@ -209,7 +292,7 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
         }
 
         if (decision === "reject") {
-          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0.8 })}\n`);
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
           await delay(40);
           enqueue("Plan cancelled.");
           clearPendingPlan(sessionId);
@@ -218,32 +301,67 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           return;
         }
 
-        const dest = path.join(pending.outputDir, pending.taskFolder);
-        if (!fs.existsSync(dest)) {
-          pending.taskFolder = uniquifyFolder(pending.outputDir, pending.taskFolder);
+        const catalog = loadProjectCatalog(pending.workspaceRoot);
+        const check = validatePlan(pending, catalog);
+        if (!check.ok) {
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
+          enqueue(
+            `I can't start yet. ${check.blockers.map((issue) => issue.message).join(" ")} Edit the plan or tell me what to change.`
+          );
+          enqueue(`\n\x02${JSON.stringify({
+            type: "execution_failed",
+            awaitingApproval: true,
+            taskFolder: pending.taskFolder,
+            blockers: check.blockers,
+          })}\n`);
+          controller.close();
+          return;
         }
-        pending.productsRel = path
-          .relative(pending.workspaceRoot, path.join(pending.outputDir, pending.taskFolder))
-          .replace(/\\/g, "/");
-        fs.mkdirSync(path.join(pending.outputDir, pending.taskFolder), { recursive: true });
-        setPendingPlan(sessionId, pending);
 
-        const tasksContent = { current: generateTasksMarkdown(pending) };
+        const identity = verifyBoundInputIdentity(pending.workspaceRoot, pending.inputs || []);
+        if (!identity.ok) {
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
+          enqueue(
+            `Bound catalog data changed or is missing. ${identity.issues.map((issue) => issue.message).join(" ")} Create a revision after re-cataloguing.`
+          );
+          enqueue(`\n\x02${JSON.stringify({
+            type: "execution_failed",
+            awaitingApproval: true,
+            identityIssues: identity.issues,
+          })}\n`);
+          controller.close();
+          return;
+        }
+
+        const frozen = freezeApprovedPlan(pending);
+        if (!planHashMatches(frozen)) {
+          enqueue(`\x00${JSON.stringify({ agentId: "orchestrator-agent", confidence: 0, showConfidence: false })}\n`);
+          enqueue("Proceed can only execute a hash-frozen plan. The plan hash did not match; I will not run.");
+          enqueue(`\n\x02${JSON.stringify({ type: "execution_failed", awaitingApproval: true })}\n`);
+          controller.close();
+          return;
+        }
+        frozen.status = "executing";
+        setPendingPlan(sessionId, frozen);
+
+        const tasksContent = { current: generateTasksMarkdown(frozen) };
+        persistRunDocs(frozen, tasksContent.current);
 
         enqueue(`\x00${JSON.stringify({
           agentId: "magnetic-agent",
           confidence: 0,
           showConfidence: false,
-          capabilityTrace: pending.steps.diurnal ? ["diurnal-correction"] : ["planning"],
+          capabilityTrace: frozen.steps.diurnal ? ["diurnal-correction"] : ["planning"],
         })}\n`);
         enqueue(`\x02${JSON.stringify({
           type: "workspace_file",
           projectFilesUpdates: [tasksUpdate(tasksContent.current, true)],
         })}\n`);
         await delay(40);
-        enqueue(`**Plan approved.** Working through the checklist.\n\n`);
+        enqueue(`**Plan approved.** Working through the checklist in \`${frozen.productsRel}/\`. A previous run is never overwritten.\n\n`);
 
         const onTasks = (content: string) => {
+          persistRunDocs(frozen, content);
           enqueue(`\x02${JSON.stringify({
             type: "workspace_file",
             projectFilesUpdates: [tasksUpdate(content)],
@@ -251,110 +369,45 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
         };
 
         const projectFilesUpdates: ProjectFileUpdate[] = [];
-
-        const mag =
-          pending.steps.diurnal ||
-          pending.steps.igrf ||
-          pending.steps.grid ||
-          pending.steps.rtp;
         let ranOk = true;
-        if (mag) {
-          const created = await runDiurnalPipeline(pending, enqueue, onTasks, tasksContent);
+        const mag = magneticStepsEnabled(frozen.steps);
+        const grav = gravityStepsEnabled(frozen.steps);
+        const ert = ertStepsEnabled(frozen.steps);
+        const radio = radiometricsStepsEnabled(frozen.steps);
+        const gpr = gprStepsEnabled(frozen.steps);
+
+        if (!mag && !grav && !ert && !radio && !gpr) {
+          ranOk = false;
+          enqueue("- ❌ **No registered steps to execute.** Seismic is not in this release. Height correction, stripping, and NASVD are not live radiometric capabilities.\n");
+        } else if (!(frozen.inputs || []).length) {
+          ranOk = false;
+          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, and/or GPR-contract catalog IDs first.\n");
+        } else {
+          const created = await runDiurnalPipeline(frozen, enqueue, onTasks, tasksContent);
           projectFilesUpdates.push(...created.files);
           ranOk = created.ok;
         }
 
-        if (pending.steps.gravity || pending.steps.ert || pending.steps.seismic || pending.steps.gpr || pending.steps.radiometrics) {
-          const { GravityPipeline, ResistivityPipeline, SeismicPipeline, GprPipeline, RadiometricPipeline } = await import(
-            "@/pipeline/MagneticPreprocessingPipeline"
-          );
-          const { PipelineEngine } = await import("@/pipeline/PipelineEngine");
-          if (!pending.parameters.inputPath) {
-            if (pending.steps.gravity) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".xyz", ".txt"]);
-            else if (pending.steps.ert) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".dat"]);
-            else if (pending.steps.seismic) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".sgy", ".segy"]);
-            else if (pending.steps.gpr) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".dzt"]);
-            else if (pending.steps.radiometrics) pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".csv"]);
-            else pending.parameters.inputPath = findWorkspaceFile(pending.workspaceRoot, [".las"]);
-          }
-          const extraParams = {
-            projectName: pending.projectName,
-            targetFolder: pending.targetFolder || "",
-            taskFolder: pending.taskFolder,
-            baseDir: pending.workspaceRoot,
-            outDir: pending.outputDir,
-            inputPath: pending.parameters.inputPath,
-            density: pending.parameters.density,
-            steps: pending.steps,
-          };
-          const runExtra = async (pipeline: InstanceType<typeof PipelineEngine>) => {
-            const extraOk = await pipeline.runPipeline([], async (event) => {
-              if (event.type === "NODE_PROGRESS") {
-                const step = workStepFromEvent(event.nodeId, event.message || "");
-                if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
-                const phase = event.nodeId ? NODE_PHASE[event.nodeId] : undefined;
-                if (phase) {
-                  tasksContent.current = checkPhaseInTasks(tasksContent.current, phase);
-                  onTasks(tasksContent.current);
-                }
-              } else if (event.type === "QC_WARNING") {
-                enqueue(`\x02${JSON.stringify({
-                  type: "work_step",
-                  id: `qc:${event.message?.slice(0, 40)}`,
-                  label: event.message || "Quality note",
-                  status: "warning",
-                })}\n`);
-              } else if (event.type === "PIPELINE_FAILED") {
-                ranOk = false;
-                enqueue(`- ❌ **Pipeline Error**: ${event.message}\n`);
-              }
-            }, extraParams);
-            if (!extraOk) ranOk = false;
-          };
-          if (pending.steps.gravity) await runExtra(new GravityPipeline());
-          if (pending.steps.ert) await runExtra(new ResistivityPipeline());
-          if (pending.steps.seismic) await runExtra(new SeismicPipeline());
-          if (pending.steps.gpr) await runExtra(new GprPipeline());
-          if (pending.steps.radiometrics) await runExtra(new RadiometricPipeline());
-        }
-
-        const lasPath = findWorkspaceFile(pending.workspaceRoot, [".las"]);
-        if (lasPath) {
-          const { WellLogPipeline } = await import("@/pipeline/MagneticPreprocessingPipeline");
-          const lasPipe = new WellLogPipeline();
-          const lasOk = await lasPipe.runPipeline([], async (event) => {
-            if (event.type === "NODE_PROGRESS") {
-              const step = workStepFromEvent(event.nodeId, event.message || "");
-              if (step) enqueue(`\x02${JSON.stringify({ type: "work_step", ...step })}\n`);
-            } else if (event.type === "PIPELINE_FAILED") {
-              ranOk = false;
-              enqueue(`- ❌ **Pipeline Error**: ${event.message}\n`);
-            }
-          }, {
-            projectName: pending.projectName,
-            targetFolder: pending.targetFolder || "",
-            taskFolder: pending.taskFolder,
-            baseDir: pending.workspaceRoot,
-            outDir: pending.outputDir,
-            inputPath: lasPath,
-            steps: pending.steps,
-          });
-          if (!lasOk) ranOk = false;
-        }
-
-        const latest = collectTaskFiles(pending.workspaceRoot, pending.outputDir, pending.taskFolder);
+        const latest = collectTaskFiles(frozen.workspaceRoot, frozen.outputDir, frozen.taskFolder);
         const seen = new Set(projectFilesUpdates.map((f) => f.path));
         for (const file of latest) {
           if (!seen.has(file.path)) projectFilesUpdates.push(file);
         }
 
+        frozen.lineage = { products: projectFilesUpdates.map((file) => file.path) };
+
         if (!ranOk) {
+          frozen.status = "failed";
+          persistRunDocs(frozen, tasksContent.current);
+          setPendingPlan(sessionId, frozen);
           onTasks(tasksContent.current);
-          enqueue(`\n\nStopped. This run did not finish. Click Proceed to retry — the plan is still here.`);
+          enqueue(`\n\nStopped. This run did not finish. Click Proceed to retry — a new run folder will be created and this one stays as-is.`);
           enqueue(`\n\x02${JSON.stringify({
             type: "execution_failed",
             agentId: "magnetic-agent",
-            taskFolder: pending.taskFolder,
+            taskFolder: frozen.taskFolder,
+            productsRel: frozen.productsRel,
+            runId: frozen.runId,
             awaitingApproval: true,
             projectFilesUpdates,
           })}\n`);
@@ -362,15 +415,19 @@ export function streamPlanDecision(sessionId: string, decision: "approve" | "rej
           return;
         }
 
-        tasksContent.current = checkPhaseInTasks(tasksContent.current, `Write products to ${GAID_OUTPUT_DIR}`);
+        tasksContent.current = checkNodeInTasks(tasksContent.current, "write_products", "complete");
+        frozen.status = "complete";
+        persistRunDocs(frozen, tasksContent.current);
         onTasks(tasksContent.current);
 
-        enqueue(`\n\nFinished. Results are on the map.`);
+        enqueue(`\n\nFinished. Results are on the map under \`${frozen.productsRel}/\`.`);
         enqueue(`\n\x02${JSON.stringify({
           type: "execution_complete",
           agentId: "magnetic-agent",
-          taskFolder: pending.taskFolder,
-          productsRel: pending.productsRel,
+          taskFolder: frozen.taskFolder,
+          productsRel: frozen.productsRel,
+          runId: frozen.runId,
+          parentRunId: frozen.parentRunId,
           awaitingApproval: false,
           projectFilesUpdates,
         })}\n`);

@@ -1,0 +1,14 @@
+{
+  "runId": "r-verify-gis-interpret",
+  "planHash": "fixture-r-verify-gis-interpret",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.spatial_overlap",
+    "gis.interpret"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}

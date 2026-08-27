@@ -1,0 +1,39 @@
+{
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "format": "geojson",
+  "layers": [
+    {
+      "source_path": "valid-lines/faults.geojson",
+      "catalog_id": "valid-lines/faults.geojson",
+      "checksum": "valid-lines/faults.geojson",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "geometry_types": [
+        "LineString"
+      ],
+      "attribute_names": [
+        "NAME"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 260050.0,
+        "minY": 6240050.0,
+        "maxX": 260200.0,
+        "maxY": 6240200.0
+      },
+      "role": "structure",
+      "role_reviewed": true,
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON."
+      ]
+    }
+  ],
+  "n_layers": 1,
+  "reprojected": false,
+  "geoprocessing": false
+}

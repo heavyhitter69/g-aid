@@ -1,0 +1,51 @@
+{
+  "kind": "borehole-log",
+  "product_name": "G-AID LAS 2.0 measured-depth log",
+  "depth_reference": "measured depth",
+  "depth_index": "DEPT",
+  "depth_units": "M",
+  "null_value": -999.25,
+  "well_id": "NOCRS",
+  "las_version": "2.0",
+  "wrap": "NO",
+  "selected_curves": [
+    "GR"
+  ],
+  "tracks": [
+    {
+      "mnemonic": "GR",
+      "units": "GAPI",
+      "description": "",
+      "semantics": "unknown",
+      "null_gaps": 0,
+      "samples": [
+        {
+          "depth": 0.0,
+          "value": 60.0
+        },
+        {
+          "depth": 2.0,
+          "value": 61.0
+        },
+        {
+          "depth": 4.0,
+          "value": 62.0
+        }
+      ]
+    }
+  ],
+  "trajectory_computed": false,
+  "catalog_id": "cat-r-verify-las-ncrs",
+  "checksum": "fixture",
+  "header_provenance": {
+    "VERS": "2.0",
+    "WRAP": "NO",
+    "WELL": "NOCRS",
+    "source": "/workspace/tests/fixtures/las-project/missing-crs/well.las"
+  },
+  "warnings": [
+    "Measured depth is not true vertical depth or a spatial trajectory.",
+    "Curve mnemonics have unknown semantics unless the user supplied meaning.",
+    "Collar coordinates are present without a documented CRS."
+  ]
+}

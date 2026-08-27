@@ -1,0 +1,39 @@
+{
+  "node_id": "gpr_process",
+  "formula": "optional dewow + optional time-zero + optional SEC + optional Nyquist-safe Butterworth (Jol 2009)",
+  "parameters": {
+    "dt_ns": 0.4,
+    "dx_m": 0.05,
+    "antenna_mhz": 400.0,
+    "sampling_hz": 2499999999.9999995,
+    "nyquist_hz": 1249999999.9999998,
+    "bandpass": {
+      "dt_s": 4.0000000000000007e-10,
+      "sampling_hz": 2499999999.9999995,
+      "nyquist_hz": 1249999999.9999998,
+      "nyquist_high_fraction": 0.8,
+      "safe_high_hz": 999999999.9999999,
+      "apply_bandpass_requested": true,
+      "requested_low_hz": 80000000.0,
+      "requested_high_hz": 800000000.0,
+      "requested_source": "antenna_default",
+      "applied_low_hz": 80000000.0,
+      "applied_high_hz": 800000000.0,
+      "bandpass_applied": true,
+      "bandpass_defaulted_from_antenna": true,
+      "bandpass_adjusted": false,
+      "bandpass_refused": false,
+      "refusal_reason": null,
+      "adjustment_reason": null,
+      "formula": "Butterworth SOS band-pass, order 4 unless overridden; filtfilt"
+    }
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr/gpr_canonical.csv"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr/gpr_radargram.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr/gpr_process_qc.json"
+  ],
+  "created_at": "2026-08-27T14:40:38.155791Z"
+}

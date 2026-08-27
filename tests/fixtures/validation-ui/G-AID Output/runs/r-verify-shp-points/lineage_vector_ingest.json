@@ -1,0 +1,15 @@
+{
+  "node_id": "vector_ingest",
+  "formula": "Documented GIS vector ingest",
+  "parameters": {
+    "n": 1
+  },
+  "inputs": [
+    "points/samples.shp"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-points/vector_canonical.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-points/vector_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T19:45:45.103564Z"
+}

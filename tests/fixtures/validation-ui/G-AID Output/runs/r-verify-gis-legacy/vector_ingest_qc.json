@@ -1,0 +1,40 @@
+{
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "format": "geojson",
+  "layers": [
+    {
+      "source_path": "compat/legacy-4326.geojson",
+      "catalog_id": "legacy",
+      "checksum": "legacy",
+      "crs": "EPSG:4326",
+      "crs_epsg": 4326,
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "lat-lon",
+      "coordinate_order": "lon-lat",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "SITE"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 18.41,
+        "minY": -33.91,
+        "maxX": 18.41,
+        "maxY": -33.91
+      },
+      "role": "sample-location",
+      "role_reviewed": true,
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "The legacy GeoJSON crs member is not the RFC 7946 CRS mechanism. This file is labeled legacy-GeoJSON.",
+        "Legacy crs names EPSG:4326 (OGC axis order lat-lon). GeoJSON coordinate arrays stay [lon, lat]. G-AID will not silently swap axes or relabel this as OGC:CRS84."
+      ]
+    }
+  ],
+  "n_layers": 1,
+  "reprojected": false,
+  "geoprocessing": false
+}

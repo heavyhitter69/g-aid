@@ -1,95 +1,46 @@
 import fs from "fs";
-import os from "os";
 import path from "path";
-import { GAID_OUTPUT_DIR, type AnalysisIntent } from "@/lib/workspace-index";
+import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
+import { EMPTY_STEPS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
+import { pendingPlansPath } from "@/lib/run-layout";
+import { checkNodeInTasks } from "@/lib/tasks-tick";
+import { generateTasksMarkdown } from "@/lib/capabilities/tasks";
 
-export type PlanSteps = {
-  diurnal: boolean;
-  igrf: boolean;
-  headingLag: boolean;
-  level: boolean;
-  grid: boolean;
-  rtp: boolean;
-  derivatives: boolean;
-  lineaments: boolean;
-  gis: boolean;
-  gravity: boolean;
-  residual: boolean;
-  ert: boolean;
-  ertInvert: boolean;
-  seismic: boolean;
-  radiometrics: boolean;
-  gpr: boolean;
-};
-
-export const EMPTY_STEPS: PlanSteps = {
-  diurnal: false,
-  igrf: false,
-  headingLag: false,
-  level: false,
-  grid: false,
-  rtp: false,
-  derivatives: false,
-  lineaments: false,
-  gis: false,
-  gravity: false,
-  residual: false,
-  ert: false,
-  ertInvert: false,
-  seismic: false,
-  radiometrics: false,
-  gpr: false,
-};
-
-export interface AgentPlan {
-  plan: string;
-  taskFolder: string;
-  outputDir: string;
-  productsRel?: string;
-  workspaceRoot: string;
-  targetFolder: string;
-  projectName: string;
-  intent: AnalysisIntent;
-  steps: PlanSteps;
-  parameters: {
-    baseReference: "mean_base" | "median_base" | "first_sample";
-    surveyDate?: string;
-    density?: number;
-    inclination?: number;
-    declination?: number;
-    inputPath?: string;
-  };
-  workspaceBrief: string;
-}
+export { EMPTY_STEPS, type AgentPlan, type PlanSteps, checkNodeInTasks, generateTasksMarkdown };
 
 const globalAny = global as any;
 if (!globalAny.PENDING_APPROVAL) {
   globalAny.PENDING_APPROVAL = {};
 }
 const PENDING_APPROVAL: Record<string, AgentPlan> = globalAny.PENDING_APPROVAL;
-const PLAN_STORE = path.join(os.tmpdir(), "g-aid-pending-plans.json");
 
-function loadPlansFromDisk(): Record<string, AgentPlan> {
+function loadPlansFromDisk(workspaceRoot?: string): Record<string, AgentPlan> {
+  if (!workspaceRoot) return {};
   try {
-    if (!fs.existsSync(PLAN_STORE)) return {};
-    const parsed = JSON.parse(fs.readFileSync(PLAN_STORE, "utf8")) as Record<string, AgentPlan>;
+    const store = pendingPlansPath(workspaceRoot);
+    if (!fs.existsSync(store)) return {};
+    const parsed = JSON.parse(fs.readFileSync(store, "utf8")) as Record<string, AgentPlan>;
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
 }
 
-function savePlansToDisk(plans: Record<string, AgentPlan>): void {
+function savePlansToDisk(workspaceRoot: string, plans: Record<string, AgentPlan>): void {
   try {
-    fs.writeFileSync(PLAN_STORE, JSON.stringify(plans));
+    const store = pendingPlansPath(workspaceRoot);
+    fs.mkdirSync(path.dirname(store), { recursive: true });
+    fs.writeFileSync(store, `${JSON.stringify(plans, null, 2)}\n`);
   } catch {
-    /* testers can still retry in the same Node process */
+    /* in-memory pending plan still works in this process */
   }
 }
 
-export function getPendingPlan(sessionId: string): AgentPlan | undefined {
+export function getPendingPlan(sessionId: string, workspaceRoot?: string): AgentPlan | undefined {
   if (PENDING_APPROVAL[sessionId]) return PENDING_APPROVAL[sessionId];
-  const disk = loadPlansFromDisk();
+  const root = workspaceRoot || Object.values(PENDING_APPROVAL).find((plan) => plan.workspaceRoot)?.workspaceRoot;
+  if (!root) return undefined;
+  const disk = loadPlansFromDisk(root);
   if (disk[sessionId]) {
     PENDING_APPROVAL[sessionId] = disk[sessionId];
     return disk[sessionId];
@@ -99,14 +50,18 @@ export function getPendingPlan(sessionId: string): AgentPlan | undefined {
 
 export function setPendingPlan(sessionId: string, plan: AgentPlan): void {
   PENDING_APPROVAL[sessionId] = plan;
-  savePlansToDisk({ ...loadPlansFromDisk(), ...PENDING_APPROVAL, [sessionId]: plan });
+  if (!plan.workspaceRoot) return;
+  savePlansToDisk(plan.workspaceRoot, { ...loadPlansFromDisk(plan.workspaceRoot), [sessionId]: plan });
 }
 
 export function clearPendingPlan(sessionId: string): void {
+  const existing = PENDING_APPROVAL[sessionId];
   delete PENDING_APPROVAL[sessionId];
-  const disk = loadPlansFromDisk();
+  const root = existing?.workspaceRoot;
+  if (!root) return;
+  const disk = loadPlansFromDisk(root);
   delete disk[sessionId];
-  savePlansToDisk(disk);
+  savePlansToDisk(root, disk);
 }
 
 const generateImplementationPlan = (
@@ -178,85 +133,6 @@ function nextTaskFolder(outputDir: string): string {
   return `task ${next}`;
 }
 
-const generateTasksMarkdown = (plan: {
-  projectName: string;
-  taskFolder: string;
-  productsRel?: string;
-  targetFolder?: string;
-  steps: PlanSteps;
-  parameters?: { baseReference?: string };
-}): string => {
-  const target = plan.targetFolder || plan.projectName;
-  const lines = [
-    `# Tasks`,
-    ``,
-    `**Project:** ${plan.projectName}`,
-    `**Target:** ${target}`,
-    `**Products:** \`${plan.productsRel || `${GAID_OUTPUT_DIR}/${plan.taskFolder}`}/\``,
-    plan.parameters?.baseReference ? `**Base reference:** \`${plan.parameters.baseReference}\`` : "",
-    ``,
-    `This file is the working checklist. Items are checked off as G-AID finishes each step.`,
-    ``,
-    `## Tasks`,
-    ``,
-  ].filter((line, i, arr) => line !== "" || arr[i - 1] !== "");
-
-  if (plan.steps.diurnal) {
-    lines.push(
-      `- [ ] Phase 1: Data Discovery`,
-      `  - [ ] Scan ${target} for files`,
-      `  - [ ] Classify airborne vs base station data`,
-      `  - [ ] Generate canonical CSV outputs`,
-      ``,
-      `- [ ] Phase 2: Flight Path Cleaning`,
-      `  - [ ] Filter spurious readings`,
-      `  - [ ] Apply altitude thresholds`,
-      `  - [ ] Remove noise outliers`,
-      ``,
-      `- [ ] Phase 3: Time Synchronization`,
-      `  - [ ] Align timestamps`,
-      `  - [ ] Interpolate base readings`,
-      `  - [ ] Validate temporal alignment`,
-      ``,
-      `- [ ] Phase 4: Diurnal Correction`,
-      `  - [ ] Compute reference value`,
-      `  - [ ] Apply correction formula`,
-      `  - [ ] Generate corrected dataset`,
-      ``,
-      `- [ ] Phase 5: Quality Control`,
-      `  - [ ] Statistical validation`,
-      `  - [ ] Generate QC report`,
-      `  - [ ] Export maps and tables`,
-      ``
-    );
-  }
-
-  if (plan.steps.igrf) lines.push(`- [ ] IGRF removal`, `  - [ ] Evaluate IGRF-13 at each sample`, `  - [ ] Write residual and inclination/declination`, ``);
-  if (plan.steps.headingLag) lines.push(`- [ ] Heading and lag correction`, ``);
-  if (plan.steps.level) lines.push(`- [ ] Tie-line levelling`, `  - [ ] Classify traverse vs tie`, `  - [ ] Hold ties, shift traverses`, `  - [ ] 2-D grid microlevelling`, ``);
-  if (plan.steps.grid) lines.push(`- [ ] Minimum-curvature gridding`, `  - [ ] Write GeoTIFF / ASCII grid`, ``);
-  if (plan.steps.rtp) lines.push(`- [ ] RTP`, `  - [ ] FFT reduction-to-pole (or RTE if |I|<10°)`, ``);
-  if (plan.steps.derivatives) lines.push(`- [ ] MAGMAP`, `  - [ ] RTP/TMI, 1VD, 2VD, AS, THD, tilt, pseudo-gravity, continuation`, ``);
-  if (plan.steps.lineaments) lines.push(`- [ ] Lineament extraction`, ``);
-  if (plan.steps.gis) lines.push(`- [ ] GIS export`, `  - [ ] Report maps (scale bar, north arrow, EPSG)`, ``);
-  if (plan.steps.gravity) lines.push(`- [ ] Gravity reduction`, `  - [ ] Somigliana, free-air, Bouguer, Bullard B`, ``);
-  if (plan.steps.residual) lines.push(`- [ ] Regional-residual separation`, ``);
-  if (plan.steps.ert) lines.push(`- [ ] ERT pseudosection`, ``);
-  if (plan.steps.ertInvert) lines.push(`- [ ] ERT inversion`, ``);
-  if (plan.steps.seismic) lines.push(`- [ ] Seismic processing`, ``);
-  if (plan.steps.radiometrics) lines.push(`- [ ] Radiometric corrections`, ``);
-  if (plan.steps.gpr) lines.push(`- [ ] GPR processing`, ``);
-
-  lines.push(
-    `- [ ] Write products to ${GAID_OUTPUT_DIR}`,
-    ``,
-    `---`,
-    ``,
-    `*Execution started: ${new Date().toISOString()}*`
-  );
-  return lines.join("\n");
-};
-
 /** Check a top-level task and its nested items. */
 const checkPhaseInTasks = (content: string, phaseHeading: string): string => {
   const lines = content.split("\n");
@@ -297,4 +173,4 @@ const updateTaskProgress = (tasksPath: string, completedPhase: string, status: "
 };
 
 // Export for external use
-export { generateImplementationPlan, generateTasksMarkdown, updateTaskProgress, checkPhaseInTasks, PENDING_APPROVAL, nextTaskFolder };
+export { generateImplementationPlan, updateTaskProgress, checkPhaseInTasks, PENDING_APPROVAL, nextTaskFolder };

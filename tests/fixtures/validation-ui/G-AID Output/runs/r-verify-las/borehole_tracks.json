@@ -1,0 +1,192 @@
+{
+  "kind": "borehole-log",
+  "product_name": "G-AID LAS 2.0 measured-depth log",
+  "depth_reference": "measured depth",
+  "depth_index": "DEPT",
+  "depth_units": "M",
+  "null_value": -999.25,
+  "well_id": "DEMO-1",
+  "las_version": "2.0",
+  "wrap": "NO",
+  "selected_curves": [
+    "GR",
+    "RHOB",
+    "NPHI"
+  ],
+  "tracks": [
+    {
+      "mnemonic": "GR",
+      "units": "GAPI",
+      "description": "2  GAMMA RAY",
+      "semantics": "unknown",
+      "null_gaps": 1,
+      "samples": [
+        {
+          "depth": 0.0,
+          "value": 80.0
+        },
+        {
+          "depth": 2.0,
+          "value": 85.0
+        },
+        {
+          "depth": 4.0,
+          "value": 90.0
+        },
+        {
+          "depth": 6.0,
+          "value": null
+        },
+        {
+          "depth": 8.0,
+          "value": 95.0
+        },
+        {
+          "depth": 10.0,
+          "value": 92.0
+        },
+        {
+          "depth": 12.0,
+          "value": 88.0
+        },
+        {
+          "depth": 14.0,
+          "value": 84.0
+        },
+        {
+          "depth": 16.0,
+          "value": 82.0
+        },
+        {
+          "depth": 18.0,
+          "value": 81.0
+        },
+        {
+          "depth": 20.0,
+          "value": 80.0
+        }
+      ]
+    },
+    {
+      "mnemonic": "RHOB",
+      "units": "G/C3",
+      "description": "3  BULK DENSITY",
+      "semantics": "unknown",
+      "null_gaps": 0,
+      "samples": [
+        {
+          "depth": 0.0,
+          "value": 2.45
+        },
+        {
+          "depth": 2.0,
+          "value": 2.48
+        },
+        {
+          "depth": 4.0,
+          "value": 2.5
+        },
+        {
+          "depth": 6.0,
+          "value": 2.52
+        },
+        {
+          "depth": 8.0,
+          "value": 2.51
+        },
+        {
+          "depth": 10.0,
+          "value": 2.49
+        },
+        {
+          "depth": 12.0,
+          "value": 2.47
+        },
+        {
+          "depth": 14.0,
+          "value": 2.46
+        },
+        {
+          "depth": 16.0,
+          "value": 2.45
+        },
+        {
+          "depth": 18.0,
+          "value": 2.44
+        },
+        {
+          "depth": 20.0,
+          "value": 2.43
+        }
+      ]
+    },
+    {
+      "mnemonic": "NPHI",
+      "units": "V/V",
+      "description": "4  NEUTRON POROSITY",
+      "semantics": "unknown",
+      "null_gaps": 0,
+      "samples": [
+        {
+          "depth": 0.0,
+          "value": 0.18
+        },
+        {
+          "depth": 2.0,
+          "value": 0.16
+        },
+        {
+          "depth": 4.0,
+          "value": 0.15
+        },
+        {
+          "depth": 6.0,
+          "value": 0.14
+        },
+        {
+          "depth": 8.0,
+          "value": 0.14
+        },
+        {
+          "depth": 10.0,
+          "value": 0.15
+        },
+        {
+          "depth": 12.0,
+          "value": 0.16
+        },
+        {
+          "depth": 14.0,
+          "value": 0.17
+        },
+        {
+          "depth": 16.0,
+          "value": 0.18
+        },
+        {
+          "depth": 18.0,
+          "value": 0.19
+        },
+        {
+          "depth": 20.0,
+          "value": 0.2
+        }
+      ]
+    }
+  ],
+  "trajectory_computed": false,
+  "catalog_id": "cat-r-verify-las",
+  "checksum": "fixture",
+  "header_provenance": {
+    "VERS": "2.0",
+    "WRAP": "NO",
+    "WELL": "DEMO-1",
+    "source": "/workspace/tests/fixtures/las-project/valid/well.las",
+    "banner": "G-AID WELL 1.0"
+  },
+  "warnings": [
+    "Measured depth is not true vertical depth or a spatial trajectory.",
+    "Curve mnemonics have unknown semantics unless the user supplied meaning.",
+    "No well location documented. No map position is invented."
+  ]
+}

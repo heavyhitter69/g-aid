@@ -1,0 +1,17 @@
+x,y,line,k,eu,eth,tc,crs_epsg,quantity,units_k,units_eu,units_eth,units_tc,catalog_id
+450000.0,1200000.0,L1,120.0,80.0,200.0,900.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450200.0,1200000.0,L1,130.0,88.0,200.0,920.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450400.0,1200000.0,L1,140.0,96.0,200.0,940.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450600.0,1200000.0,L1,150.0,104.0,200.0,960.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450000.0,1200200.0,L2,120.0,80.0,212.0,915.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450200.0,1200200.0,L2,130.0,88.0,212.0,935.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450400.0,1200200.0,L2,140.0,96.0,212.0,955.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450600.0,1200200.0,L2,150.0,104.0,212.0,975.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450000.0,1200400.0,L3,120.0,80.0,224.0,930.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450200.0,1200400.0,L3,130.0,88.0,224.0,950.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450400.0,1200400.0,L3,140.0,96.0,224.0,970.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450600.0,1200400.0,L3,150.0,104.0,224.0,990.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450000.0,1200600.0,L4,120.0,80.0,236.0,945.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450200.0,1200600.0,L4,130.0,88.0,236.0,965.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450400.0,1200600.0,L4,140.0,96.0,236.0,985.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps
+450600.0,1200600.0,L4,150.0,104.0,236.0,1005.0,32630,count_rate,cps,cps,cps,cps,cat-r-verify-rad-cps

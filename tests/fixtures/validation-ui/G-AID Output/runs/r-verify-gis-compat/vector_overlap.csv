@@ -1,0 +1,2 @@
+left_path,right_path,left_id,right_id,left_role,right_role,crs,compatibility_decision,relation,reason
+compat/crs84.geojson,compat/legacy-4326.geojson,r1,e1,generic-vector,generic-vector,OGC:CRS84+EPSG:4326,geojson-lonlat-no-axis-swap,contains,"Geometric contains. OGC:CRS84 and EPSG:4326 are different CRS identities. Documented compatibility uses stored GeoJSON [lon, lat] without an axis swap or reprojection. Spatial overlap does not establish geological, mineral, or causal relationships."

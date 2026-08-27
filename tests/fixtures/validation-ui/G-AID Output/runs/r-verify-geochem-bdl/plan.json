@@ -1,0 +1,15 @@
+{
+  "runId": "r-verify-geochem-bdl",
+  "planHash": "fixture-r-verify-geochem-bdl",
+  "intent": "geochemistry",
+  "status": "complete",
+  "capabilities": [
+    "geochem.ingest",
+    "geochem.qc",
+    "geochem.map_points",
+    "geochem.summary",
+    "geochem.interpret"
+  ],
+  "product": "G-AID documented geochemical sample table",
+  "parameters": {}
+}

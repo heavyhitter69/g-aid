@@ -1,0 +1,17 @@
+{
+  "runId": "r-verify-gpr-mig",
+  "parentRunId": "r-verify-gpr-parent",
+  "planHash": "fixture-r-verify-gpr-mig",
+  "intent": "gpr",
+  "status": "complete",
+  "capabilities": [
+    "gpr.ingest",
+    "gpr.process",
+    "gpr.interpret",
+    "gpr.migrate"
+  ],
+  "product": "G-AID GPR 1.0 processed radargram",
+  "parameters": {
+    "velocityMs": 100000000.0
+  }
+}

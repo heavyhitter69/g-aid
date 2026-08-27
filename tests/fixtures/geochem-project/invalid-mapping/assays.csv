@@ -1,0 +1,6 @@
+# G-AID GEOCHEM 1.0
+# / CRS=EPSG:32734
+# / Medium=rock
+sample,east,north,gold,copper
+I-001,260100,6240100,0.4,120
+I-002,260140,6240140,0.2,88

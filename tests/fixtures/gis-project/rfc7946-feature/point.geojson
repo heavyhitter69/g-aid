@@ -1,0 +1,9 @@
+{
+  "type": "Feature",
+  "id": "f1",
+  "properties": { "SITE": "feature-root" },
+  "geometry": {
+    "type": "Point",
+    "coordinates": [18.5, -33.8]
+  }
+}

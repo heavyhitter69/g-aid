@@ -1,0 +1,36 @@
+{
+  "frozen": true,
+  "tables": [
+    {
+      "source_path": "mixed-units/assays.csv",
+      "mapping": {
+        "sampleId": "SampleID",
+        "x": "X",
+        "y": "Y",
+        "medium": "Medium",
+        "elements": [
+          {
+            "column": "Au_ppm",
+            "symbol": "Au",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          },
+          {
+            "column": "Fe_pct",
+            "symbol": "Fe",
+            "units": "pct",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          }
+        ],
+        "qcFlag": null,
+        "batch": null,
+        "date": null,
+        "lab": null,
+        "method": null,
+        "reviewed": false
+      }
+    }
+  ]
+}

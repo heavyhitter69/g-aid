@@ -1,0 +1,115 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "supported_format": "G-AID GEOCHEM 1.0 CSV/XYZ (SampleID, X, Y, Medium, documented CRS, element columns with units)",
+  "capabilities": [
+    "geochem.ingest",
+    "geochem.qc",
+    "geochem.map_points",
+    "geochem.summary",
+    "geochem.display_transform",
+    "geochem.interpret"
+  ],
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["GridMapView", "DatasetExplorer-equivalent catalog table"],
+  "url": "http://127.0.0.1:3000/workspace/verify-geochem",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-27T18:35:00Z",
+  "electron_packaged_app": false,
+  "arbitrary_csv_classified_as_geochem": false,
+  "bdl_replaced_with_zero": false,
+  "silent_log_transform": false,
+  "anomaly_detection": false,
+  "prospectivity_scoring": false,
+  "mineral_targeting": false,
+  "resource_estimation": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same GridMapView).",
+    "A packaged Electron executable was not launched.",
+    "G-AID GEOCHEM 1.0 is the only supported assay ingest. An arbitrary CSV with Fe/Cu/Au columns is not geochemistry.",
+    "Below-detection values stay censored (n_censored=4 on the BDL fixture; replaced_bdl_with_zero=false).",
+    "Mixed units (ppm vs pct) block direct comparison. Units were not converted.",
+    "QA/QC summaries for blanks/standards/duplicates applied only because QCFlag records and StandardExpected were present.",
+    "Spatial association with geology is geometric coincidence, not causal evidence.",
+    "High assay values are observations, not ore, economic grade, mineralisation confirmation, or drill targets.",
+    "geochem.display_transform is not in default chat. log10 of strictly positive uncensored values requires explicit approval.",
+    "Anomaly detection, prospectivity, targeting, resource estimation, and ML classification are not registered.",
+    "SEG-Y seismic is not started from leftover science code."
+  ],
+  "tabs": {
+    "catalog": {
+      "passed": true,
+      "valid_assays": { "support": "supported", "adapter": "geochem-csv", "crs": "EPSG:32734", "medium": "soil", "units": "ppm" },
+      "mixed_units": { "support": "supported", "units": "mixed" },
+      "xyz": { "support": "supported", "adapter": "geochem-xyz", "medium": "rock" },
+      "missing_crs_support": "recognised-unsupported",
+      "unknown_headers_support": "recognised-unsupported",
+      "invalid_mapping_support": "recognised-unsupported",
+      "geology_geojson_adapter": "geojson",
+      "screenshot": "docs/validation/results/screenshots/geochem-catalog.webp"
+    },
+    "points": {
+      "passed": true,
+      "title": "Valid soil assays (EPSG:32734)",
+      "crs": "EPSG:32734",
+      "element": "Au",
+      "units": "ppm",
+      "qualifier": "none",
+      "source": "valid/assays.csv",
+      "filter_state": "unfiltered",
+      "visual_scale": "raw observation (not an anomaly score)",
+      "points_toggle": "Points checkbox hid then restored the markers",
+      "screenshot": "docs/validation/results/screenshots/geochem-points.webp"
+    },
+    "bdl": {
+      "passed": true,
+      "n_censored": 4,
+      "replaced_bdl_with_zero": false,
+      "qualifier": "<",
+      "source": "bdl/assays.csv",
+      "screenshot": "docs/validation/results/screenshots/geochem-bdl.webp"
+    },
+    "mixed": {
+      "passed": true,
+      "blocked": true,
+      "reason": "Mixed units (ppm vs pct) block direct comparison.",
+      "elements": ["Au_ppm", "Fe_pct"],
+      "units_converted": false,
+      "screenshot": "docs/validation/results/screenshots/geochem-mixed.webp"
+    },
+    "qc": {
+      "passed": true,
+      "qa_qc_applied": true,
+      "duplicate_ids": [],
+      "mixed_units": false,
+      "screenshot": "docs/validation/results/screenshots/geochem-qc.webp"
+    },
+    "overlay": {
+      "passed": true,
+      "title": "Assays over geology polygon (coincidence, not proof)",
+      "crs": "EPSG:32734",
+      "layers": ["overlay/assays.csv", "overlay/geology.geojson"],
+      "causal_evidence": false,
+      "screenshot": "docs/validation/results/screenshots/geochem-overlay.webp"
+    },
+    "interpretation": {
+      "passed": true,
+      "run": "r-verify-geochem-valid",
+      "planHash": "fixture-r-verify-geochem-valid",
+      "product_name": "G-AID documented geochemical sample table",
+      "geological_certainty_improved": false,
+      "not_established": [
+        "Ore is not established.",
+        "Economic grade is not established.",
+        "Mineralisation is not established.",
+        "Drill targets are not established.",
+        "Anomaly detection is not established.",
+        "Prospectivity is not established.",
+        "Resource or reserve estimates are not established.",
+        "Causal relationships from overlay are not established."
+      ],
+      "screenshot": "docs/validation/results/screenshots/geochem-interpretation.webp"
+    }
+  }
+}

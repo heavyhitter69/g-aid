@@ -39,21 +39,28 @@ Your domain expertise includes:
 - Inversion non-uniqueness and equivalence problems
 - Suppression effects of conductive overburden
 - Electrode geometry and contact resistance effects
-- Depth of investigation (DOI) analysis
-- Pseudosection interpretation (qualitative only)
-- Aquifer, palaeochannel, and regolith characterisation
-- Hydrogeological interpretation
+- Apparent-resistivity QC and labelled pseudosections
+- Experimental 2-D smoothness inversion and its recovery limits
 
 Critical constraints:
 - ALWAYS state inversion non-uniqueness as a limitation
-- ALWAYS specify depth-of-investigation uncertainty (±15–30%)
-- Distinguish clay-related conduction from fluid-related conduction when possible
+- NEVER present an experimental invert as a production ERT inversion pack
+- NEVER treat a pseudosection as a depth model
+- NEVER confirm groundwater, lithology, ore, or drill targets from ERT
+- NEVER generate affirmative interpretation language from a failed or poorly resolved invert
+- Do not quote a production depth of investigation; experimental invert depth is poorly constrained
 - Your output: structured markdown with confidence provenance displayed`,
 
   "gravity-agent": `You are the Gravity Agent — specialist in ground and airborne gravimetry.
 
 Your domain expertise includes:
-- Free-air, Bouguer, and terrain corrections
+- Free-air and simple Bouguer (infinite slab) when density, datum, and CRS are documented
+- Near-zone terrain-corrected Bouguer (Nagy prism TC) only when a documented DEM, density, and radius validate
+- Intermediate- and far-zone planar Nagy rings only on a bound DEM; skipped when coverage is incomplete
+- Never present near-zone or zoned planar terrain as a full-convention Bouguer product. Missing: spherical far-zone treatment, Hayford–Bowie or equivalent geometry, global/adequate terrain coverage, and atmospheric correction
+- Regional-residual polynomial split when requested
+- Density is never assumed (including 2.67 g/cm³)
+- Hayford–Bowie compartments, spherical far-zone theory, atmospheric correction, isostasy, DEM download, and Oasis montaj equivalence are not implemented
 - Regional-residual separation methods and wavelength dependency
 - Density contrast ambiguity and its effect on depth estimates
 - Isostatic residual gravity for crustal studies
@@ -97,6 +104,8 @@ Critical constraints:
 - You do not override specialist domain conclusions
 - You always identify when models are underconstrained
 - Competing interpretations are preserved as epistemic branches, not discarded
+- Radiometric maps, ratios, and ternaries are not mineralisation, lithology, alteration, or drill targets
+- G-AID does not apply height, stripping, NASVD, or concentration conversion
 - Your output: geological synthesis in structured markdown`,
 
   "workflow-agent": `You are the Workflow Agent — scientific workflow planning and coordination.
@@ -184,9 +193,10 @@ export function synthesizeResponse(input: SynthesisInput): string {
       return formatSpecialistResponse({
         domain: "Resistivity / ERT",
         specialistNotes: [
-          "2D smooth-model inversion applied (iterative least-squares)",
-          "Depth of investigation index computed — unreliable regions flagged",
-          "Pseudosection reviewed for qualitative preliminary interpretation",
+          "Default ERT work is ingest and a labelled pseudosection (not a depth model)",
+          "2-D invert is experimental and off the default workflow — not production, not Res2DInv",
+          "Do not report groundwater, lithology, ore, or drill targets",
+          "Failed or poorly resolved models must not be described as structure",
         ],
         interpretations, warnings, recommendations, confLabel, confPct, provenance, datasetList, ruleMatchIds,
       });
@@ -195,7 +205,7 @@ export function synthesizeResponse(input: SynthesisInput): string {
       return formatSpecialistResponse({
         domain: "Gravity",
         specialistNotes: [
-          "Complete Bouguer anomaly computed (free-air + slab + terrain correction)",
+          "Report only the reduction that actually ran: simple Bouguer vs near-zone vs zoned planar terrain-corrected Bouguer. Do not invent terrain or download a DEM. Spherical far-zone, Hayford–Bowie geometry, global coverage, and atmosphere are excluded.",
           "Regional-residual separation applied via upward continuation",
           "Residual anomalies interpreted relative to assumed density contrasts",
         ],
@@ -251,7 +261,7 @@ function formatOrchestratorResponse(
       return [
         `I am **G-AID**, your assistant in this desktop app.`,
         ``,
-        `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, seismic) and auto-generating structured workflows. Let me know what data we're looking at, and I can start analyzing!`,
+        `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, already-corrected radiometrics, G-AID GPR 1.0) and auto-generating structured workflows. Seismic is not in this release.`,
       ].join("\n");
     }
 
@@ -273,7 +283,7 @@ function formatOrchestratorResponse(
       ``,
       datasets.length > 0
         ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded. Tell me what geophysical anomalies or inversion tasks you'd like to tackle next.`
-        : `No datasets are loaded yet. Upload your gravity, magnetic, ERT, or seismic data files, and let's get started!`,
+        : `No datasets are loaded yet. Open a folder with MagArrow/GSM-19, gravity-contract, ERT-contract, RAD-contract, or G-AID GPR 1.0 files.`,
     ].join("\n");
   }
 
@@ -292,8 +302,8 @@ function formatOrchestratorResponse(
         `   * Click **File > Open File...** (or press \`Ctrl+O\`) to pick files from your local drive.`,
         `   * Supported extensions include \`.dat\`, \`.grd\`, \`.csv\`, \`.json\`, \`.segy\`, \`.las\`, etc.`,
         ``,
-        `3. **Switch Between Demo Projects**`,
-        `   * Click **File > Open Folder...** and choose one of the built-in geological models (e.g., *Nevada Basin Survey*, *Death Valley*, or *Colorado Aquifer*).`,
+        `3. **Recent folders**`,
+        `   * After you open a folder, it appears under **File > Open Folder...** as a recent project on this computer. G-AID does not ship with built-in survey datasets.`,
       ].join("\n");
     }
 
@@ -303,8 +313,8 @@ function formatOrchestratorResponse(
         ``,
         `To switch projects or open local workspaces:`,
         `1. Go to the top menu and select **File > Open Folder...** (\`Ctrl+M Ctrl+O\`).`,
-        `2. You can select a local folder from your computer or switch to one of G-AID's built-in demo datasets listed in the popup modal.`,
-        `3. Once loaded, G-AID's workspace will calibrate its active files, sidebar views, and scientific agents accordingly.`,
+        `2. Pick a folder on this computer. Recent folders you already opened can be chosen from the same dialog.`,
+        `3. Once loaded, Explorer, the map, and G-AID's agents work from that folder only.`,
       ].join("\n");
     }
 
@@ -605,8 +615,8 @@ function formatGeologicalSynthesis(
     ``,
     `**Cross-Method Assessment**`,
     interpretations.length >= 2
-      ? `${interpretations.length} independent geophysical methods provide convergent evidence. Multi-method agreement increases confidence in the interpreted geological framework.`
-      : `Single-method interpretation. Additional independent geophysical constraints are recommended to reduce interpretive ambiguity.`,
+      ? `${interpretations.length} independent geophysical methods provide convergent evidence. Multi-method agreement increases confidence in the interpreted geological framework. Radiometric colour composites and ratios are not lithology or mineralisation.`
+      : `Single-method interpretation. Additional independent geophysical constraints are recommended to reduce interpretive ambiguity. Radiometric maps do not establish lithology, alteration, mineralisation, or drill targets.`,
     ``,
     ...(models.length > 0 ? [
       `**Conceptual Geological Model**`,

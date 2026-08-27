@@ -1,0 +1,56 @@
+{
+  "product": "G-AID ERT 1.0 historical Gaussian-kernel invert (not the live engine)",
+  "kernel": "gaussian_halfspace_sensitivity",
+  "not_res2dinv": true,
+  "not_3d": true,
+  "topography_in_forward": false,
+  "cases": [
+    {
+      "name": "homogeneous_100ohm_5pct_noise",
+      "true_resistivity_ohm_m": 100.0,
+      "noise_percent": 5,
+      "recovered_median_ohm_m": 98.30131658774606,
+      "relative_error": 0.01698683412253942,
+      "log10_std": 0.012631528869787821,
+      "misfit_percent": 3.476186728238372,
+      "tolerance_relative_median": 0.15,
+      "pass": true,
+      "recovery_claim": "Median model resistivity within 15% of the true homogeneous value under 5% noise.",
+      "not_claimed": "Res2DInv equivalence, 3-D, topography, lithology, groundwater.",
+      "forward": "\u03c1a = \u03c1true (homogeneous half-space), independent of the invert Jacobian construction except through invert_2d_smooth itself"
+    },
+    {
+      "name": "two_layer_wenner_50_over_500",
+      "forward": "Wenner two-layer image series (Telford 1990 \u00a78.4), independent of the invert kernel",
+      "rho1_ohm_m": 50.0,
+      "rho2_ohm_m": 500.0,
+      "overburden_thickness_m": 8.0,
+      "noise_percent": 5,
+      "shallow_median_ohm_m": 109.90726962020636,
+      "deep_median_ohm_m": 74.46802807132599,
+      "misfit_percent": 6.893131802072319,
+      "one_d_layer_recovery": false,
+      "pass": true,
+      "recovery_claim": "1-D layering is not recovered by this homogeneous-half-space smoothness invert. Observed shallow/deep medians are recorded so the limitation is test-backed.",
+      "not_claimed": [
+        "True layer resistivities",
+        "Sharp 8 m boundary recovery",
+        "Res2DInv or 2.5-D finite-difference equivalence",
+        "Groundwater, lithology, ore, or drill targets"
+      ]
+    },
+    {
+      "name": "lateral_contrast_left_conductive",
+      "forward": "Independent 1-D Wenner image series on the left; homogeneous 200 \u03a9\u00b7m on the right",
+      "left_shallow_median_ohm_m": 73.56791226171805,
+      "right_shallow_median_ohm_m": 206.86089424707347,
+      "misfit_percent": 12.426055431736598,
+      "lateral_contrast_recovered": true,
+      "pass": true,
+      "recovery_claim": "Lateral contrast is recorded, not required. If left_shallow < right_shallow, the invert shows a qualitative left-side low; otherwise the kernel does not resolve this contrast.",
+      "not_claimed": "Contact position, true resistivities, 3-D structure, groundwater."
+    }
+  ],
+  "all_passed": true,
+  "support_bar": "Historical failed two-layer case preserved. Live invert results are in ert_invert2d_benchmarks.json. ert.invert2d is experimental."
+}

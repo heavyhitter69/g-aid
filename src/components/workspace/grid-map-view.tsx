@@ -2,53 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map as MapIcon } from "lucide-react";
+import { parseEsriAscii, type RasterGrid } from "@/lib/map/ascii";
 
-export interface AsciiGrid {
-  ncols: number;
-  nrows: number;
-  xllcorner: number;
-  yllcorner: number;
-  cellsize: number;
-  nodata: number;
-  values: Float64Array;
-}
+export type OverlayPolygon =
+  | { x: number; y: number }[]
+  | { exterior: { x: number; y: number }[]; holes?: { x: number; y: number }[][] };
 
-export function parseEsriAscii(text: string): AsciiGrid | null {
-  const lines = text.split(/\r?\n/);
-  const meta: Record<string, number> = {};
-  let i = 0;
-  while (i < lines.length && i < 12) {
-    const parts = lines[i].trim().split(/\s+/);
-    if (parts.length < 2) break;
-    const key = parts[0].toLowerCase();
-    if (!["ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "nodata_value"].includes(key)) break;
-    meta[key] = parseFloat(parts[1]);
-    i += 1;
-  }
-  const ncols = meta.ncols;
-  const nrows = meta.nrows;
-  if (!ncols || !nrows || ncols > 4000 || nrows > 4000) return null;
-  const values = new Float64Array(ncols * nrows);
-  let n = 0;
-  for (; i < lines.length && n < values.length; i++) {
-    const parts = lines[i].trim().split(/\s+/);
-    for (const part of parts) {
-      if (!part) continue;
-      values[n] = parseFloat(part);
-      n += 1;
-      if (n >= values.length) break;
-    }
-  }
-  if (n < values.length * 0.5) return null;
-  return {
-    ncols,
-    nrows,
-    xllcorner: meta.xllcorner ?? 0,
-    yllcorner: meta.yllcorner ?? 0,
-    cellsize: meta.cellsize ?? 1,
-    nodata: meta.nodata_value ?? -9999,
-    values,
-  };
+function normalizeOverlayPolygon(poly: OverlayPolygon): {
+  exterior: { x: number; y: number }[];
+  holes: { x: number; y: number }[][];
+} {
+  if (Array.isArray(poly)) return { exterior: poly, holes: [] };
+  return { exterior: poly.exterior, holes: poly.holes || [] };
 }
 
 function colorFor(t: number, ramp: "jet" | "gray" | "viridis" = "jet"): [number, number, number] {
@@ -274,12 +239,26 @@ export function GridMapView({
   note,
   overlay,
   overlayLines,
+  overlayPolygons,
+  units = "nT",
+  warnings,
+  opacity = 1,
+  crsLabel,
+  onInspect,
+  onProfile,
 }: {
   title: string;
   grid: AsciiGrid | null;
   note?: string;
   overlay?: { x: number; y: number }[];
   overlayLines?: { x: number; y: number }[][];
+  overlayPolygons?: OverlayPolygon[];
+  units?: string;
+  warnings?: string[];
+  opacity?: number;
+  crsLabel?: string;
+  onInspect?: (hit: { x: number; y: number; value: number | null; nodata: boolean }) => void;
+  onProfile?: (a: { x: number; y: number }, b: { x: number; y: number }) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLCanvasElement>(null);
@@ -291,8 +270,10 @@ export function GridMapView({
   const [showHillshade, setShowHillshade] = useState(true);
   const [showContours, setShowContours] = useState(true);
   const [showLineaments, setShowLineaments] = useState(true);
+  const [showPolygons, setShowPolygons] = useState(true);
   const [cursor, setCursor] = useState<string>("");
   const [fitted, setFitted] = useState(0);
+  const profileA = useRef<{ x: number; y: number } | null>(null);
 
   const stats = useMemo(() => {
     if (!grid) return null;
@@ -319,6 +300,7 @@ export function GridMapView({
 
   const sampledOverlay = useMemo(() => downsample(overlay || [], 40000), [overlay]);
   const sampledLines = useMemo(() => (overlayLines || []).slice(0, 4000), [overlayLines]);
+  const sampledPolygons = useMemo(() => (overlayPolygons || []).slice(0, 2000), [overlayPolygons]);
   const contourCache = useMemo(() => {
     if (!grid || !stats) return [];
     const lo = stretch === "pct" ? stats.p2 : stats.min;
@@ -382,7 +364,9 @@ export function GridMapView({
     ctx.fillRect(0, 0, w, h);
     ctx.imageSmoothingEnabled = false;
     ctx.setTransform(scale, 0, 0, scale, panX, panY);
+    ctx.globalAlpha = Math.max(0.15, Math.min(1, opacity));
     ctx.drawImage(raster, 0, 0);
+    ctx.globalAlpha = 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (showPath && sampledOverlay.length) {
       ctx.fillStyle = "rgba(255,255,255,0.9)";
@@ -409,6 +393,45 @@ export function GridMapView({
         ctx.stroke();
       }
     }
+    if (showPolygons && sampledPolygons.length) {
+      ctx.fillStyle = "rgba(78, 201, 176, 0.28)";
+      ctx.strokeStyle = "rgba(78, 201, 176, 0.95)";
+      ctx.lineWidth = 1.5;
+      const toScreen = (p: { x: number; y: number }) => {
+        const col = (p.x - grid.xllcorner) / grid.cellsize;
+        const row = grid.nrows - (p.y - grid.yllcorner) / grid.cellsize;
+        return { sx: panX + col * scale, sy: panY + row * scale };
+      };
+      const drawRing = (ring: { x: number; y: number }[]) => {
+        ring.forEach((p, i) => {
+          const { sx, sy } = toScreen(p);
+          if (i === 0) ctx.moveTo(sx, sy);
+          else ctx.lineTo(sx, sy);
+        });
+        ctx.closePath();
+      };
+      for (const poly of sampledPolygons) {
+        const { exterior, holes } = normalizeOverlayPolygon(poly);
+        if (exterior.length < 3) continue;
+        ctx.beginPath();
+        drawRing(exterior);
+        for (const hole of holes) {
+          if (hole.length >= 3) drawRing(hole);
+        }
+        ctx.fill("evenodd");
+        ctx.beginPath();
+        drawRing(exterior);
+        ctx.stroke();
+        for (const hole of holes) {
+          if (hole.length < 3) continue;
+          ctx.beginPath();
+          drawRing(hole);
+          ctx.strokeStyle = "rgba(220, 160, 80, 0.95)";
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(78, 201, 176, 0.95)";
+        }
+      }
+    }
     if (showLineaments && sampledLines.length) {
       ctx.strokeStyle = "rgba(255, 214, 102, 0.95)";
       ctx.lineWidth = 1.5;
@@ -429,7 +452,7 @@ export function GridMapView({
     const lo = stretch === "pct" ? stats.p2 : stats.min;
     const hi = stretch === "pct" ? stats.p98 : stats.max;
     drawMapChrome(ctx, w, h, grid.cellsize, scale, ramp, lo, hi);
-  }, [grid, sampledOverlay, sampledLines, showPath, showContours, showLineaments, contourCache, stats, stretch, ramp]);
+  }, [grid, sampledOverlay, sampledLines, sampledPolygons, showPath, showContours, showLineaments, showPolygons, contourCache, stats, stretch, ramp, opacity]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -515,7 +538,8 @@ export function GridMapView({
       <div className="h-[45px] border-b border-[#2b2b2b] shrink-0 flex items-center justify-between px-3 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <MapIcon className="h-4 w-4 text-[#4ec9b0] shrink-0" />
-          <span className="text-[#cccccc] text-[13px] font-medium truncate">{title}</span>
+          <span className="text-[#cccccc] text-[13px] font-medium truncate" data-testid="map-title">{title}</span>
+          {crsLabel ? <span className="text-[10px] text-[#858585] font-mono truncate">{crsLabel}</span> : null}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-[#cccccc] shrink-0">
           <select
@@ -538,7 +562,7 @@ export function GridMapView({
           {sampledOverlay.length > 0 && (
             <label className="flex items-center gap-1 text-[#858585]">
               <input type="checkbox" checked={showPath} onChange={(e) => setShowPath(e.target.checked)} />
-              Flight path
+              Points
             </label>
           )}
           <label className="flex items-center gap-1 text-[#858585]">
@@ -552,7 +576,13 @@ export function GridMapView({
           {sampledLines.length > 0 && (
             <label className="flex items-center gap-1 text-[#858585]">
               <input type="checkbox" checked={showLineaments} onChange={(e) => setShowLineaments(e.target.checked)} />
-              Lineaments
+              Lines
+            </label>
+          )}
+          {sampledPolygons.length > 0 && (
+            <label className="flex items-center gap-1 text-[#858585]">
+              <input type="checkbox" checked={showPolygons} onChange={(e) => setShowPolygons(e.target.checked)} />
+              Polygons
             </label>
           )}
           <span className="text-[#858585] font-mono hidden sm:inline">
@@ -560,11 +590,34 @@ export function GridMapView({
           </span>
         </div>
       </div>
+      {warnings?.length ? (
+        <div className="px-3 py-1.5 bg-[#3a2a12] text-[#f0c674] text-[11px] leading-snug border-b border-[#2b2b2b]" data-testid="map-warnings">
+          {warnings.join(" ")}
+        </div>
+      ) : null}
+      {grid.preview ? (
+        <div className="px-3 py-1 bg-[#252526] text-[#858585] text-[11px] border-b border-[#2b2b2b]">
+          {grid.previewNote || "Preview/overview — not the full dataset."}
+        </div>
+      ) : null}
       <div
         ref={hostRef}
         className="flex-1 min-h-0 relative cursor-crosshair"
         onMouseDown={(e) => {
           if (e.button !== 0) return;
+          if (e.shiftKey && onProfile) {
+            const hit = toGrid(e.clientX, e.clientY);
+            if (!hit) return;
+            const pt = { x: hit.x, y: hit.y };
+            if (!profileA.current) {
+              profileA.current = pt;
+              setCursor("Profile start set. Shift-click the end point.");
+              return;
+            }
+            onProfile(profileA.current, pt);
+            profileA.current = null;
+            return;
+          }
           viewState.current.dragging = true;
           viewState.current.lastX = e.clientX;
           viewState.current.lastY = e.clientY;
@@ -583,9 +636,10 @@ export function GridMapView({
             setCursor("");
             return;
           }
-          const val =
-            Number.isFinite(hit.v) && hit.v !== grid.nodata ? `${hit.v.toFixed(2)} nT` : "nodata";
-          setCursor(`${hit.x.toFixed(1)}, ${hit.y.toFixed(1)} · ${val}`);
+          const nodata = !Number.isFinite(hit.v) || hit.v === grid.nodata;
+          const val = nodata ? "nodata" : `${hit.v.toFixed(2)} ${units}`;
+          setCursor(`${hit.x.toFixed(1)}, ${hit.y.toFixed(1)} · ${val}${crsLabel ? ` · ${crsLabel}` : ""}`);
+          onInspect?.({ x: hit.x, y: hit.y, value: nodata ? null : hit.v, nodata });
         }}
         onMouseUp={() => {
           viewState.current.dragging = false;
@@ -599,10 +653,10 @@ export function GridMapView({
         <canvas ref={viewRef} className="absolute inset-0 w-full h-full" />
       </div>
       <div className="px-4 py-1.5 border-t border-[#2b2b2b] text-[11px] text-[#858585] font-mono flex justify-between gap-3">
-        <span>
-          {lo.toFixed(2)} – {hi.toFixed(2)} nT
+        <span data-testid="colorbar-units">
+          {lo.toFixed(2)} – {hi.toFixed(2)} {units}
         </span>
-        <span className="truncate">{cursor || "Scroll to zoom · drag to pan · double-click to fit"}</span>
+        <span className="truncate">{cursor || "Scroll to zoom · drag to pan · double-click to fit · Shift-click two points for a profile"}</span>
       </div>
     </div>
   );

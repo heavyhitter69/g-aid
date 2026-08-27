@@ -19,7 +19,7 @@ const SKIP_DIRS = new Set([
   "cache",
 ]);
 
-const MAX_FILES = 4000;
+const MAX_FILES = 20000;
 const PEEK_BYTES = 4096;
 const MAX_READ_BYTES = 2 * 1024 * 1024;
 const TABULAR_READ_BYTES = 64 * 1024 * 1024;
@@ -449,6 +449,19 @@ function writeWorkspaceFile(root, relativePath, content = "") {
   return path.relative(resolvedRoot, full).replace(/\\/g, "/");
 }
 
+function isGaidOutputRel(relativePath) {
+  return String(relativePath || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((part) => part.toLowerCase() === "g-aid output");
+}
+
+function copyToOutputRel(relativePath) {
+  const cleaned = sanitizeRelative(relativePath);
+  if (isGaidOutputRel(cleaned)) return cleaned;
+  return ["G-AID Output", "edits", ...cleaned.split("/")].join("/");
+}
+
 function saveWorkspaceFile(root, relativePath, content = "") {
   if (typeof root !== "string" || typeof relativePath !== "string") {
     throw new Error("root and relativePath are required");
@@ -462,6 +475,9 @@ function saveWorkspaceFile(root, relativePath, content = "") {
   const full = path.resolve(resolvedRoot, relativePath);
   if (!isInsideRoot(resolvedRoot, full)) {
     throw new Error("Path is outside the open workspace");
+  }
+  if (fs.existsSync(full) && !isGaidOutputRel(relativePath)) {
+    return saveWorkspaceFile(root, copyToOutputRel(relativePath), content);
   }
   fs.mkdirSync(path.dirname(full), { recursive: true });
   fs.writeFileSync(full, content, "utf8");
@@ -543,6 +559,102 @@ function copyWorkspacePath(root, fromRel, destFolderRel) {
   return path.relative(src.resolvedRoot, dest).replace(/\\/g, "/");
 }
 
+function searchWorkspace(root, query, options = {}) {
+  const maxHits = Math.min(Number(options.maxHits) || 40, 80);
+  const resolvedRoot = path.resolve(root);
+  if (!resolvedRoot || !fs.existsSync(resolvedRoot) || !fs.statSync(resolvedRoot).isDirectory()) {
+    throw new Error(`Folder not found: ${resolvedRoot}`);
+  }
+  const raw = String(query || "").trim();
+  if (!raw) return [];
+
+  const tokens = raw
+    .toLowerCase()
+    .split(/[^a-z0-9()+_-]+/)
+    .filter((tok) => tok.length >= 2);
+  const hits = [];
+  let seen = 0;
+  const PEEK = 4096;
+  const FILE_CAP = 8000;
+
+  function score(hay) {
+    const h = String(hay || "").toLowerCase();
+    let n = 0;
+    for (const tok of tokens) {
+      if (h.includes(tok)) n += tok.length >= 4 ? 40 : 20;
+    }
+    return n;
+  }
+
+  function walk(dir) {
+    if (hits.length >= 400 || seen >= FILE_CAP) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      if (hits.length >= 400 || seen >= FILE_CAP) return;
+      if (!ent.name || ent.name.startsWith(".")) continue;
+      const full = path.join(dir, ent.name);
+      const rel = path.relative(resolvedRoot, full).replace(/\\/g, "/");
+      if (ent.isDirectory()) {
+        if (SKIP_DIRS.has(ent.name.toLowerCase()) || ent.name.toLowerCase() === "g-aid output") continue;
+        const folderScore = Math.max(score(rel), score(ent.name));
+        if (folderScore > 0) {
+          hits.push({
+            relativePath: rel,
+            name: ent.name,
+            kind: "folder",
+            score: folderScore,
+            why: "name",
+          });
+        }
+        walk(full);
+      } else if (ent.isFile()) {
+        seen += 1;
+        let size = 0;
+        try {
+          size = fs.statSync(full).size;
+        } catch {
+          continue;
+        }
+        const pathScore = Math.max(score(rel), score(ent.name));
+        let contentScore = 0;
+        let snippet;
+        const ext = path.extname(ent.name).toLowerCase();
+        if ([".csv", ".txt", ".dat", ".xyz", ".las", ".json", ".md", ".log", ".asc"].includes(ext)) {
+          const peek = peekFile(full, size).slice(0, PEEK);
+          contentScore = score(peek);
+          if (contentScore > 0) {
+            const lower = peek.toLowerCase();
+            const tok = tokens.find((t) => lower.includes(t));
+            if (tok) {
+              const at = lower.indexOf(tok);
+              snippet = peek.slice(Math.max(0, at - 24), at + tok.length + 40).replace(/\s+/g, " ").trim();
+            }
+          }
+        }
+        const best = Math.max(pathScore, contentScore);
+        if (best <= 0) continue;
+        hits.push({
+          relativePath: rel,
+          name: ent.name,
+          kind: classifyPeek(ent.name, contentScore ? peekFile(full, size) : ""),
+          score: best,
+          why: contentScore > pathScore ? "content" : "path",
+          snippet,
+        });
+      }
+    }
+  }
+
+  walk(resolvedRoot);
+  hits.sort((a, b) => b.score - a.score || a.relativePath.localeCompare(b.relativePath));
+  return hits.slice(0, maxHits);
+}
+
 function renameWorkspacePath(root, fromRel, newName) {
   const name = String(newName || "").trim();
   if (!name || /[\\/]/.test(name) || name === "." || name === "..") {
@@ -571,4 +683,5 @@ module.exports = {
   moveWorkspacePath,
   copyWorkspacePath,
   renameWorkspacePath,
+  searchWorkspace,
 };

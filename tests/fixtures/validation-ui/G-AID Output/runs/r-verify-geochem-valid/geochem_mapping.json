@@ -1,0 +1,36 @@
+{
+  "frozen": true,
+  "tables": [
+    {
+      "source_path": "valid/assays.csv",
+      "mapping": {
+        "sampleId": "SampleID",
+        "x": "X",
+        "y": "Y",
+        "medium": "Medium",
+        "elements": [
+          {
+            "column": "Au_ppm",
+            "symbol": "Au",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          },
+          {
+            "column": "Cu_ppm",
+            "symbol": "Cu",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          }
+        ],
+        "qcFlag": null,
+        "batch": "Batch",
+        "date": "Date",
+        "lab": null,
+        "method": null,
+        "reviewed": false
+      }
+    }
+  ]
+}

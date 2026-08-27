@@ -1,0 +1,14 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "e1",
+      "properties": { "SAMPLE_ID": "E1", "NOTE": "/ EPSG=32734" },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [260110, 6240110]
+      }
+    }
+  ]
+}

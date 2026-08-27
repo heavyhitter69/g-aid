@@ -1,0 +1,53 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "n_tables": 1,
+  "n_samples": 6,
+  "n_values": 12,
+  "n_censored": 2,
+  "duplicate_sample_ids": [],
+  "duplicate_locations": [
+    {
+      "x": 260100.0,
+      "y": 6240100.0,
+      "n": 2
+    }
+  ],
+  "mixed_units": false,
+  "invalid_numeric": 0,
+  "missing_sample_metadata": 0,
+  "replaced_bdl_with_zero": false,
+  "imputed": false,
+  "log_transformed": false,
+  "qa_qc": {
+    "applied": true,
+    "blanks": {
+      "n": 1,
+      "ids": [
+        "BLK-1"
+      ]
+    },
+    "standards": {
+      "n": 1,
+      "ids": [
+        "STD-1"
+      ],
+      "expected": [
+        "STD-1:Au_ppm=0.20"
+      ]
+    },
+    "field_duplicates": {
+      "n": 1,
+      "ids": [
+        "S-101-FD"
+      ]
+    },
+    "lab_duplicates": {
+      "n": 1,
+      "ids": [
+        "S-102-LD"
+      ]
+    },
+    "note": "Counts only. Recovery statistics require documented expected values per standard ID; no silent pass/fail is invented."
+  },
+  "kind": "raw"
+}

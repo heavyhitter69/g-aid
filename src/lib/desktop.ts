@@ -26,7 +26,14 @@ export function desktopHandoffUrl(accessToken: string, refreshToken: string): st
     access_token: accessToken,
     refresh_token: refreshToken,
   });
-  return `gaid://auth/callback#${params.toString()}`;
+  const origin =
+    typeof window !== "undefined" && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(window.location.origin)
+      ? window.location.origin
+      : "";
+  if (origin) {
+    return `${origin}/__gaid/auth?${params.toString()}`;
+  }
+  return `gaid://auth/callback?${params.toString()}`;
 }
 
 export function isDesktopHandoff(searchParams: URLSearchParams | { get: (key: string) => string | null }): boolean {

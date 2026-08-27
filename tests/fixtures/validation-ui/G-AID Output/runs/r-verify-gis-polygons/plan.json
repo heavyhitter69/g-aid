@@ -1,0 +1,13 @@
+{
+  "runId": "r-verify-gis-polygons",
+  "planHash": "fixture-r-verify-gis-polygons",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.interpret"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}

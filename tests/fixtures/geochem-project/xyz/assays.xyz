@@ -1,0 +1,7 @@
+/ G-AID GEOCHEM 1.0
+/ CRS=EPSG:32734
+/ Medium=rock
+/ Units=ppm
+SampleID X Y Medium Au_ppm
+R-1 260200 6240200 rock 0.40
+R-2 260240 6240240 rock 0.18

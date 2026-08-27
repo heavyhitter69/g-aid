@@ -1,0 +1,15 @@
+{
+  "node_id": "las_ingest",
+  "formula": "CWLS LAS 2.0 WRAP.NO ingest",
+  "parameters": {
+    "n": 3
+  },
+  "inputs": [
+    "missing-crs/well.las"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-las-ncrs/borehole_canonical.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-las-ncrs/borehole_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T15:46:40.307034Z"
+}

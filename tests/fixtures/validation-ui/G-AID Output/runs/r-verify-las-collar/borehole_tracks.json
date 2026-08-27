@@ -1,0 +1,97 @@
+{
+  "kind": "borehole-log",
+  "product_name": "G-AID LAS 2.0 measured-depth log",
+  "depth_reference": "measured depth",
+  "depth_index": "DEPT",
+  "depth_units": "M",
+  "null_value": -999.25,
+  "well_id": "COLLAR-1",
+  "las_version": "2.0",
+  "wrap": "NO",
+  "selected_curves": [
+    "GR",
+    "RHOB"
+  ],
+  "tracks": [
+    {
+      "mnemonic": "GR",
+      "units": "GAPI",
+      "description": "2  GAMMA RAY",
+      "semantics": "unknown",
+      "null_gaps": 0,
+      "samples": [
+        {
+          "depth": 0.0,
+          "value": 70.0
+        },
+        {
+          "depth": 2.0,
+          "value": 72.0
+        },
+        {
+          "depth": 4.0,
+          "value": 74.0
+        },
+        {
+          "depth": 6.0,
+          "value": 73.0
+        },
+        {
+          "depth": 8.0,
+          "value": 71.0
+        },
+        {
+          "depth": 10.0,
+          "value": 70.0
+        }
+      ]
+    },
+    {
+      "mnemonic": "RHOB",
+      "units": "G/C3",
+      "description": "3  BULK DENSITY",
+      "semantics": "unknown",
+      "null_gaps": 0,
+      "samples": [
+        {
+          "depth": 0.0,
+          "value": 2.4
+        },
+        {
+          "depth": 2.0,
+          "value": 2.41
+        },
+        {
+          "depth": 4.0,
+          "value": 2.42
+        },
+        {
+          "depth": 6.0,
+          "value": 2.43
+        },
+        {
+          "depth": 8.0,
+          "value": 2.42
+        },
+        {
+          "depth": 10.0,
+          "value": 2.41
+        }
+      ]
+    }
+  ],
+  "trajectory_computed": false,
+  "catalog_id": "cat-r-verify-las-collar",
+  "checksum": "fixture",
+  "header_provenance": {
+    "VERS": "2.0",
+    "WRAP": "NO",
+    "WELL": "COLLAR-1",
+    "source": "/workspace/tests/fixtures/las-project/valid-collar/well.las",
+    "banner": "G-AID WELL 1.0"
+  },
+  "warnings": [
+    "Measured depth is not true vertical depth or a spatial trajectory.",
+    "Curve mnemonics have unknown semantics unless the user supplied meaning."
+  ]
+}

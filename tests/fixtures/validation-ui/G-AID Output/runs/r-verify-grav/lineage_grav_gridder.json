@@ -1,0 +1,21 @@
+{
+  "node_id": "grav_gridder",
+  "formula": "Thin-plate spline = 2-D minimum curvature (Duchon 1977 / Briggs 1974)",
+  "parameters": {
+    "crs_epsg": 32630,
+    "dx": 100.0,
+    "nx": 8,
+    "ny": 8,
+    "source_column": "near_zone_terrain_corrected_bouguer_mgal",
+    "units": "mGal"
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/near_zone_terrain_corrected_bouguer.csv"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/near_zone_terrain_corrected_bouguer_grid.asc",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/near_zone_terrain_corrected_bouguer_grid.tif",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-grav/near_zone_terrain_corrected_bouguer_grid.xyz"
+  ],
+  "created_at": "2026-08-26T22:16:51.717385Z"
+}

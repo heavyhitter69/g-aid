@@ -1,0 +1,12 @@
+{
+  "n": 30,
+  "array": "dipole_dipole",
+  "units": "ohm.m",
+  "interpolation": "none \u2014 discrete measurements at conventional pseudo-depth",
+  "model_status": "not a depth model",
+  "formula": "pseudo-depth = n\u00b7a/2 (dipole-dipole plotting convention)",
+  "limitations": [
+    "Pseudosection \u2260 depth model.",
+    "Apparent resistivity \u2260 true resistivity."
+  ]
+}

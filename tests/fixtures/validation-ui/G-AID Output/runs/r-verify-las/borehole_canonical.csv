@@ -1,0 +1,12 @@
+DEPT,GR,RHOB,NPHI,well_id,depth_reference,source_catalog_id,source_checksum
+0.0,80.0,2.45,0.18,DEMO-1,measured depth,cat-r-verify-las,fixture
+2.0,85.0,2.48,0.16,DEMO-1,measured depth,cat-r-verify-las,fixture
+4.0,90.0,2.5,0.15,DEMO-1,measured depth,cat-r-verify-las,fixture
+6.0,,2.52,0.14,DEMO-1,measured depth,cat-r-verify-las,fixture
+8.0,95.0,2.51,0.14,DEMO-1,measured depth,cat-r-verify-las,fixture
+10.0,92.0,2.49,0.15,DEMO-1,measured depth,cat-r-verify-las,fixture
+12.0,88.0,2.47,0.16,DEMO-1,measured depth,cat-r-verify-las,fixture
+14.0,84.0,2.46,0.17,DEMO-1,measured depth,cat-r-verify-las,fixture
+16.0,82.0,2.45,0.18,DEMO-1,measured depth,cat-r-verify-las,fixture
+18.0,81.0,2.44,0.19,DEMO-1,measured depth,cat-r-verify-las,fixture
+20.0,80.0,2.43,0.2,DEMO-1,measured depth,cat-r-verify-las,fixture

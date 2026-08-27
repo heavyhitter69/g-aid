@@ -1,0 +1,233 @@
+{
+  "kind": "geochem-samples",
+  "tables": [
+    {
+      "kind": "geochem-samples",
+      "product_name": "G-AID documented geochemical sample table",
+      "source_path": "valid/assays.csv",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "medium": "soil",
+      "lab": "ALS",
+      "method": "ICP-MS",
+      "detection_limit_treatment": "censored",
+      "standard_expected": null,
+      "mapping": {
+        "sampleId": "SampleID",
+        "x": "X",
+        "y": "Y",
+        "medium": "Medium",
+        "elements": [
+          {
+            "column": "Au_ppm",
+            "symbol": "Au",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          },
+          {
+            "column": "Cu_ppm",
+            "symbol": "Cu",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          }
+        ],
+        "qcFlag": null,
+        "batch": "Batch",
+        "date": "Date",
+        "lab": null,
+        "method": null,
+        "reviewed": false
+      },
+      "columns": [
+        "SampleID",
+        "X",
+        "Y",
+        "Medium",
+        "Au_ppm",
+        "Cu_ppm",
+        "Batch",
+        "Date"
+      ],
+      "units": [
+        "ppm"
+      ],
+      "mixed_units": false,
+      "samples": [
+        {
+          "sample_id": "S-001",
+          "x": 260100.0,
+          "y": 6240100.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B1",
+          "date": "2024-03-01",
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.12,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 45.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-002",
+          "x": 260140.0,
+          "y": 6240140.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B1",
+          "date": "2024-03-01",
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.08,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 38.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-003",
+          "x": 260180.0,
+          "y": 6240180.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B1",
+          "date": "2024-03-02",
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.31,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 92.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-004",
+          "x": 260220.0,
+          "y": 6240120.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B1",
+          "date": "2024-03-02",
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.05,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 21.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-005",
+          "x": 260160.0,
+          "y": 6240160.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B1",
+          "date": "2024-03-03",
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.19,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 67.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        }
+      ],
+      "n": 5,
+      "replaced_bdl_with_zero": false,
+      "imputed": false,
+      "log_transformed": false,
+      "catalog_id": "cat-r-verify-geochem-valid",
+      "checksum": null
+    }
+  ],
+  "product_kind": "raw"
+}

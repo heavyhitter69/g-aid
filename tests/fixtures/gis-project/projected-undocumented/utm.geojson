@@ -1,0 +1,14 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "u1",
+      "properties": { "NOTE": "utm-without-crs" },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [260100, 6240100]
+      }
+    }
+  ]
+}

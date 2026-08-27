@@ -1,10 +1,11 @@
-"""DC resistivity: geometric factors, pseudosections, Occam 1-D, smooth 2-D inversion.
+"""DC resistivity: geometric factors, pseudosections, Occam 1-D, experimental 2-D invert.
 
 Apparent resistivity geometric factors: Telford, Geldart & Sheriff (1990) §8.4.
 Occam 1-D: Constable, Parker & Constable (1987) Geophysics 52, 289–300.
-2-D smoothness inversion: Loke & Barker (1996) Geophysics 61, 1682–1692,
-using a homogeneous-half-space Jacobian and Gauss-Newton with roughness.
-2.5-D finite-difference forward: Dey & Morrison (1979) Geophysics 44, 753–780.
+Live 2-D invert: Dey & Morrison (1979) 2.5-D finite-difference forward with
+∇φ·∇φ Frechet and smoothness-constrained Gauss–Newton. Experimental until
+synthetic recovery meets production thresholds. Not Res2DInv.
+Historical Gaussian half-space invert is preserved for failed-benchmark replay.
 """
 
 from __future__ import annotations
@@ -57,69 +58,10 @@ class ERTMeasurement:
 
 
 def parse_res2dinv_dat(path: str) -> dict:
-    """Parse a Res2DInv general-array or dipole-dipole .dat file (Loke format)."""
-    with open(path, "r", errors="ignore") as handle:
-        lines = [ln.rstrip("\n") for ln in handle]
-    if len(lines) < 4:
-        raise ValueError(f"ERT file too short: {path}")
-    title = lines[0].strip()
-    try:
-        spacing = float(lines[1].split()[0])
-    except (ValueError, IndexError):
-        spacing = 1.0
-    array_code = None
-    try:
-        array_code = int(float(lines[2].split()[0]))
-    except (ValueError, IndexError):
-        array_code = 3
-    array_map = {1: "wenner", 2: "pole_pole", 3: "dipole_dipole", 6: "pole_dipole", 7: "schlumberger"}
-    array = array_map.get(array_code, "dipole_dipole")
-    measurements = []
-    # Search for numeric blocks: x, a, n, rhoa  or  n_data then rows
-    i = 3
-    n_data = None
-    for j, ln in enumerate(lines[3:10], start=3):
-        parts = ln.split()
-        if len(parts) == 1:
-            try:
-                n_data = int(float(parts[0]))
-                i = j + 1
-                break
-            except ValueError:
-                continue
-    if n_data is None:
-        i = 3
-        n_data = 10**9
-    count = 0
-    while i < len(lines) and count < n_data:
-        parts = lines[i].split()
-        i += 1
-        if len(parts) < 3:
-            continue
-        try:
-            nums = [float(p) for p in parts]
-        except ValueError:
-            continue
-        if len(nums) >= 4:
-            x, a, n, rhoa = nums[0], nums[1], nums[2], nums[3]
-        elif len(nums) == 3:
-            x, a, rhoa = nums
-            n = 1.0
-        else:
-            continue
-        measurements.append(
-            {
-                "midpoint_x": x,
-                "a": a if a > 0 else spacing,
-                "n": n,
-                "rhoa": rhoa,
-                "array": array,
-            }
-        )
-        count += 1
-    if not measurements:
-        raise ValueError(f"No ERT measurements parsed from {path}")
-    return {"title": title, "array": array, "spacing": spacing, "measurements": measurements}
+    """Parse G-AID ERT 1.0 (Res2DInv-style) — strict. No array-code or spacing defaults."""
+    from formats.ert import parse_ert_dat
+
+    return parse_ert_dat(path)
 
 
 def occam_1d(ab2: np.ndarray, rhoa: np.ndarray, n_layers: int = 12, max_iter: int = 20, target_rms: float = 1.05) -> dict:
@@ -201,25 +143,25 @@ def _t_kernel(rho: np.ndarray, thick: np.ndarray, lam: float) -> float:
     return t
 
 
-def invert_2d_smooth(
+def invert_2d_sensitivity_kernel(
     measurements: list[dict],
     n_x: int = 40,
     n_z: int = 16,
     max_iter: int = 8,
     lam: float = 0.2,
     damping: float = 0.1,
+    max_misfit_percent: float = 25.0,
+    fail_on_divergence: bool = True,
 ) -> dict:
-    """Smoothness-constrained Gauss-Newton 2-D inversion (Loke & Barker 1996).
+    """Historical homogeneous-half-space Gaussian sensitivity invert.
 
-    Forward: homogeneous half-space ρa plus a sensitivity kernel that decays
-    with depth as the dipole-dipole sensitivity (Roy & Apparao 1971). This is
-    the same first-order scheme used to start Res2DInv; it does not invent a
-    section — predicted ρa and RMS are reported so a senior engineer can
-    reject a poor fit. For homogeneous input data the recovered model is
-    uniform to within a few percent.
+    Kept so failed two-layer recovery of this kernel remains reproducible.
+    It is not the live ert.invert2d engine.
     """
     if not measurements:
         raise ValueError("No ERT measurements")
+    if len(measurements) < 8:
+        raise ValueError("2-D inversion needs at least 8 measurements.")
     xs = np.array([m["midpoint_x"] for m in measurements], float)
     ns = np.array([m["n"] for m in measurements], float)
     a_sp = np.array([m["a"] for m in measurements], float)
@@ -272,16 +214,160 @@ def invert_2d_smooth(
     model = np.exp(m).reshape(n_z, n_x)
     pred = np.exp(jacobian(m) @ m)
     misfit_pct = 100.0 * float(np.sqrt(np.mean(((pred - rhoa) / np.clip(rhoa, 1e-6, None)) ** 2)))
+    rms_final = rms_hist[-1] if rms_hist else None
+    converged = bool(misfit_pct <= float(max_misfit_percent) and np.isfinite(misfit_pct))
+    if fail_on_divergence and not converged:
+        raise ValueError(
+            f"ERT 2-D inversion did not converge (misfit {misfit_pct:.1f}% > {max_misfit_percent}%). "
+            "No model is written. This is not Res2DInv."
+        )
     return {
         "x_m": x_nodes.tolist(),
         "z_m": z_nodes.tolist(),
         "resistivity_ohm_m": model.tolist(),
         "predicted_rhoa": pred.tolist(),
         "observed_rhoa": rhoa.tolist(),
-        "rms_log": rms_hist[-1] if rms_hist else None,
+        "rms_log": rms_final,
         "misfit_percent": misfit_pct,
         "iterations": len(rms_hist),
-        "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity",
+        "converged": converged,
+        "topography_used": False,
+        "formula": "Historical Gaussian half-space sensitivity (Roy & Apparao 1971). Not the live 2.5-D invert. Not Res2DInv.",
+        "limitations": [
+            "Homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+            "Does not recover 1-D layering. Preserved as a failed-benchmark kernel.",
+            "Topography is not used in the forward kernel.",
+            "3-D inversion is not implemented.",
+        ],
+        "experimental": True,
+        "kernel": "gaussian_halfspace_sensitivity",
+    }
+
+
+def invert_2d_smooth(
+    measurements: list[dict],
+    n_x: int = 10,
+    n_z: int = 8,
+    max_iter: int = 8,
+    lam: float = 0.08,
+    damping: float = 0.02,
+    max_misfit_percent: float = 25.0,
+    fail_on_divergence: bool = True,
+    n_k: int = 5,
+) -> dict:
+    """Experimental flat-topography 2-D smoothness invert with a 2.5-D FD forward.
+
+    Forward/Jacobian: Dey & Morrison (1979) cosine-transformed Poisson equation
+    on a padded (x, z) mesh; Frechet from ∇φ_src · ∇φ_rec. Gauss–Newton with
+    first-difference roughness (Constable et al. 1987 / Loke & Barker 1996 style).
+    Topography is not used. Not Res2DInv. Production support requires the
+    synthetic recovery programme to meet its declared thresholds.
+    """
+    from science.ert_25d import Forward25D, homogeneous_scale
+
+    if not measurements:
+        raise ValueError("No ERT measurements")
+    if len(measurements) < 8:
+        raise ValueError("2-D inversion needs at least 8 measurements.")
+    meas = []
+    for item in measurements:
+        row = dict(item)
+        row["array"] = str(row.get("array") or "wenner")
+        meas.append(row)
+    xs = np.array([m["midpoint_x"] for m in meas], float)
+    ns = np.array([m["n"] for m in meas], float)
+    a_sp = np.array([m["a"] for m in meas], float)
+    rhoa = np.array([m["rhoa"] for m in meas], float)
+    xmin, xmax = float(xs.min()), float(xs.max())
+    x_nodes = np.linspace(xmin, xmax, n_x)
+    z_max = float(np.max(a_sp * (ns + 1.0)))
+    z_lo = max(0.25 * float(np.min(a_sp)), 0.5)
+    z_hi = max(z_max, 4.0 * z_lo)
+    z_nodes = np.logspace(np.log10(z_lo), np.log10(z_hi), n_z)
+    n_m = n_x * n_z
+    m = np.full(n_m, np.log(max(float(np.median(rhoa)), 1.0)))
+    rx = diags([-1.0, 1.0], [0, 1], shape=(n_x - 1, n_x))
+    rz = diags([-1.0, 1.0], [0, 1], shape=(n_z - 1, n_z))
+    ix = kron(eye(n_z), rx)
+    iz = kron(rz, eye(n_x))
+    scale = homogeneous_scale(meas, x_nodes, z_nodes, n_k=n_k)
+    pred = np.full_like(rhoa, float(np.median(rhoa)))
+    rms_hist = []
+    misfit_hist = []
+    roughness_hist = []
+    row_sum = None
+    for _ in range(max_iter):
+        rho = np.exp(m).reshape(n_z, n_x)
+        fwd = Forward25D(meas, rho, x_nodes, z_nodes, n_k=n_k)
+        pred_raw = fwd.apparent_resistivities()
+        pred = pred_raw * scale
+        pred = np.clip(pred, 1e-3, 1e6)
+        residual = np.log(np.clip(rhoa, 1e-6, None)) - np.log(pred)
+        # Huber-like weights for outliers
+        mad = float(np.median(np.abs(residual - np.median(residual)))) + 1e-6
+        w = np.clip(1.5 * mad / np.maximum(np.abs(residual), 1.5 * mad), 0.05, 1.0)
+        rms = float(np.sqrt(np.mean(residual**2)))
+        rms_hist.append(rms)
+        misfit_pct_i = 100.0 * float(np.sqrt(np.mean(((pred - rhoa) / np.clip(rhoa, 1e-6, None)) ** 2)))
+        misfit_hist.append(misfit_pct_i)
+        j = fwd.jacobian_dlogrhoa_dlogrho(x_nodes, z_nodes, pred_raw)
+        row_sums = j.sum(axis=1)
+        row_sum = float(np.median(row_sums)) if row_sums.size else 0.0
+        # Homogeneous Euler: d log ρa / d log ρ should sum to ~1. Scale only when the
+        # Frechet/FT discretisation is off by a global factor (documented limitation).
+        if abs(row_sum) > 1e-6:
+            j = j / row_sum
+        jw = j * w[:, None]
+        jtwdj = csr_matrix(jw.T @ jw)
+        rough = ix.T @ ix + iz.T @ iz
+        roughness_hist.append(float(m @ (rough @ m)))
+        a_mat = (jtwdj + lam * rough + damping * eye(n_m)).tocsr()
+        rhs = jw.T @ (w * residual)
+        try:
+            dm = spsolve(a_mat, rhs)
+        except Exception:
+            dm = np.linalg.lstsq(a_mat.toarray(), rhs, rcond=None)[0]
+        m = np.clip(m + np.asarray(dm, float), np.log(1e-2), np.log(1e5))
+
+    model = np.exp(m).reshape(n_z, n_x)
+    misfit_pct = misfit_hist[-1] if misfit_hist else 999.0
+    rms_final = rms_hist[-1] if rms_hist else None
+    converged = bool(misfit_pct <= float(max_misfit_percent) and np.isfinite(misfit_pct))
+    if fail_on_divergence and not converged:
+        raise ValueError(
+            f"ERT 2-D inversion did not converge (misfit {misfit_pct:.1f}% > {max_misfit_percent}%). "
+            "No model is written. This experimental invert is not Res2DInv."
+        )
+    return {
+        "x_m": x_nodes.tolist(),
+        "z_m": z_nodes.tolist(),
+        "resistivity_ohm_m": model.tolist(),
+        "predicted_rhoa": pred.tolist(),
+        "observed_rhoa": rhoa.tolist(),
+        "rms_log": rms_final,
+        "rms_history": rms_hist,
+        "misfit_percent": misfit_pct,
+        "misfit_history": misfit_hist,
+        "roughness_history": roughness_hist,
+        "iterations": len(rms_hist),
+        "converged": converged,
+        "topography_used": False,
+        "experimental": True,
+        "kernel": "dey_morrison_1979_25d_fd",
+        "n_k": n_k,
+        "homogeneous_scale": scale,
+        "jacobian_row_sum_median": row_sum,
+        "formula": (
+            "Experimental flat-topography 2.5-D FD forward (Dey & Morrison 1979) and "
+            "∇φ·∇φ Frechet; smoothness-constrained Gauss–Newton. Not Res2DInv."
+        ),
+        "limitations": [
+            "Experimental until synthetic-recovery thresholds are met.",
+            "Flat topography only. Topography is not used in the forward kernel.",
+            "3-D inversion is not implemented.",
+            "Not equivalent to Res2DInv.",
+            "A homogeneous-half-space scale is applied because the 2.5-D cosine transform is not yet unscaled-accurate; independent two-layer true resistivities are not recovered.",
+        ],
     }
 
 

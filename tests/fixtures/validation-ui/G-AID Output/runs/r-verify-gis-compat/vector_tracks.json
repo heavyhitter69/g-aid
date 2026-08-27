@@ -1,0 +1,108 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "layers": [
+    {
+      "source_path": "compat/crs84.geojson",
+      "catalog_id": "crs84",
+      "crs": "OGC:CRS84",
+      "crs_source": "rfc7946",
+      "geojson_contract": "rfc7946",
+      "axis_order": "lon-lat",
+      "coordinate_order": "lon-lat",
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "SITE"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 18.39,
+        "minY": -33.92,
+        "maxX": 18.42,
+        "maxY": -33.89
+      },
+      "features": [
+        {
+          "id": "r1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 18.39,
+              "y": -33.92
+            },
+            {
+              "x": 18.42,
+              "y": -33.92
+            },
+            {
+              "x": 18.42,
+              "y": -33.89
+            },
+            {
+              "x": 18.39,
+              "y": -33.89
+            },
+            {
+              "x": 18.39,
+              "y": -33.92
+            }
+          ],
+          "properties": {
+            "SITE": "rfc7946"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    },
+    {
+      "source_path": "compat/legacy-4326.geojson",
+      "catalog_id": "legacy",
+      "crs": "EPSG:4326",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "lat-lon",
+      "coordinate_order": "lon-lat",
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "SITE"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 18.41,
+        "minY": -33.91,
+        "maxX": 18.41,
+        "maxY": -33.91
+      },
+      "features": [
+        {
+          "id": "e1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 18.41,
+              "y": -33.91
+            }
+          ],
+          "properties": {
+            "SITE": "legacy-4326"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

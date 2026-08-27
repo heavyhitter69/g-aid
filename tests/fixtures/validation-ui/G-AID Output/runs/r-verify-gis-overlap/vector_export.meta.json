@@ -1,0 +1,12 @@
+{
+  "format": "geojson",
+  "rfc7946_crs84": true,
+  "shapefile": false,
+  "geopackage": false,
+  "reprojected": false,
+  "attribute_editing": false,
+  "files": [
+    "vector_export_1.geojson",
+    "vector_export_2.geojson"
+  ]
+}

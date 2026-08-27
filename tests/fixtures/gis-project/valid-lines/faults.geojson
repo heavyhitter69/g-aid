@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "f1",
+      "properties": {
+        "NAME": "F-1"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            260050,
+            6240050
+          ],
+          [
+            260200,
+            6240200
+          ]
+        ]
+      }
+    }
+  ]
+}

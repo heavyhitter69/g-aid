@@ -1,0 +1,55 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "T1",
+      "properties": {
+        "ID": "T1",
+        "UNIT": "licence",
+        "_g_aid_source": "overlap/tenure.shp",
+        "_g_aid_source_format": "shapefile",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": null,
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "tenure",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              260100.0,
+              6240100.0
+            ],
+            [
+              260500.0,
+              6240100.0
+            ],
+            [
+              260500.0,
+              6240400.0
+            ],
+            [
+              260100.0,
+              6240400.0
+            ],
+            [
+              260100.0,
+              6240100.0
+            ]
+          ]
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
+}

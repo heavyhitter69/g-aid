@@ -1,0 +1,20 @@
+{
+  "kind": "gpr-radargram",
+  "vertical_axis": "two-way time ns \u2014 not depth",
+  "sampling_hz": 50000000.0,
+  "nyquist_hz": 25000000.0,
+  "bandpass_applied": false,
+  "bandpass_adjusted": false,
+  "bandpass_refused": true,
+  "requested_filter_hz": [
+    80000000.0,
+    800000000.0
+  ],
+  "applied_filter_hz": [
+    null,
+    null
+  ],
+  "refusal_reason": "Band-pass high-cut 800 MHz is at or above Nyquist 25 MHz. G-AID will not silently place a high-cut at 0.999 \u00d7 Nyquist. Antenna default also cannot be replaced by 0.8 \u00d7 Nyquist (20 MHz) while keeping the 0.2 \u00d7 AntennaMHz low-cut. Supply fLowHz/fHighHz below Nyquist.",
+  "adjustment_reason": null,
+  "geological_certainty_improved": false
+}

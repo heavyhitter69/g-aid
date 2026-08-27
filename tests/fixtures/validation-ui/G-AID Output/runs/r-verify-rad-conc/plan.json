@@ -1,0 +1,16 @@
+{
+  "runId": "r-verify-rad-conc",
+  "parentRunId": "r-verify-rad-parent",
+  "planHash": "fixture-verify-rad-conc",
+  "intent": "radiometrics",
+  "status": "complete",
+  "capabilities": [
+    "rad.ingest",
+    "rad.grid",
+    "rad.ternary",
+    "rad.ratios",
+    "rad.gis",
+    "rad.interpret"
+  ],
+  "product": "already-corrected concentration radiometrics"
+}

@@ -1,0 +1,15 @@
+{
+  "node_id": "vector_ingest",
+  "formula": "Documented GeoJSON ingest",
+  "parameters": {
+    "n": 1
+  },
+  "inputs": [
+    "compat/legacy-4326.geojson"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-legacy/vector_canonical.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-legacy/vector_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T17:29:02.461851Z"
+}

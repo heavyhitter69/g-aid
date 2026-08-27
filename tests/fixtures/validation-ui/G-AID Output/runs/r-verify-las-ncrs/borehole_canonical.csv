@@ -1,0 +1,4 @@
+DEPT,GR,well_id,depth_reference,source_catalog_id,source_checksum
+0.0,60.0,NOCRS,measured depth,cat-r-verify-las-ncrs,fixture
+2.0,61.0,NOCRS,measured depth,cat-r-verify-las-ncrs,fixture
+4.0,62.0,NOCRS,measured depth,cat-r-verify-las-ncrs,fixture

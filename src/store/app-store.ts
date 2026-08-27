@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
+import type { ProjectCatalog } from "@/lib/catalog/types";
 import type { JobResults } from "@/lib/job-results";
 import type { WorkStep } from "@/lib/work-steps";
 import { conversationTitleFromText, isPlaceholderTopic } from "@/lib/conversation-title";
@@ -92,11 +93,14 @@ interface AppState {
   assignedAgent: AgentProfile | null;
   workspaceView: WorkspaceView;
   lastJobResults: JobResults | null;
+  mapFocus: { catalogId?: string; artifactId?: string; path?: string } | null;
+  compareRunId: string | null;
   currentProject: string | null;
   workspaceRoot: string | null;
   lastWorkspaceRoot: string | null;
   lastCurrentProject: string | null;
   workspaceIndex: WorkspaceIndex | null;
+  projectCatalog: ProjectCatalog | null;
   recentProjects: RecentProject[];
   processingStatus: "idle" | "running" | "complete" | "error";
   theme: "light" | "dark";
@@ -138,6 +142,8 @@ interface AppState {
   completeOnboarding: () => void;
   setWorkspaceView: (view: WorkspaceView) => void;
   presentJobResults: (results: JobResults) => void;
+  setMapFocus: (focus: { catalogId?: string; artifactId?: string; path?: string } | null) => void;
+  setCompareRunId: (runId: string | null) => void;
   setProcessingStatus: (status: "idle" | "running" | "complete" | "error") => void;
   setTheme: (theme: "light" | "dark") => void;
   toggleAgentSidebar: () => void;
@@ -165,6 +171,7 @@ interface AppState {
   addProjectFile: (file: ProjectFile) => void;
   setCurrentProject: (projectName: string | null, path?: string, fileCount?: number) => void;
   setWorkspaceRoot: (root: string | null, index?: WorkspaceIndex | null) => void;
+  setProjectCatalog: (catalog: ProjectCatalog | null) => void;
   setOpenFileDialogOpen: (value: boolean) => void;
   setOpenFolderDialogOpen: (value: boolean) => void;
   setSaveAsDialogOpen: (value: boolean) => void;
@@ -234,11 +241,14 @@ const initialState = {
   assignedAgent: null,
   workspaceView: "dashboard" as WorkspaceView,
   lastJobResults: null as JobResults | null,
+  mapFocus: null as { catalogId?: string; artifactId?: string; path?: string } | null,
+  compareRunId: null as string | null,
   currentProject: null as string | null,
   workspaceRoot: null as string | null,
   lastWorkspaceRoot: null as string | null,
   lastCurrentProject: null as string | null,
   workspaceIndex: null as WorkspaceIndex | null,
+  projectCatalog: null as ProjectCatalog | null,
   recentProjects: [] as RecentProject[],
   processingStatus: "idle" as const,
   theme: "dark" as const,
@@ -326,7 +336,7 @@ export const useAppStore = create<AppState>()(
             : [...s.workbenchTabs, { id, type: "view" as const, title }];
           const reveal =
             results.activeLayerId ||
-            results.files.find((file: string) => /\.(tif|tiff|asc|npz|npy)$/i.test(file)) ||
+            results.files.find((file: string) => /\.(tif|tiff|asc|npz|npy|geojson)$/i.test(file)) ||
             results.productsRel;
           return {
             lastJobResults: results,
@@ -341,6 +351,21 @@ export const useAppStore = create<AppState>()(
             }),
           };
         }),
+      setMapFocus: (focus) =>
+        set((s) => {
+          const id = "visualization";
+          const alreadyOpen = s.workbenchTabs.some((t) => t.id === id);
+          const workbenchTabs = alreadyOpen
+            ? s.workbenchTabs
+            : [...s.workbenchTabs, { id, type: "view" as const, title: "Map" }];
+          return {
+            mapFocus: focus,
+            workbenchTabs,
+            activeWorkbenchTabId: id,
+            workspaceView: "visualization" as WorkspaceView,
+          };
+        }),
+      setCompareRunId: (runId) => set({ compareRunId: runId }),
       setProcessingStatus: (status) => set({ processingStatus: status }),
       setTheme: (theme) => set({ theme }),
       toggleAgentSidebar: () => set((s) => ({ isAgentSidebarOpen: !s.isAgentSidebarOpen })),
@@ -521,6 +546,7 @@ export const useAppStore = create<AppState>()(
         workspaceIndex: index ?? null,
         ...(root ? { lastWorkspaceRoot: root } : {}),
       })),
+      setProjectCatalog: (catalog) => set({ projectCatalog: catalog }),
       setOpenFileDialogOpen: (value) => set({ isOpenFileDialogOpen: value }),
       setOpenFolderDialogOpen: (value) => set({ isOpenFolderDialogOpen: value }),
       setSaveAsDialogOpen: (value) => set({ isSaveAsDialogOpen: value }),
@@ -578,6 +604,7 @@ export const useAppStore = create<AppState>()(
         currentProject: null,
         workspaceRoot: null,
         workspaceIndex: null,
+        projectCatalog: null,
         projectFiles: [],
         fileContents: {},
         workbenchTabs: [],
@@ -585,6 +612,8 @@ export const useAppStore = create<AppState>()(
         activeWorkbenchTabId: null,
         workspaceView: "dashboard",
         lastJobResults: null,
+        mapFocus: null,
+        compareRunId: null,
       }),
       hideConversation: (id) => set((s) => {
         const updated = s.conversations.map((c) => (c.id === id ? { ...c, hidden: true } : c));

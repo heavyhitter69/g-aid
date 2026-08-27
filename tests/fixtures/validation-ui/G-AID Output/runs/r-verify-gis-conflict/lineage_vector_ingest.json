@@ -1,0 +1,16 @@
+{
+  "node_id": "vector_ingest",
+  "formula": "Documented GeoJSON ingest",
+  "parameters": {
+    "n": 2
+  },
+  "inputs": [
+    "conflict-crs/a.geojson",
+    "conflict-crs/b.geojson"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-conflict/vector_canonical.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-conflict/vector_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T17:29:48.758714Z"
+}

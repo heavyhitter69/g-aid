@@ -1,0 +1,151 @@
+{
+  "observations": [
+    "Radiometric measurements were ingested under the G-AID RAD 1.0 already-corrected contract.",
+    "Quantity: concentration. G-AID did not apply height, stripping, dead-time, or concentration conversion.",
+    "Ternary computed: True. A ternary is a colour composite, not a lithology map.",
+    "Units K=%K, eU=ppm eU, eTh=ppm eTh, TC=nGy/h."
+  ],
+  "assumptions": [
+    "Channel values are as supplied in the declared units from the catalog record or versioned artifact metadata.",
+    "Correction history is the contractor/survey declaration; it was not re-applied.",
+    "Filenames are not a source of quantity or units."
+  ],
+  "uncertainty": [
+    "Equivalent concentrations are non-unique with respect to source geometry, attenuation, and residual stripping.",
+    "Gridding interpolates. It is not a measurement."
+  ],
+  "recommendations": [
+    "Do not treat K, eU, eTh, ratios, or a ternary as mineralisation, lithology, alteration, or a drill target."
+  ],
+  "not_established": [
+    "Mineralisation is not established.",
+    "Lithology is not established.",
+    "Alteration is not established.",
+    "Drill targets are not established.",
+    "Raw spectrometer corrections were not performed."
+  ],
+  "qc": {
+    "rad_ingest_qc.json": {
+      "files": [
+        {
+          "path": "/workspace/tests/fixtures/radio-project/valid/stations.csv",
+          "n": 16,
+          "n_lines": 4,
+          "quantity": "concentration",
+          "crs_epsg": 32630,
+          "channels": {
+            "k": "%K",
+            "eu": "ppm eU",
+            "eth": "ppm eTh",
+            "tc": "nGy/h"
+          },
+          "units_unknown": false,
+          "correction_history": "contractor height, stripping, NASVD; delivered as equivalent concentrations",
+          "platform": "airborne",
+          "instrument": "RSX-5",
+          "acquisition_date": "2024-06-12",
+          "mapping": {
+            "x": "X",
+            "y": "Y",
+            "line": "Line",
+            "k": "K",
+            "eu": "eU",
+            "eth": "eTh",
+            "tc": "TC"
+          },
+          "assumptions": "None. CRS, quantity, units, and correction history came from the RAD 1.0 contract or a reviewed mapping.",
+          "not_raw_spectrum": true,
+          "corrections_applied_in_g_aid": false,
+          "catalogId": "cat-r-verify-rad-conc"
+        }
+      ],
+      "n": 16,
+      "line_qc": {
+        "n": 16,
+        "n_lines": 4,
+        "duplicate_xy_line": 0,
+        "x_span_m": 600.0,
+        "y_span_m": 600.0
+      },
+      "quantity": "concentration",
+      "units_k": "%K",
+      "units_eu": "ppm eU",
+      "units_eth": "ppm eTh",
+      "units_tc": "nGy/h",
+      "units_unknown": false,
+      "channels": [
+        "k",
+        "eu",
+        "eth",
+        "tc"
+      ],
+      "corrections_applied_in_g_aid": false,
+      "not_raw_spectrum": true,
+      "assumptions": "None. Already-corrected values as supplied. G-AID did not height-correct, strip, or convert concentrations. Units came from the catalog contract, not from filenames."
+    },
+    "rad_grid_qc.json": {
+      "channels": [
+        "k",
+        "eu",
+        "eth",
+        "tc"
+      ],
+      "quantity": "concentration",
+      "units": {
+        "k": "%K",
+        "eu": "ppm eU",
+        "eth": "ppm eTh",
+        "tc": "nGy/h"
+      },
+      "units_unknown": false,
+      "interpolation": "Thin-plate spline = 2-D minimum curvature (Duchon 1977 / Briggs 1974)",
+      "not_a_geological_map": true,
+      "units_source": "catalog record / versioned artifact metadata, not filename"
+    },
+    "rad_ternary_qc.json": {
+      "justified": true,
+      "quantity": "concentration",
+      "units_k": "%K",
+      "units_eu": "ppm eU",
+      "units_eth": "ppm eTh",
+      "assignment": {
+        "R": "K %",
+        "G": "eTh ppm",
+        "B": "eU ppm"
+      },
+      "skipped": false,
+      "not_mineralisation": true,
+      "not_lithology": true,
+      "source": "grids",
+      "formula": "Linear stretch between the 2.0th and 98.0th percentiles of each channel, clipped to [0,1].",
+      "p_lo": 2.0,
+      "p_hi": 98.0
+    },
+    "rad_ratio_qc.json": {
+      "formula": "eU/eTh (ppm/ppm); eU/K (ppm/%); eTh/K (ppm/%). Denominator clipped at eps.",
+      "skipped": false,
+      "n": 16,
+      "quantity": "concentration",
+      "units_k": "%K",
+      "units_eu": "ppm eU",
+      "units_eth": "ppm eTh",
+      "units_eu_eth": "ppm eU / ppm eTh",
+      "units_eu_k": "ppm eU / %K",
+      "units_eth_k": "ppm eTh / %K",
+      "not_lithology": true,
+      "not_alteration": true,
+      "n_eth_clipped": 0,
+      "n_k_clipped_eu": 0,
+      "n_k_clipped_eth": 0
+    }
+  },
+  "quantity": "concentration",
+  "units_k": "%K",
+  "units_eu": "ppm eU",
+  "units_eth": "ppm eTh",
+  "units_tc": "nGy/h",
+  "interpretation_limit": "Already-corrected radiometric maps and ratios are not geology.",
+  "affirmative_language_allowed": false,
+  "interpretation_blocked": false,
+  "corrections_applied_in_g_aid": false
+}

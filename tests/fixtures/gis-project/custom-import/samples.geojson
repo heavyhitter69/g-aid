@@ -1,0 +1,14 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "c1",
+      "properties": { "SAMPLE_ID": "C1" },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [260120, 6240120]
+      }
+    }
+  ]
+}

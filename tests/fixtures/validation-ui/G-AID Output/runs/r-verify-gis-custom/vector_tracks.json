@@ -1,0 +1,51 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "layers": [
+    {
+      "source_path": "custom-import/samples.geojson",
+      "catalog_id": "custom",
+      "crs": "EPSG:32734",
+      "crs_source": "companion-prj",
+      "geojson_contract": "g-aid-custom-import",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "sample-location",
+      "role_reviewed": true,
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "SAMPLE_ID"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 260120.0,
+        "minY": 6240120.0,
+        "maxX": 260120.0,
+        "maxY": 6240120.0
+      },
+      "features": [
+        {
+          "id": "c1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260120.0,
+              "y": 6240120.0
+            }
+          ],
+          "properties": {
+            "SAMPLE_ID": "C1"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

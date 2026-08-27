@@ -1,0 +1,19 @@
+{
+  "channels": [
+    "k",
+    "eu",
+    "eth",
+    "tc"
+  ],
+  "quantity": "concentration",
+  "units": {
+    "k": "unknown",
+    "eu": "unknown",
+    "eth": "unknown",
+    "tc": "unknown"
+  },
+  "units_unknown": true,
+  "interpolation": "Thin-plate spline = 2-D minimum curvature (Duchon 1977 / Briggs 1974)",
+  "not_a_geological_map": true,
+  "units_source": "catalog record / versioned artifact metadata, not filename"
+}

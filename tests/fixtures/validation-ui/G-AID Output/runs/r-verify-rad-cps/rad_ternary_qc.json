@@ -1,0 +1,16 @@
+{
+  "justified": false,
+  "quantity": "count_rate",
+  "units_k": "cps",
+  "units_eu": "cps",
+  "units_eth": "cps",
+  "assignment": {
+    "R": "K %",
+    "G": "eTh ppm",
+    "B": "eU ppm"
+  },
+  "skipped": true,
+  "not_mineralisation": true,
+  "not_lithology": true,
+  "reason": "Ternary needs Quantity=concentration. quantity=count_rate."
+}

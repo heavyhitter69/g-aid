@@ -1,0 +1,21 @@
+{
+  "product_name": "GPR Kirchhoff time migration (user velocity)",
+  "migrated": true,
+  "velocity_ms": 100000000.0,
+  "velocity_source": "user",
+  "velocity_assumed": false,
+  "dt_ns": 0.4,
+  "sampling_hz": 2499999999.9999995,
+  "nyquist_hz": 1249999999.9999998,
+  "dx_m": 0.05,
+  "depth_sample_m": 0.020000000000000004,
+  "formula": "2-D Kirchhoff time migration, zero-offset, constant velocity (Yilmaz 2001). z = 0.5 v t with the user velocity. No topography, no 3-D, not a measured depth model.",
+  "benchmark_passed": true,
+  "benchmark_file": "docs/validation/results/gpr_migration_benchmark.json",
+  "geological_certainty_improved": false,
+  "limitations": [
+    "Migrated depth uses the supplied velocity and is not ground truth.",
+    "Hyperbola collapse does not prove a pipe, void, or archaeological feature.",
+    "The operator passed a noise-free constant-velocity diffraction benchmark. Field data are not that case."
+  ]
+}

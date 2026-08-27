@@ -277,12 +277,20 @@ function startPythonBackend() {
   }
   if (pythonProcess && !pythonProcess.killed) return;
 
-  const enginePath = bundledBinary(path.join(process.resourcesPath, "g-aid-engine"), "g-aid-engine");
+  const engineDir = path.join(process.resourcesPath, "g-aid-engine");
+  const enginePath = bundledBinary(engineDir, "g-aid-engine");
   if (!fs.existsSync(enginePath)) {
     log("Python engine missing:", enginePath);
     return;
   }
   pythonProcess = spawnHidden(enginePath, []);
+}
+
+function resolveOllamaPath() {
+  const ollamaDir = path.join(process.resourcesPath, "ai");
+  const bundled = bundledBinary(ollamaDir, "ollama");
+  if (fs.existsSync(bundled)) return bundled;
+  return whichOnPath("ollama");
 }
 
 function startOllamaDaemon() {
@@ -293,10 +301,10 @@ function startOllamaDaemon() {
   if (ollamaProcess && !ollamaProcess.killed) return;
 
   const ollamaDir = path.join(process.resourcesPath, "ai");
-  const ollamaPath = bundledBinary(ollamaDir, "ollama");
+  const ollamaPath = resolveOllamaPath();
   const modelsPath = path.join(ollamaDir, "models");
-  if (!fs.existsSync(ollamaPath)) {
-    log("Ollama missing:", ollamaPath);
+  if (!ollamaPath || !fs.existsSync(ollamaPath)) {
+    log("Ollama missing: bundled binary and PATH");
     return;
   }
   ollamaProcess = spawnHidden(ollamaPath, ["serve"], {
@@ -338,10 +346,9 @@ function ollamaEnv() {
 }
 
 function ensureFastOrchestra() {
-  const ollamaDir = path.join(process.resourcesPath, "ai");
-  const ollamaPath = bundledBinary(ollamaDir, "ollama");
+  const ollamaPath = resolveOllamaPath();
   const modelfile = orchestraFastModelfilePath();
-  if (!fs.existsSync(ollamaPath) || !modelfile) {
+  if (!ollamaPath || !fs.existsSync(ollamaPath) || !modelfile) {
     log("Orchestra Fast model or Modelfile missing");
     return;
   }
@@ -355,8 +362,8 @@ function ensureOrchestraModel() {
     return;
   }
   const ollamaDir = path.join(process.resourcesPath, "ai");
-  const ollamaPath = bundledBinary(ollamaDir, "ollama");
-  if (!fs.existsSync(ollamaPath)) return;
+  const ollamaPath = resolveOllamaPath();
+  if (!ollamaPath || !fs.existsSync(ollamaPath)) return;
   spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], {
     OLLAMA_MODELS: path.join(ollamaDir, "models"),
     OLLAMA_HOST: "127.0.0.1:11434",
@@ -378,6 +385,49 @@ function listenOnPort(server, port) {
     server.once("listening", onListening);
     server.listen(port, hostname);
   });
+}
+
+function firstExisting(paths) {
+  return paths.find((file) => {
+    try {
+      return file && fs.existsSync(file);
+    } catch {
+      return false;
+    }
+  }) || null;
+}
+
+function ensureExecutable(file) {
+  if (!file || process.platform === "win32") return file;
+  try {
+    fs.chmodSync(file, 0o755);
+  } catch {
+    /* packaged files may already be executable */
+  }
+  return file;
+}
+
+function bundledBinary(dir, name) {
+  const unix = path.join(dir, name);
+  const win = path.join(dir, `${name}.exe`);
+  if (process.platform === "win32") {
+    const found = firstExisting([win, unix]);
+    return found ? ensureExecutable(found) : win;
+  }
+  if (fs.existsSync(unix)) return ensureExecutable(unix);
+  return unix;
+}
+
+function whichOnPath(name) {
+  const dirs = String(process.env.PATH || "").split(path.delimiter);
+  const names = process.platform === "win32" ? [`${name}.exe`, name] : [name];
+  for (const dir of dirs) {
+    for (const file of names) {
+      const full = path.join(dir, file);
+      if (fs.existsSync(full)) return full;
+    }
+  }
+  return null;
 }
 
 function iconPath() {
@@ -541,6 +591,16 @@ async function createWindow() {
 
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
+    if (parsedUrl.pathname === "/__gaid/auth") {
+      const access = parsedUrl.query && parsedUrl.query.access_token;
+      const refresh = parsedUrl.query && parsedUrl.query.refresh_token;
+      if (access && refresh) {
+        sendAuthUrl(`http://${hostname}:${serverPort}${req.url}`);
+      }
+      res.writeHead(302, { Location: "/auth/desktop/done" });
+      res.end();
+      return;
+    }
     handle(req, res, parsedUrl);
   });
 
@@ -608,6 +668,9 @@ ipcMain.handle("pick-folder", async (event, options) => {
 
 ipcMain.handle("index-workspace", async (_event, root) => {
   return workspaceFs.indexWorkspace(root);
+});
+ipcMain.handle("search-workspace", async (_event, root, query, options) => {
+  return workspaceFs.searchWorkspace(root, query, options || {});
 });
 
 ipcMain.handle("read-workspace-file", async (_event, root, relativePath) => {
@@ -700,7 +763,34 @@ ipcMain.handle("open-path", async (_event, root, relativePath) => {
   if (err) throw new Error(err);
 });
 
-const gotTheLock = app.requestSingleInstanceLock();
+function registerLinuxProtocolHandler() {
+  if (process.platform !== "linux" || dev) return;
+  const execPath = process.execPath;
+  if (execPath.startsWith("/opt/") || execPath.startsWith("/usr/")) return;
+  try {
+    const apps = path.join(app.getPath("home"), ".local", "share", "applications");
+    fs.mkdirSync(apps, { recursive: true });
+    const desktop = path.join(apps, "g-aid.desktop");
+    fs.writeFileSync(
+      desktop,
+      [
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name=G-AID",
+        "Exec=" + JSON.stringify(execPath) + " %u",
+        "Icon=g-aid",
+        "Terminal=false",
+        "Categories=Science;Education;",
+        "MimeType=x-scheme-handler/gaid;",
+        "StartupWMClass=g-aid",
+        "",
+      ].join("\n")
+    );
+    spawn("xdg-mime", ["default", "g-aid.desktop", "x-scheme-handler/gaid"], { stdio: "ignore" });
+  } catch (err) {
+    log("Linux protocol handler skipped", err);
+  }
+}
 
 if (!gotTheLock) {
   app.quit();
@@ -742,6 +832,7 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     log("App ready, log file:", logPath());
+    registerLinuxProtocolHandler();
     try {
       await createWindow();
       startOllamaDaemon();

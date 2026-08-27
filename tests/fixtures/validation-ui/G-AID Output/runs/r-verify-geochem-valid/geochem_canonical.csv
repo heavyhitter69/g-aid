@@ -1,0 +1,6 @@
+source_path,sample_id,x,y,medium,qc_flag,batch,date,lab,method,crs,kind,Au_ppm,Au_ppm_qual,Au_ppm_dl,Au_ppm_censored,Cu_ppm,Cu_ppm_qual,Cu_ppm_dl,Cu_ppm_censored
+valid/assays.csv,S-001,260100.0,6240100.0,soil,sample,B1,2024-03-01,ALS,ICP-MS,EPSG:32734,raw,0.12,,,False,45.0,,,False
+valid/assays.csv,S-002,260140.0,6240140.0,soil,sample,B1,2024-03-01,ALS,ICP-MS,EPSG:32734,raw,0.08,,,False,38.0,,,False
+valid/assays.csv,S-003,260180.0,6240180.0,soil,sample,B1,2024-03-02,ALS,ICP-MS,EPSG:32734,raw,0.31,,,False,92.0,,,False
+valid/assays.csv,S-004,260220.0,6240120.0,soil,sample,B1,2024-03-02,ALS,ICP-MS,EPSG:32734,raw,0.05,,,False,21.0,,,False
+valid/assays.csv,S-005,260160.0,6240160.0,soil,sample,B1,2024-03-03,ALS,ICP-MS,EPSG:32734,raw,0.19,,,False,67.0,,,False

@@ -278,133 +278,47 @@ def magarrow_survey_date(df: pd.DataFrame) -> datetime | None:
 
 
 def parse_geosoft_xyz(path: str) -> pd.DataFrame:
-    """Geosoft XYZ / space-delimited X Y [Z] value with optional / or \\ comments."""
-    xs, ys, zs, vals, lines = [], [], [], [], []
-    current_line = "1"
-    with open(path, "r", errors="ignore") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if not line or line.startswith("/") or line.startswith("\\") or line.startswith("#"):
-                if line.lower().startswith("/line") or line.lower().startswith("line"):
-                    parts = line.replace("=", " ").split()
-                    current_line = parts[-1]
-                continue
-            if line.lower().startswith("line"):
-                current_line = line.split()[-1]
-                continue
-            parts = line.replace(",", " ").split()
-            if len(parts) < 3:
-                continue
-            try:
-                x = float(parts[0])
-                y = float(parts[1])
-                if len(parts) >= 4:
-                    z = float(parts[2])
-                    v = float(parts[3])
-                else:
-                    z = np.nan
-                    v = float(parts[2])
-            except ValueError:
-                continue
-            xs.append(x)
-            ys.append(y)
-            zs.append(z)
-            vals.append(v)
-            lines.append(current_line)
-    if not vals:
-        raise ValueError(f"No XYZ samples in {path}")
-    df = pd.DataFrame({"x": xs, "y": ys, "z": zs, "value": vals, "line_id": lines})
-    df["timestamp"] = np.arange(len(df), dtype=float)
-    df["source"] = "xyz"
-    df["crs_epsg"] = 0
-    df["unit"] = ""
+    """Deprecated loose XYZ. Gravity pack uses formats.gravity.parse_gravity_table."""
+    from formats.gravity import parse_gravity_table
+
+    df, _qc = parse_gravity_table(path)
     return df
 
 
 def parse_las(path: str) -> dict:
-    """LAS 2.0 well log."""
-    sections: dict[str, list[str]] = {"V": [], "W": [], "C": [], "P": [], "A": []}
-    current = None
-    with open(path, "r", errors="ignore") as handle:
-        for line in handle:
-            if line.startswith("~"):
-                key = line[1].upper() if len(line) > 1 else "A"
-                current = key if key in sections else "A"
-                continue
-            if current:
-                sections[current].append(line.rstrip("\n"))
-    curves = []
-    for line in sections["C"]:
-        if not line or line.startswith("#"):
-            continue
-        name = line.split(".", 1)[0].strip().split()[0] if "." in line else line.split()[0]
-        curves.append(name)
-    if not curves:
-        raise ValueError(f"No LAS curve mnemonics in {path}")
-    rows = []
-    null = -999.25
-    for line in sections["W"]:
-        if "NULL" in line.upper():
-            try:
-                null = float(line.split(".", 1)[-1].split(":")[0].strip().split()[0])
-            except (ValueError, IndexError):
-                pass
-    for line in sections["A"]:
-        if not line.strip() or line.startswith("#"):
-            continue
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        try:
-            rows.append([float(p) for p in parts])
-        except ValueError:
-            continue
-    if not rows:
-        raise ValueError(f"No LAS ASCII data in {path}")
-    arr = np.asarray(rows, float)
-    n = min(arr.shape[1], len(curves))
-    data = {curves[i]: arr[:, i] for i in range(n)}
-    df = pd.DataFrame(data)
-    df = df.replace(null, np.nan)
-    well = ""
-    for line in sections["W"]:
-        if line.strip().upper().startswith("WELL"):
-            well = line.split(":", 1)[-1].strip()
-    return {"well": well, "null": null, "curves": curves[:n], "data": df, "path": path}
+    """CWLS LAS 2.0 WRAP.NO well log. LASF / WRAP.YES / LAS 3.0 raise ValueError."""
+    from formats.las import parse_las_20
+
+    return parse_las_20(path)
+
+
+def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = False) -> dict:
+    """Documented GeoJSON. RFC 7946 files are OGC:CRS84; legacy crs and .prj are custom contracts."""
+    from formats.geojson import parse_geojson as impl
+
+    return impl(path, role=role, role_reviewed=role_reviewed)
+
+
+def parse_shapefile(path: str, role: str | None = None, role_reviewed: bool = False) -> dict:
+    """Documented ESRI shapefile. Requires .shp/.shx/.dbf and a .prj EPSG. Not a geological interpretation."""
+    from formats.shapefile import parse_shapefile as impl
+
+    return impl(path, role=role, role_reviewed=role_reviewed)
+
+
+def parse_geochem(path: str, mapping=None) -> dict:
+    """Documented G-AID GEOCHEM 1.0 assay table. Element-like names are not geochemistry."""
+    from formats.geochem import parse_geochem_table
+
+    return parse_geochem_table(path, mapping=mapping)
 
 
 def parse_dzt(path: str) -> dict:
-    """GSSI SIR DZT (1024-byte header when rh_nbits==16 and rh_ant=..., common case)."""
-    with open(path, "rb") as handle:
-        header = handle.read(1024)
-        if len(header) < 128:
-            raise ValueError(f"DZT header too short: {path}")
-        nsamp = struct_u16(header, 4)
-        bits = struct_u16(header, 6)
-        zero = struct_u16(header, 8)
-        sps = struct_u16(header, 10) or 1
-        spm = struct_f32(header, 14) or 1.0
-        range_ns = struct_f32(header, 18) or 50.0
-        data = handle.read()
-    width = 4 if bits == 32 else 2
-    n_trace_bytes = nsamp * width
-    if n_trace_bytes <= 0:
-        raise ValueError("DZT nsamp is zero")
-    n_traces = len(data) // n_trace_bytes
-    dtype = np.int32 if bits == 32 else np.int16
-    traces = np.frombuffer(data[: n_traces * n_trace_bytes], dtype=dtype).reshape(n_traces, nsamp).astype(np.float32)
-    traces -= zero
-    dt = (range_ns * 1e-9) / max(nsamp, 1)
-    dx = 1.0 / spm if spm else 0.05
-    return {
-        "traces": traces,
-        "ns": int(nsamp),
-        "n_traces": int(n_traces),
-        "dt_s": float(dt),
-        "dx_m": float(dx),
-        "range_ns": float(range_ns),
-        "path": path,
-    }
+    """Recognised-unsupported. G-AID does not invent dt, dx, or antenna from a DZT header."""
+    raise ValueError(
+        f"GSSI DZT is recognised-unsupported ({path}). Convert to a documented G-AID GPR 1.0 CSV. "
+        "I will not invent dt, dx, or antenna frequency from a binary header."
+    )
 
 
 def struct_u16(buf: bytes, offset: int) -> int:

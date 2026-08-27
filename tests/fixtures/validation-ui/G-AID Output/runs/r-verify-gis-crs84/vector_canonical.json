@@ -1,0 +1,52 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "product_name": "G-AID documented GeoJSON vector layer",
+      "format": "geojson",
+      "crs_epsg": null,
+      "crs": "OGC:CRS84",
+      "crs_source": "rfc7946",
+      "geojson_contract": "rfc7946",
+      "axis_order": "lon-lat",
+      "coordinate_order": "lon-lat",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": 0,
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 18.4,
+              "y": -33.9
+            }
+          ],
+          "properties": {},
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 18.4,
+        "minY": -33.9,
+        "maxX": 18.4,
+        "maxY": -33.9
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "no-crs/clip.geojson",
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (WGS 84 longitude-latitude degrees). It is not EPSG:4326."
+      ],
+      "errors": [],
+      "formula": "GeoJSON Feature/FeatureCollection with documented CRS. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "clip",
+      "checksum": "crs84"
+    }
+  ]
+}

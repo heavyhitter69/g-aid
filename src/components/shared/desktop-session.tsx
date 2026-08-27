@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { useAppStore } from "@/store/app-store";
 import { isDesktop, parseGaidAuthUrl } from "@/lib/desktop";
 import { profileFromUser } from "@/lib/auth-user";
@@ -33,32 +33,38 @@ export function DesktopSessionProvider({ children }: { children: React.ReactNode
   }, []);
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!hasSupabaseConfig()) return;
 
-    const applySessionUser = (user: Parameters<typeof profileFromUser>[0] | null) => {
-      if (!user) return;
-      setUser(profileFromUser(user));
-      setAuthenticated(true);
-    };
+    try {
+      const supabase = createClient();
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        applySessionUser(data.session.user);
-      }
-    });
+      const applySessionUser = (user: Parameters<typeof profileFromUser>[0] | null) => {
+        if (!user) return;
+        setUser(profileFromUser(user));
+        setAuthenticated(true);
+      };
 
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        applySessionUser(session.user);
-      } else if (event === "SIGNED_OUT") {
-        setAuthenticated(false);
-        setUser(null);
-      }
-    });
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user) {
+          applySessionUser(data.session.user);
+        }
+      });
 
-    return () => {
-      data.subscription.unsubscribe();
-    };
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session?.user) {
+          applySessionUser(session.user);
+        } else if (event === "SIGNED_OUT") {
+          setAuthenticated(false);
+          setUser(null);
+        }
+      });
+
+      return () => {
+        data.subscription.unsubscribe();
+      };
+    } catch {
+      return;
+    }
   }, [setAuthenticated, setUser]);
 
   useEffect(() => {
@@ -67,7 +73,7 @@ export function DesktopSessionProvider({ children }: { children: React.ReactNode
     const applyAuthUrl = async (url: string | null) => {
       if (!url || appliedUrl.current === url) return;
       const tokens = parseGaidAuthUrl(url);
-      if (!tokens) return;
+      if (!tokens || !hasSupabaseConfig()) return;
       appliedUrl.current = url;
 
       const supabase = createClient();

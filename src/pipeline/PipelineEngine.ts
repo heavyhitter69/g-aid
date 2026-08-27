@@ -73,11 +73,18 @@ export class ChildProcessRuntime {
     const result = await executePythonNode(nodeId, scriptPath, inputArtifacts, parameters);
     const events = [started, ...(result.events || [])];
     if (result.success) {
+      const skipped =
+        (result.artifacts || []).length === 0 &&
+        (result.events || []).some((event) => /skipped:/i.test(event.message || ""));
       events.push({
         type: "NODE_COMPLETED",
         nodeId,
-        message: `Completed node ${nodeId}`,
+        message: skipped ? `Skipped node ${nodeId}` : `Completed node ${nodeId}`,
         timestamp: new Date().toISOString(),
+        payload: {
+          artifacts: result.artifacts || [],
+          skipped,
+        },
       });
     }
     return {

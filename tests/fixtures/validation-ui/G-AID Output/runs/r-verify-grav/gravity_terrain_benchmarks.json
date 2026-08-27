@@ -1,0 +1,63 @@
+{
+  "product_name": "near-zone terrain-corrected Bouguer anomaly",
+  "not_complete_bouguer": true,
+  "kernel": "Nagy 1966 rectangular prisms, near-zone only",
+  "far_zone": false,
+  "intermediate_zone": false,
+  "cases": [
+    {
+      "name": "single_prism_nagy_vs_newton",
+      "density_gcc": 2.67,
+      "geometry_m": {
+        "x1": 40.0,
+        "x2": 90.0,
+        "y1": 10.0,
+        "y2": 40.0,
+        "z1": 12.0,
+        "z2": 40.0
+      },
+      "production_mgal": 0.05255296704082117,
+      "independent_newton_mgal": 0.052552967040821214,
+      "rewritten_nagy_mgal": 0.05255296704082117,
+      "west_octant_production_mgal": 0.05255296704082085,
+      "west_octant_newton_mgal": 0.05255296704082061,
+      "tolerance_mgal": 0.005,
+      "pass": true,
+      "oracle": "Gauss\u2013Legendre Newton volume integral; rewritten Nagy 1966 eight-corner form"
+    },
+    {
+      "name": "wide_prism_vs_analytic_slab",
+      "density_gcc": 2.67,
+      "thickness_m": 20.0,
+      "half_width_m": 10000.0,
+      "production_mgal": 2.2373388156452574,
+      "analytic_slab_mgal": 2.2378872,
+      "relative_error": 0.0002450455745680437,
+      "tolerance_relative": 0.06,
+      "pass": true,
+      "oracle": "Infinite slab 2\u03c0G\u03c1h (Bullard A)"
+    },
+    {
+      "name": "bullard_b_lafehr_small_h",
+      "density_gcc": 2.67,
+      "height_m": 200.0,
+      "earth_radius_m": 6371000.0,
+      "production_mgal": 0.0007025120307164087,
+      "small_h_expansion_mgal": 0.0007025230576047717,
+      "relative_error": 1.5696123057677302e-05,
+      "tolerance_relative": 0.01,
+      "pass": true,
+      "oracle": "LaFehr 1991 small-h expansion 2\u03c0G\u03c1 h\u00b2/R"
+    },
+    {
+      "name": "one_dem_cell_vs_independent_prism",
+      "density_gcc": 2.4,
+      "tc_mgal": 0.9232235195828464,
+      "independent_prism_mgal": 0.9232235195828464,
+      "tolerance_mgal": 0.001,
+      "pass": true,
+      "oracle": "Rewritten Nagy 1966 for the same rectangular cell"
+    }
+  ],
+  "all_passed": true
+}

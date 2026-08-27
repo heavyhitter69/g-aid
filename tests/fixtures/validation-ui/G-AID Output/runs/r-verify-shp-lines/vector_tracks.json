@@ -1,0 +1,82 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GIS vector layer",
+  "layers": [
+    {
+      "source_path": "lines/faults.shp",
+      "catalog_id": "lines",
+      "crs": "EPSG:32734",
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "source_format": "shapefile",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "geometry_types": [
+        "LineString"
+      ],
+      "attribute_names": [
+        "ID",
+        "NAME"
+      ],
+      "feature_count": 2,
+      "bbox": {
+        "minX": 260120.0,
+        "minY": 6240120.0,
+        "maxX": 260220.0,
+        "maxY": 6240220.0
+      },
+      "features": [
+        {
+          "id": "F1",
+          "geometry_type": "LineString",
+          "coordinates": [
+            {
+              "x": 260120.0,
+              "y": 6240120.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240220.0
+            }
+          ],
+          "properties": {
+            "ID": "F1",
+            "NAME": "fault-a"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "F2",
+          "geometry_type": "LineString",
+          "coordinates": [
+            {
+              "x": 260130.0,
+              "y": 6240200.0
+            },
+            {
+              "x": 260200.0,
+              "y": 6240140.0
+            }
+          ],
+          "properties": {
+            "ID": "F2",
+            "NAME": "fault-b"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "topology_engine": "g-aid-evenodd-segment",
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

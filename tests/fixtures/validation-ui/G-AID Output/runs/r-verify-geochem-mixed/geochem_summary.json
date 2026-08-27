@@ -1,0 +1,76 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "elements": [
+    {
+      "key": "Au_ppm",
+      "symbol": "Au",
+      "units": "ppm",
+      "n": 3,
+      "n_censored": 0,
+      "n_uncensored": 3,
+      "min": 0.07,
+      "max": 0.22,
+      "median": 0.11,
+      "mean": 0.13333333333333333,
+      "kind": "raw",
+      "log_transformed": false
+    },
+    {
+      "key": "Fe_pct",
+      "symbol": "Fe",
+      "units": "pct",
+      "n": 3,
+      "n_censored": 0,
+      "n_uncensored": 3,
+      "min": 3.8,
+      "max": 6.1,
+      "median": 4.2,
+      "mean": 4.7,
+      "kind": "raw",
+      "log_transformed": false
+    }
+  ],
+  "selected": [
+    {
+      "key": "Au_ppm",
+      "symbol": "Au",
+      "units": "ppm",
+      "n": 3,
+      "n_censored": 0,
+      "n_uncensored": 3,
+      "min": 0.07,
+      "max": 0.22,
+      "median": 0.11,
+      "mean": 0.13333333333333333,
+      "kind": "raw",
+      "log_transformed": false
+    },
+    {
+      "key": "Fe_pct",
+      "symbol": "Fe",
+      "units": "pct",
+      "n": 3,
+      "n_censored": 0,
+      "n_uncensored": 3,
+      "min": 3.8,
+      "max": 6.1,
+      "median": 4.2,
+      "mean": 4.7,
+      "kind": "raw",
+      "log_transformed": false
+    }
+  ],
+  "comparisons": [
+    {
+      "left": "Au_ppm",
+      "right": "Fe_pct",
+      "blocked": true,
+      "reason": "Mixed/unknown units (ppm vs pct) block direct comparison."
+    }
+  ],
+  "kind": "raw",
+  "derived": false,
+  "display_only": false,
+  "log_transformed": false,
+  "note": "Statistics use uncensored values only. Censored below-detection samples are counted, not zeroed."
+}

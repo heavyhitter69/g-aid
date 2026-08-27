@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "s1",
+      "properties": {
+        "SAMPLE_ID": "IN"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260150,
+          6240150
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "s2",
+      "properties": {
+        "SAMPLE_ID": "OUT"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          261000,
+          6241000
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "node_id": "vector_view",
+  "formula": "Vector viewer metadata",
+  "parameters": {
+    "n": 2
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-conflict/vector_canonical.json"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-conflict/vector_tracks.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-conflict/vector_tracks.meta.json"
+  ],
+  "created_at": "2026-08-27T19:45:45.111145Z"
+}

@@ -1,0 +1,11 @@
+{
+  "skipped": false,
+  "collar_mapped": true,
+  "crs_epsg": 4326,
+  "coordinate_kind": "geographic",
+  "location_quality": "documented",
+  "x": 18.4241,
+  "y": -33.9249,
+  "z": 102.0,
+  "trajectory_computed": false
+}

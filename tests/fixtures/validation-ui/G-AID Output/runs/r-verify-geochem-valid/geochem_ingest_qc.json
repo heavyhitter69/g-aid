@@ -1,0 +1,30 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "format": "geochem-csv",
+  "tables": [
+    {
+      "source_path": "valid/assays.csv",
+      "catalog_id": "cat-r-verify-geochem-valid",
+      "checksum": null,
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "medium": "soil",
+      "lab": "ALS",
+      "method": "ICP-MS",
+      "n": 5,
+      "units": [
+        "ppm"
+      ],
+      "mixed_units": false,
+      "detection_limit_treatment": "censored",
+      "replaced_bdl_with_zero": false,
+      "imputed": false,
+      "log_transformed": false,
+      "kind": "raw"
+    }
+  ],
+  "n_tables": 1,
+  "replaced_bdl_with_zero": false,
+  "imputed": false,
+  "log_transformed": false
+}

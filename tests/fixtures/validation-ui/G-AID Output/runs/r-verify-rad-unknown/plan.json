@@ -1,0 +1,16 @@
+{
+  "runId": "r-verify-rad-unknown",
+  "parentRunId": "r-verify-rad-parent",
+  "planHash": "fixture-verify-rad-unknown",
+  "intent": "radiometrics",
+  "status": "complete",
+  "capabilities": [
+    "rad.ingest",
+    "rad.grid",
+    "rad.ternary",
+    "rad.ratios",
+    "rad.gis",
+    "rad.interpret"
+  ],
+  "product": "radiometrics with unknown units"
+}

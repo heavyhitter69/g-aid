@@ -1,0 +1,61 @@
+{
+  "product_name": "GPR Kirchhoff time migration (user velocity)",
+  "kernel": "2-D Kirchhoff time migration, zero-offset, constant velocity (Yilmaz 2001). z = 0.5 v t with the user velocity. No topography, no 3-D, not a measured depth model.",
+  "all_passed": true,
+  "unavailable_reason": null,
+  "cases": [
+    {
+      "name": "known_diffraction_correct_velocity",
+      "velocity_ms": 100000000.0,
+      "oracle": "analytic zero-offset hyperbola t=sqrt(t0^2+x^2/v^2) at a known apex",
+      "peak_trace": 20,
+      "peak_sample": 40,
+      "true_apex_trace": 20,
+      "true_apex_sample": 40,
+      "location_pass": true,
+      "migrated_energy_fraction_near_apex": 0.2365716861566002,
+      "raw_energy_fraction_near_apex": 0.07317073170731707,
+      "energy_concentration_pass": true,
+      "apex_amplitude": 0.8604852533047681,
+      "flank_mean_amplitude": 0.07505404926593157,
+      "contrast_pass": true,
+      "pass": true,
+      "thresholds": {
+        "peak_within_traces": 1,
+        "peak_within_samples": 2,
+        "energy_fraction_gt_raw_times": 2.0,
+        "apex_over_flank": 5.0
+      }
+    },
+    {
+      "name": "known_diffraction_half_velocity_diagnostic",
+      "velocity_ms": 50000000.0,
+      "oracle": "same hyperbola migrated at 0.5 v; must not earn the correct-velocity gate",
+      "peak_trace": 10,
+      "peak_sample": 42,
+      "true_apex_trace": 20,
+      "true_apex_sample": 40,
+      "location_pass": false,
+      "migrated_energy_fraction_near_apex": 0.057358642259188915,
+      "raw_energy_fraction_near_apex": 0.07317073170731707,
+      "energy_concentration_pass": false,
+      "apex_amplitude": 0.19145606518444422,
+      "flank_mean_amplitude": 0.04297079068189645,
+      "contrast_pass": false,
+      "pass": true,
+      "thresholds": {
+        "peak_within_traces": 1,
+        "peak_within_samples": 2,
+        "energy_fraction_gt_raw_times": 2.0,
+        "apex_over_flank": 5.0
+      },
+      "diagnostic_only": true,
+      "notes": "Wrong-velocity imaging is recorded; it is not required to fail the location gate."
+    }
+  ],
+  "limitations": [
+    "Benchmark is a noise-free constant-velocity zero-offset hyperbola.",
+    "Passing does not prove pipes, voids, archaeology, or a measured depth.",
+    "3-D migration, topography, and laterally varying velocity are not implemented."
+  ]
+}

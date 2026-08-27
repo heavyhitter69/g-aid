@@ -14,12 +14,14 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --experimental-strip-types --no-warnings src/lib/plan-spec.test.ts && node --experimental-strip-types --no-warnings src/lib/workspace-search.test.ts && node --experimental-strip-types --no-warnings src/lib/phase1-integrity.test.ts && node --experimental-strip-types --no-warnings src/lib/catalog.test.ts && node --experimental-strip-types --no-warnings src/lib/phase3-workflow.test.ts && node --experimental-strip-types --no-warnings src/lib/phase4-map.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5-gravity.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5b-gravity-terrain.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5b-ert.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5b-validation.test.ts && node --experimental-strip-types --no-warnings src/lib/phase6-radiometrics.test.ts && node --experimental-strip-types --no-warnings src/lib/phase7-gpr.test.ts && node --experimental-strip-types --no-warnings src/lib/phase8-las.test.ts && node --experimental-strip-types --no-warnings src/lib/phase9-gis.test.ts && node --experimental-strip-types --no-warnings src/lib/phase10-geochem.test.ts && node --experimental-strip-types --no-warnings src/lib/phase11-shapefile.test.ts",
     "icons": "node scripts/generate-icons.mjs",
     "dist": "npm run icons && npm run build && electron-builder",
     "dist:inno": "node scripts/compile-inno.mjs",
     "dist:win": "npm run icons && npm run build && electron-builder --win dir && npm run dist:inno",
     "dist:mac": "npm run icons && npm run build && electron-builder --mac",
-    "dist:linux": "npm run icons && npm run build && electron-builder --linux && node scripts/write-linux-launcher.mjs"
+    "dist:linux": "npm run icons && npm run build && electron-builder --linux AppImage && node scripts/write-linux-launcher.mjs",
+    "dist:deb": "npm run icons && npm run build && electron-builder --linux deb"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -134,15 +136,24 @@
       "category": "Science",
       "icon": "build/icons",
       "executableName": "g-aid",
+      "synopsis": "Geophysics AI desktop workspace",
       "desktop": {
         "entry": {
           "Name": "G-AID",
           "Comment": "Geophysics AI desktop workspace",
           "Categories": "Science;Education;",
           "Icon": "g-aid",
+          "MimeType": "x-scheme-handler/gaid;",
           "StartupWMClass": "g-aid"
         }
       }
+    },
+    "deb": {
+      "packageName": "g-aid",
+      "priority": "optional",
+      "afterInstall": "scripts/linux/after-install.sh",
+      "afterRemove": "scripts/linux/after-remove.sh",
+      "artifactName": "g-aid_${version}_${arch}.${ext}"
     },
     "publish": {
       "provider": "github",

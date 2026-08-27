@@ -1,0 +1,166 @@
+{
+  "kind": "geochem-samples",
+  "tables": [
+    {
+      "kind": "geochem-samples",
+      "product_name": "G-AID documented geochemical sample table",
+      "source_path": "mixed-units/assays.csv",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "medium": "soil",
+      "lab": "ALS",
+      "method": "ICP-MS",
+      "detection_limit_treatment": "censored",
+      "standard_expected": null,
+      "mapping": {
+        "sampleId": "SampleID",
+        "x": "X",
+        "y": "Y",
+        "medium": "Medium",
+        "elements": [
+          {
+            "column": "Au_ppm",
+            "symbol": "Au",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          },
+          {
+            "column": "Fe_pct",
+            "symbol": "Fe",
+            "units": "pct",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          }
+        ],
+        "qcFlag": null,
+        "batch": null,
+        "date": null,
+        "lab": null,
+        "method": null,
+        "reviewed": false
+      },
+      "columns": [
+        "SampleID",
+        "X",
+        "Y",
+        "Medium",
+        "Au_ppm",
+        "Fe_pct"
+      ],
+      "units": [
+        "pct",
+        "ppm"
+      ],
+      "mixed_units": true,
+      "samples": [
+        {
+          "sample_id": "M-001",
+          "x": 260100.0,
+          "y": 6240100.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": null,
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.11,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Fe_pct": {
+              "symbol": "Fe",
+              "units": "pct",
+              "value": 4.2,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Fe_pct",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "M-002",
+          "x": 260140.0,
+          "y": 6240140.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": null,
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.07,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Fe_pct": {
+              "symbol": "Fe",
+              "units": "pct",
+              "value": 3.8,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Fe_pct",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "M-003",
+          "x": 260180.0,
+          "y": 6240180.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": null,
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.22,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Fe_pct": {
+              "symbol": "Fe",
+              "units": "pct",
+              "value": 6.1,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Fe_pct",
+              "kind": "raw"
+            }
+          }
+        }
+      ],
+      "n": 3,
+      "replaced_bdl_with_zero": false,
+      "imputed": false,
+      "log_transformed": false,
+      "catalog_id": "cat-r-verify-geochem-mixed",
+      "checksum": null
+    }
+  ],
+  "product_kind": "raw"
+}

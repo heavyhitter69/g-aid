@@ -1,0 +1,17 @@
+x,y,line,k,eu,eth,tc,crs_epsg,quantity,units_k,units_eu,units_eth,units_tc,catalog_id
+450000.0,1200000.0,L1,1.5,1.2,8.0,40.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450200.0,1200000.0,L1,1.7,1.5,8.4,42.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450400.0,1200000.0,L1,1.9,1.8,8.8,44.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450600.0,1200000.0,L1,2.1,2.1,9.2,46.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450000.0,1200200.0,L2,1.6,1.25,8.5,43.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450200.0,1200200.0,L2,1.8,1.55,8.9,45.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450400.0,1200200.0,L2,2.0,1.85,9.3,47.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450600.0,1200200.0,L2,2.2,2.15,9.7,49.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450000.0,1200400.0,L3,1.7,1.3,9.0,46.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450200.0,1200400.0,L3,1.9,1.6,9.4,48.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450400.0,1200400.0,L3,2.1,1.9,9.8,50.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450600.0,1200400.0,L3,2.3,2.2,10.2,52.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450000.0,1200600.0,L4,1.8,1.35,9.5,49.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450200.0,1200600.0,L4,2.0,1.65,9.9,51.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450400.0,1200600.0,L4,2.2,1.95,10.3,53.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc
+450600.0,1200600.0,L4,2.4,2.25,10.7,55.0,32630,concentration,%K,ppm eU,ppm eTh,nGy/h,cat-r-verify-rad-conc

@@ -1,0 +1,10 @@
+x,y,g_obs_mgal,elevation_m,station_id,crs_epsg,units_in,elevation_datum,gravity_datum,source,catalog_id
+450000,1200000,978100.1,120.0,ST01,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450200,1200000,978100.4,121.0,ST02,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450400,1200000,978100.2,119.0,ST03,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450000,1200200,978100.55,122.0,ST04,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450200,1200200,978101.1,123.0,ST05,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450400,1200200,978100.8,121.5,ST06,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450000,1200400,978100.3,118.0,ST07,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450200,1200400,978100.9,120.5,ST08,32630,mGal,orthometric,IGSN71,gravity,grav-valid
+450400,1200400,978100.6,119.5,ST09,32630,mGal,orthometric,IGSN71,gravity,grav-valid

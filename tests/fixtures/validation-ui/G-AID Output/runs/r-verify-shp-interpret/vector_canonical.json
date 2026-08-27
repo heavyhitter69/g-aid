@@ -1,0 +1,243 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "ID",
+        "UNIT"
+      ],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": "T1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            }
+          ],
+          "rings": [
+            [
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              }
+            ]
+          ],
+          "parts": [
+            [
+              [
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                }
+              ]
+            ]
+          ],
+          "topology": {
+            "engine": "g-aid-evenodd-segment",
+            "engine_version": "1.0",
+            "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+            "valid": true,
+            "part_count": 1,
+            "hole_count": 0,
+            "classification": "nesting-containment"
+          },
+          "properties": {
+            "ID": "T1",
+            "UNIT": "licence"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240100.0,
+        "maxX": 260500.0,
+        "maxY": 6240400.0
+      },
+      "role": "tenure",
+      "role_reviewed": true,
+      "source_path": "overlap/tenure.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "c79d4d2890f5387ab914a1bf293fe53c6ba70d6e4eb26eae8fabbe38a1a3b084",
+        "shx": "2fa10a84c17367a492b5ecef4dbbf3e9e3f19c8b1331e41fafc93f6a5a682a91",
+        "dbf": "7af3bc4862df0f0b469c6d1ae2bf3945be3456bfc264c40ff766938546448d3f",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "tenure",
+      "checksum": "tenure"
+    },
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "ID",
+        "SAMPLE_ID"
+      ],
+      "feature_count": 2,
+      "features": [
+        {
+          "id": "1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260150.0,
+              "y": 6240150.0
+            }
+          ],
+          "properties": {
+            "ID": "1",
+            "SAMPLE_ID": "S-001"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "2",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260180.0,
+              "y": 6240180.0
+            }
+          ],
+          "properties": {
+            "ID": "2",
+            "SAMPLE_ID": "S-002"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260150.0,
+        "minY": 6240150.0,
+        "maxX": 260180.0,
+        "maxY": 6240180.0
+      },
+      "role": "sample-location",
+      "role_reviewed": true,
+      "source_path": "overlap/samples.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "22c2c81938af195d377dd1db90e07afcadfbdffd362a60b24472e26bfd74af4c",
+        "shx": "6188424fb8135a37dc789d68a31116ffe3ce9c72ab215d6c931f8738c3d5b141",
+        "dbf": "d75d5fb869a04412833fe26c9529576bbd34f8894d8d2155d2e79edbf8f72030",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "samples",
+      "checksum": "samples"
+    }
+  ]
+}

@@ -5,18 +5,24 @@
 
 import type { NextRequest } from "next/server";
 import { getPendingPlan } from "./implementation-plan";
-import { buildPlanningPrompt, upsertAgentPlan } from "./agent-plan";
+import { buildPlanningPrompt, collectWorkspaceSearch, syncPendingFromEditor, upsertAgentPlan } from "./agent-plan";
 import { patchStreamEpilogue } from "./stream-epilogue";
 import { streamPlanDecision } from "../execute-plan";
 import {
   detectAnalysisIntent,
+  isGeneralKnowledgeQuestion,
   isProceedPhrase,
+  isProcessingRequest,
+  isProjectInventoryQuestion,
   splitUserAndContext,
   type WorkspaceIndex,
 } from "@/lib/workspace-index";
+import { inventoryAnswer, loadProjectCatalog } from "@/lib/catalog";
+import { buildMapLayers, isMapQuestion, listRunArtifactPaths, mapWorkspaceAnswer } from "@/lib/map";
 import { streamOrchestra } from "@/lib/ollama-orchestra";
 import type { PluginState } from "@/lib/plugins";
 import { resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
+import { validatePlan } from "@/lib/plan-spec";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,8 +40,8 @@ function streamAgentResponse(
         encoder.encode(
           `\x00${JSON.stringify({
             agentId: "orchestrator-agent",
-            confidence: 0.9,
-            showConfidence: true,
+            confidence: 0,
+            showConfidence: false,
             capabilityTrace: ["G-AID"],
             ...preamble,
           })}\n`
@@ -127,7 +133,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { message, sessionId, workspaceRoot, workspaceIndex, projectName, history, pluginState, orchestraChoice, resumePartial } = body as {
+  const { message, sessionId, workspaceRoot, workspaceIndex, projectName, history, pluginState, orchestraChoice, resumePartial, implementationPlanContent } = body as {
     message?: string;
     sessionId?: string;
     workspaceRoot?: string;
@@ -137,44 +143,83 @@ export async function POST(request: NextRequest): Promise<Response> {
     pluginState?: Partial<PluginState>;
     orchestraChoice?: OrchestraChoice | string;
     resumePartial?: string;
+    implementationPlanContent?: string;
   };
   if (!message || !sessionId) {
     return Response.json({ error: "message and sessionId are required" }, { status: 400 });
   }
 
   const { userText } = splitUserAndContext(message);
-  const pending = getPendingPlan(sessionId);
+  const editorMarkdown = typeof implementationPlanContent === "string" ? implementationPlanContent : undefined;
+  let pending = getPendingPlan(sessionId);
   const intent = detectAnalysisIntent(userText);
   const root = typeof workspaceRoot === "string" ? workspaceRoot.trim() : "";
+  const catalog = root ? loadProjectCatalog(root) : null;
+
+  if (root && isProjectInventoryQuestion(userText) && !isProceedPhrase(userText)) {
+    return streamAgentResponse(inventoryAnswer(catalog), {
+      type: "synthesis_complete",
+      awaitingApproval: false,
+    });
+  }
+
+  if (root && isMapQuestion(userText) && !isProceedPhrase(userText) && !isProcessingRequest(userText)) {
+    const files = catalog ? listRunArtifactPaths(root, catalog.runs) : [];
+    const layers = buildMapLayers({ catalog, files });
+    return streamAgentResponse(mapWorkspaceAnswer({ catalog, layers, message: userText }), {
+      type: "synthesis_complete",
+      awaitingApproval: false,
+    });
+  }
 
   if (pending && isProceedPhrase(userText)) {
-    return new Response(streamPlanDecision(sessionId, "approve"), {
+    pending = syncPendingFromEditor(sessionId, editorMarkdown) || pending;
+    const check = validatePlan(pending, catalog);
+    if (!check.ok) {
+      return streamAgentResponse(
+        `I can't start yet. ${check.blockers.map((issue) => issue.message).join(" ")} Edit the plan or tell me what to change.`,
+        {
+          type: "synthesis_complete",
+          awaitingApproval: true,
+          taskFolder: pending.taskFolder,
+          implementationPlanContent: pending.plan,
+          planRev: pending.rev,
+        }
+      );
+    }
+    return new Response(streamPlanDecision(sessionId, "approve", root), {
       headers: { "Content-Type": "application/octet-stream" },
     });
   }
 
-  const planTurn = Boolean(intent || pending);
+  const planTurn = Boolean(intent || pending || isProcessingRequest(userText)) && !isGeneralKnowledgeQuestion(userText);
   const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn });
   if (planTurn && !root) {
     return streamAgentResponse(
-      "Open the survey folder first (**File → Open Folder**). Open the main survey (for example TEMA SURVEY), not a single day, so I can see DAY 1, DAY 2, … and write results to `G-AID Output` under that folder.",
+      "Open the survey folder first (**File → Open Folder**). Open the parent survey folder — not a single file — so I can search the days or lines inside it and write results to `G-AID Output`.",
       { type: "synthesis_complete", awaitingApproval: false }
     );
   }
 
   try {
     if (planTurn && root) {
+      const { hits, misses } = collectWorkspaceSearch(userText, root, workspaceIndex ?? null);
       const plan = upsertAgentPlan({
         sessionId,
         userText,
         workspaceRoot: root,
         workspaceIndex: workspaceIndex ?? null,
         projectName: projectName || "",
+        editorMarkdown,
+        searchHits: hits,
+        searchMisses: misses,
+        catalog,
       });
       const prompt = buildPlanningPrompt({
         userText,
         history: Array.isArray(history) ? history.slice(-8) : [],
         plan,
+        catalog,
       });
       return await proxyOrchestra(
         prompt,
@@ -184,6 +229,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           awaitingApproval: true,
           taskFolder: plan.taskFolder,
           implementationPlanContent: plan.plan,
+          planRev: plan.rev,
         },
         undefined,
         undefined,

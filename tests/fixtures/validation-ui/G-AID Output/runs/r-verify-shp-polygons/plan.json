@@ -1,0 +1,12 @@
+{
+  "runId": "r-verify-shp-polygons",
+  "planHash": "fixture-r-verify-shp-polygons",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view"
+  ],
+  "product": "G-AID documented GIS vector layer",
+  "parameters": {}
+}

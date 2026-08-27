@@ -22,13 +22,25 @@ def read_ascii_grid(path: str) -> Grid:
     with open(path, encoding="utf-8", errors="ignore") as handle:
         lines = handle.read().splitlines()
     meta: dict[str, float] = {}
+    comment_meta: dict[str, str] = {}
     i = 0
-    while i < min(12, len(lines)):
-        parts = lines[i].split()
+    header_keys = {"ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"}
+    while i < len(lines):
+        raw = lines[i].strip()
+        if not raw or raw.startswith(("/", "#", ";", "\\")):
+            if raw.startswith(("/", "#", ";", "\\")):
+                for key in ("Units", "Quantity", "Channel"):
+                    prefix = f"{key}="
+                    lowered = raw.lstrip("/#;\\").strip()
+                    if lowered.lower().startswith(key.lower() + "="):
+                        comment_meta[key.lower()] = lowered.split("=", 1)[1].strip()
+            i += 1
+            continue
+        parts = raw.split()
         if len(parts) < 2:
             break
         key = parts[0].lower()
-        if key not in {"ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "nodata_value"}:
+        if key not in header_keys:
             break
         meta[key] = float(parts[1])
         i += 1
@@ -43,14 +55,28 @@ def read_ascii_grid(path: str) -> Grid:
         if len(vals) >= nx * ny:
             break
     arr = np.array(vals[: nx * ny], float).reshape(ny, nx)
+    cell = meta.get("cellsize", 1.0)
+    x0 = meta.get("xllcorner")
+    y0 = meta.get("yllcorner")
+    if x0 is None and "xllcenter" in meta:
+        x0 = meta["xllcenter"] - cell / 2.0
+    if y0 is None and "yllcenter" in meta:
+        y0 = meta["yllcenter"] - cell / 2.0
+    metadata = {}
+    if comment_meta.get("quantity"):
+        metadata["quantity"] = comment_meta["quantity"]
+    if comment_meta.get("channel"):
+        metadata["channel"] = comment_meta["channel"]
     return Grid(
         values=arr,
-        x0=meta.get("xllcorner", 0.0),
-        y0=meta.get("yllcorner", 0.0),
-        dx=meta.get("cellsize", 1.0),
-        dy=meta.get("cellsize", 1.0),
+        x0=float(x0 or 0.0),
+        y0=float(y0 or 0.0),
+        dx=cell,
+        dy=cell,
         nodata=meta.get("nodata_value", -9999.0),
         name=os.path.splitext(os.path.basename(path))[0],
+        units=comment_meta.get("units") or "nT",
+        metadata=metadata,
     )
 
 
@@ -91,7 +117,14 @@ def write_xyz(grid: Grid, path: str) -> str:
     return path
 
 
-def write_geojson_points(x, y, properties: list[dict] | None, path: str, crs_epsg: int = 4326) -> str:
+def write_geojson_points(
+    x,
+    y,
+    properties: list[dict] | None,
+    path: str,
+    crs_epsg: int = 4326,
+    collection: dict | None = None,
+) -> str:
     feats = []
     props = properties or [{}] * len(x)
     for xi, yi, prop in zip(x, y, props):
@@ -109,6 +142,8 @@ def write_geojson_points(x, y, properties: list[dict] | None, path: str, crs_eps
         "crs": {"type": "name", "properties": {"name": f"EPSG:{crs_epsg}"}},
         "features": feats,
     }
+    if collection:
+        payload.update({k: _jsonable(v) for k, v in collection.items()})
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle)
     return path
@@ -265,4 +300,17 @@ def export_grid_bundle(grid: Grid, directory: str, basename: str, crs: CRS | Non
     write_ascii_grid(grid, paths["asc"], crs)
     write_geotiff(grid, paths["tif"], crs)
     write_xyz(grid, paths["xyz"])
+    meta_path = os.path.join(directory, f"{basename}.meta.json")
+    with open(meta_path, "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "name": grid.name,
+                "units": grid.units or "unknown",
+                "quantity": (grid.metadata or {}).get("quantity"),
+                "channel": (grid.metadata or {}).get("channel"),
+                "crs_epsg": grid.crs_epsg,
+            },
+            handle,
+        )
+    paths["meta"] = meta_path
     return paths

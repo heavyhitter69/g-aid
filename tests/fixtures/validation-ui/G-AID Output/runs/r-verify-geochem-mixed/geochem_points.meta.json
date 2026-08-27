@@ -1,0 +1,17 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "crs": "EPSG:32734",
+  "n_features": 6,
+  "elements": [
+    "Au_ppm",
+    "Fe_pct"
+  ],
+  "skipped_no_crs": [],
+  "visual_scale": "raw observation (not an anomaly score)",
+  "kind": "raw",
+  "warnings": [
+    "Assay values are observations, not ore or drill targets.",
+    "Qualifiers, units, source, and filter state are map attributes.",
+    "Below-detection samples remain censored (value null)."
+  ]
+}

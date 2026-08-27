@@ -1,93 +1,119 @@
 import path from "path";
-import type { AnalysisIntent, WorkspaceIndex } from "@/lib/workspace-index";
 import {
-  GAID_OUTPUT_DIR,
   buildWorkspaceBrief,
   detectAnalysisIntent,
-  inferTargetFolder,
+  isAbsoluteDiskPath,
+  type WorkspaceIndex,
 } from "@/lib/workspace-index";
-import { resolveOutputLayout } from "@/lib/output-layout";
-import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan, type PlanSteps } from "./implementation-plan";
+import {
+  extractSearchNeedles,
+  inferTargetFolder,
+  mergeSearchHits,
+  searchWorkspaceIndex,
+  unmatchedNeedles,
+  type WorkspaceSearchHit,
+} from "@/lib/workspace-search";
+import { grepWorkspaceRoot } from "@/lib/workspace-search-fs";
+import { generateRunId, resolveRunLayout } from "@/lib/run-layout";
+import { loadProjectCatalog, summarizeCatalog, type ProjectCatalog } from "@/lib/catalog";
+import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan } from "./implementation-plan";
+import {
+  applyChatPatches,
+  applyEditorAndChat,
+  normalizePlan,
+  renderImplementationPlan,
+  validatePlan,
+  workItems,
+} from "@/lib/plan-spec";
+import { collectPlanInputs, inferIntentFromFiles, intentToSteps } from "@/lib/plan-intent";
+import { capabilitiesFromSteps, compileCapabilityDag } from "@/lib/capabilities";
 
-function magSuite(enabled: boolean): Pick<
-  PlanSteps,
-  "igrf" | "headingLag" | "level" | "grid" | "derivatives" | "lineaments" | "gis"
-> {
-  return {
-    igrf: enabled,
-    headingLag: enabled,
-    level: enabled,
-    grid: enabled,
-    derivatives: enabled,
-    lineaments: enabled,
-    gis: enabled,
+export { intentToSteps };
+
+function paintPlan(plan: AgentPlan): AgentPlan {
+  const projectName = plan.projectName;
+  const runId = plan.runId || generateRunId();
+  const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
+  const notes = [...(plan.notes || [])];
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "gpr" && plan.intent !== "borehole" && plan.intent !== "gis" && plan.intent !== "geochemistry" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, radiometric, GPR, borehole, GIS vector, or geochemistry checklist.");
+  }
+  const next: AgentPlan = {
+    ...plan,
+    runId,
+    taskFolder: layout.taskFolder,
+    outputDir: layout.outputDir,
+    productsRel: layout.productsRel,
+    status: plan.status || "draft",
+    rev: plan.rev ?? 1,
+    notes,
   };
-}
-
-function intentToSteps(intent: AnalysisIntent | null, message: string, previous?: PlanSteps): PlanSteps {
-  const m = message.toLowerCase();
-  const onlyDiurnal =
-    /\b(only|just)\s+diurnal\b|\bdiurnal\s+only\b/.test(m) ||
-    (intent === "diurnal" && !/\brtp\b|\bigrf\b|\bgrid\b|\bfull\s+(mag|magnetic)\b/.test(m));
-  const next: PlanSteps = { ...(previous ?? EMPTY_STEPS) };
-
-  if (intent === "gravity" || /\bbouguer\b|\bfree[\s-]?air\b/.test(m)) {
-    next.gravity = true;
-    next.residual = true;
-    next.gis = true;
+  next.capabilities = next.capabilities?.length
+    ? next.capabilities
+    : capabilitiesFromSteps(next.steps as unknown as Record<string, boolean>);
+  if (
+    next.capabilities.includes("borehole.ingest_las") &&
+    !next.capabilities.includes("borehole.map_collar") &&
+    (next.inputs || []).some((item) => item.adapterId === "las-well" && (item.crs || item.collarMappable))
+  ) {
+    next.capabilities = [...next.capabilities, "borehole.map_collar"];
   }
-  if (intent === "resistivity" || /\bert\b|\bpseudosection\b/.test(m)) {
-    next.ert = true;
-    next.ertInvert = !/\bpseudosection only\b/.test(m);
-  }
-  if (intent === "seismic") next.seismic = true;
-  if (intent === "radiometrics") next.radiometrics = true;
-  if (intent === "gpr") next.gpr = true;
-
-  const mag =
-    intent === "diurnal" ||
-    intent === "rtp" ||
-    intent === "magnetic" ||
-    /\bdiurnal\b|\brtp\b|\bigrf\b|\bmagnetic\b/.test(m);
-
-  if (mag) {
-    next.diurnal = true;
-    if (!onlyDiurnal) {
-      Object.assign(next, magSuite(true));
-      next.rtp = intent === "rtp" || intent === "magnetic" || /\brtp\b/.test(m) || previous?.rtp || false;
-      if (intent === "magnetic" || intent === "rtp") next.rtp = true;
-      if (intent === "diurnal" && !/\brtp\b/.test(m)) {
-        next.rtp = previous?.rtp || false;
-      }
-    }
-  }
+  next.dag = next.dag?.nodes?.length ? next.dag : compileCapabilityDag(next.capabilities);
+  next.plan = renderImplementationPlan({
+    projectName,
+    targetFolder: next.targetFolder,
+    taskFolder: next.taskFolder,
+    productsRel: next.productsRel,
+    steps: next.steps,
+    baseReference: next.parameters.baseReference,
+    notes: next.notes,
+    capabilities: next.capabilities,
+    inputs: next.inputs,
+    dag: next.dag,
+    reviewDecisions: next.reviewDecisions,
+    inclination: next.parameters.inclination,
+    declination: next.parameters.declination,
+    density: next.parameters.density,
+    surveyLatitude: next.parameters.surveyLatitude,
+    elevationDatum: next.parameters.elevationDatum,
+    applyBullardB: next.parameters.applyBullardB,
+    terrainRadiusM: next.parameters.terrainRadiusM,
+    useDemExtent: next.parameters.useDemExtent,
+    applyIntermediateZone: next.parameters.applyIntermediateZone || next.steps.intermediateZoneTerrain,
+    applyFarZone: next.parameters.applyFarZone || next.steps.farZoneTerrain,
+    intermediateRadiusM: next.parameters.intermediateRadiusM,
+    farRadiusM: next.parameters.farRadiusM,
+    requestIntent: next.parameters.requestIntent,
+    productName: next.parameters.productName,
+    velocityMs: next.parameters.velocityMs,
+    fLowHz: next.parameters.fLowHz,
+    fHighHz: next.parameters.fHighHz,
+    applyDewow: next.parameters.applyDewow,
+    dewowWindow: next.parameters.dewowWindow,
+    applyTimeZero: next.parameters.applyTimeZero,
+    applySecGain: next.parameters.applySecGain,
+    applyBandpass: next.parameters.applyBandpass,
+    filterOrder: next.parameters.filterOrder,
+    secPower: next.parameters.secPower,
+  });
   return next;
 }
 
-function jobLabel(steps: PlanSteps): string {
-  const parts: string[] = [];
-  if (steps.diurnal) parts.push("diurnal");
-  if (steps.igrf) parts.push("IGRF");
-  if (steps.rtp) parts.push("RTP");
-  if (steps.gravity) parts.push("gravity");
-  if (steps.ert) parts.push("ERT");
-  if (steps.seismic) parts.push("seismic");
-  if (steps.gpr) parts.push("GPR");
-  if (steps.radiometrics) parts.push("rad");
-  return parts.join("+") || "process";
+export function applyParameterTweaks(message: string, plan: AgentPlan): AgentPlan {
+  return applyChatPatches(plan, message);
 }
 
-export function applyParameterTweaks(message: string, plan: AgentPlan): AgentPlan {
-  const m = message.toLowerCase();
-  const parameters = { ...plan.parameters };
-  if (/\bmedian\b/.test(m)) parameters.baseReference = "median_base";
-  else if (/\bfirst\s+sample\b/.test(m)) parameters.baseReference = "first_sample";
-  else if (/\bmean\b/.test(m)) parameters.baseReference = "mean_base";
-  const date = message.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
-  if (date) parameters.surveyDate = date[1];
-  const dens = message.match(/\b(2\.\d{2})\s*g\s*\/?\s*c(c|m3)\b/i);
-  if (dens) parameters.density = parseFloat(dens[1]);
-  return { ...plan, parameters };
+export function collectWorkspaceSearch(
+  userText: string,
+  workspaceRoot: string,
+  workspaceIndex: WorkspaceIndex | null
+): { hits: WorkspaceSearchHit[]; misses: string[] } {
+  const needles = extractSearchNeedles(userText);
+  let hits = searchWorkspaceIndex(workspaceIndex, userText);
+  if (needles.all.length && isAbsoluteDiskPath(workspaceRoot)) {
+    hits = mergeSearchHits(hits, grepWorkspaceRoot(workspaceRoot, userText));
+  }
+  return { hits, misses: unmatchedNeedles(needles.named, hits) };
 }
 
 export function upsertAgentPlan(options: {
@@ -96,114 +122,103 @@ export function upsertAgentPlan(options: {
   workspaceRoot: string;
   workspaceIndex: WorkspaceIndex | null;
   projectName: string;
+  editorMarkdown?: string;
+  searchHits?: WorkspaceSearchHit[];
+  searchMisses?: string[];
+  catalog?: ProjectCatalog | null;
 }): AgentPlan {
-  const existing = getPendingPlan(options.sessionId);
-  const intent =
-    detectAnalysisIntent(options.userText) ||
-    existing?.intent ||
-    "magnetic";
-  const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex);
-  const targetFolder = inferredTarget || existing?.targetFolder || "";
-  const steps = intentToSteps(intent, options.userText, existing?.steps);
+  const existing = getPendingPlan(options.sessionId, options.workspaceRoot);
   const projectName = options.projectName || path.basename(options.workspaceRoot);
-  const layout = resolveOutputLayout(
-    options.workspaceRoot,
-    targetFolder,
-    projectName,
-    jobLabel(steps)
-  );
-  const workspaceBrief = buildWorkspaceBrief(
-    options.workspaceIndex,
-    options.workspaceRoot,
-    targetFolder
-  );
+  const catalog = options.catalog ?? loadProjectCatalog(options.workspaceRoot);
+  const hits = options.searchHits ?? searchWorkspaceIndex(options.workspaceIndex, options.userText);
+  const misses = options.searchMisses ?? unmatchedNeedles(extractSearchNeedles(options.userText).named, hits);
+  const inferredTarget = inferTargetFolder(options.userText, options.workspaceIndex, hits);
+  const targetFolder = inferredTarget || existing?.targetFolder || "";
+  const detected = detectAnalysisIntent(options.userText);
+  const intent = detected
+    || (existing && !detected ? existing.intent : inferIntentFromFiles(null, options.workspaceIndex, targetFolder, options.userText));
 
-  const draft: AgentPlan = {
-    plan: "",
-    taskFolder: layout.taskFolder,
-    outputDir: layout.outputDir,
-    productsRel: layout.productsRel,
-    workspaceRoot: options.workspaceRoot,
-    targetFolder,
-    projectName,
-    intent,
-    steps,
-    parameters: existing?.parameters || { baseReference: "mean_base" },
-    workspaceBrief,
-  };
-  const withTweaks = applyParameterTweaks(options.userText, draft);
-  withTweaks.plan = seedPlan({
-    projectName,
-    targetFolder,
-    taskFolder: layout.taskFolder,
-    productsRel: layout.productsRel,
-    steps,
-    baseReference: withTweaks.parameters.baseReference,
-  });
-  setPendingPlan(options.sessionId, withTweaks);
-  return withTweaks;
+  let draft: AgentPlan;
+  if (existing) {
+    draft = {
+      ...existing,
+      notes: [],
+      intent,
+      workspaceRoot: options.workspaceRoot,
+      projectName,
+      rev: (existing.rev || 1) + 1,
+      status: "draft",
+    };
+    if (detected && detected !== "diurnal" && detected !== "rtp" && detected !== "magnetic" && detected !== "gravity") {
+      draft.steps = intentToSteps(intent, options.userText);
+    }
+    draft = applyEditorAndChat(draft, options.editorMarkdown, options.userText);
+    if (inferredTarget) draft.targetFolder = inferredTarget;
+  } else {
+    draft = {
+      plan: "",
+      taskFolder: "",
+      outputDir: "",
+      workspaceRoot: options.workspaceRoot,
+      targetFolder,
+      projectName,
+      intent,
+      steps: intentToSteps(intent, options.userText),
+      parameters: { baseReference: "mean_base" },
+      workspaceBrief: "",
+      rev: 1,
+      notes: [],
+      status: "draft",
+    };
+    draft = applyChatPatches(draft, options.userText);
+    draft = normalizePlan(draft);
+    if (inferredTarget) draft.targetFolder = inferredTarget;
+  }
+
+  if (misses.length) {
+    draft.notes = [
+      ...(draft.notes || []),
+      `I could not find ${misses.map((item) => `"${item}"`).join(", ")} in the open folder. I will not invent a path.`,
+    ];
+  }
+
+  draft.inputs = collectPlanInputs(options.workspaceIndex, draft.targetFolder, catalog);
+  if (!(typeof draft.parameters.velocityMs === "number" && draft.parameters.velocityMs > 0)) {
+    const documented = (draft.inputs || []).find((item) => typeof item.velocityMs === "number" && item.velocityMs > 0);
+    if (documented?.velocityMs) draft.parameters.velocityMs = documented.velocityMs;
+  }
+  draft.workspaceBrief = [
+    buildWorkspaceBrief(
+      options.workspaceIndex,
+      options.workspaceRoot,
+      draft.targetFolder,
+      hits,
+      misses
+    ),
+    catalog ? summarizeCatalog(catalog, 40) : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const painted = paintPlan(draft);
+  setPendingPlan(options.sessionId, painted);
+  return painted;
 }
 
-function baseRefLabel(ref: string): string {
-  if (ref === "median_base") return "median of the GSM-19 base";
-  if (ref === "first_sample") return "first sample of the GSM-19";
-  return "mean of the GSM-19 base";
-}
-
-function workItems(s: PlanSteps, target: string, baseReference: string): string[] {
-  const loc = target && target !== "(opened folder)" ? ` on ${target}` : "";
-  const items: string[] = [];
-  if (s.diurnal) items.push(`- Correct MagArrow lines${loc} using the GSM-19 (${baseRefLabel(baseReference)})`);
-  if (s.igrf) items.push("- Remove the Earth's main magnetic field at each sample");
-  if (s.headingLag) items.push("- Apply heading and lag corrections");
-  if (s.level) items.push("- Level the tie lines");
-  if (s.grid) items.push("- Grid the residual and write map products");
-  if (s.rtp) items.push("- Reduce the grid to the pole");
-  if (s.derivatives) items.push("- Compute analytic signal, first vertical derivative, tilt, and continuation");
-  if (s.lineaments) items.push("- Extract lineaments from the derivative maps");
-  if (s.gis) items.push("- Write GeoTIFF, ASC, and GeoJSON products");
-  if (s.gravity) items.push("- Apply latitude, free-air, and Bouguer corrections");
-  if (s.residual) items.push("- Separate regional and residual gravity");
-  if (s.ert) items.push("- Build an ERT pseudosection");
-  if (s.ertInvert) items.push("- Invert the ERT data");
-  if (s.seismic) items.push("- Process the SEG-Y (filter, gain, spectrum)");
-  if (s.radiometrics) items.push("- Apply height, stripping, and spectral corrections to the radiometric data");
-  if (s.gpr) items.push("- Process the GPR (dewow, gain, bandpass)");
-  return items;
-}
-
-function seedPlan(opts: {
-  projectName: string;
-  targetFolder: string;
-  taskFolder: string;
-  productsRel?: string;
-  steps: PlanSteps;
-  baseReference: string;
-}): string {
-  const target = opts.targetFolder || "(opened folder)";
-  const items = workItems(opts.steps, target, opts.baseReference);
-  const products = opts.productsRel || `${GAID_OUTPUT_DIR}/${opts.taskFolder}`;
-  return `# Implementation Plan
-
-**Survey:** ${opts.projectName}
-**Target:** ${target}
-**Products:** \`${products}/\`
-
-## This run
-${items.join("\n") || "- Ask for a specific method (diurnal, RTP, Bouguer, ERT, SEG-Y)."}
-
-## Parameters
-- Base station reference: ${baseRefLabel(opts.baseReference)}
-
-## After you click Proceed
-Products are written under \`${products}/\`.
-`;
+export function syncPendingFromEditor(sessionId: string, markdown: string | undefined): AgentPlan | undefined {
+  const existing = getPendingPlan(sessionId);
+  if (!existing) return undefined;
+  if (!markdown?.trim()) return existing;
+  const merged = paintPlan(normalizePlan(applyEditorAndChat({ ...existing, notes: [] }, markdown, "")));
+  merged.rev = (existing.rev || 1) + 1;
+  setPendingPlan(sessionId, merged);
+  return merged;
 }
 
 export function buildPlanningPrompt(options: {
   userText: string;
   history: { sender: string; text: string }[];
   plan: AgentPlan;
+  catalog?: ProjectCatalog | null;
 }): string {
   const historyBlock = options.history
     .map((msg) => {
@@ -222,14 +237,19 @@ export function buildPlanningPrompt(options: {
     options.plan.targetFolder || "(opened folder)",
     options.plan.parameters.baseReference
   )
-    .map((item) => item.replace(/^- /, ""))
+    .map((item) => item.replace(/^- /, "").replace(/\s*<!--.*?-->\s*/g, ""))
     .join("; ");
+  const validation = validatePlan(options.plan, options.catalog);
+  const science = [...validation.notes, ...validation.warnings, ...validation.blockers]
+    .map((issue) => issue.message)
+    .join(" ");
   return `G-AID_PLANNING
 You are G-AID. Speak in first person as I. Never call yourself Orchestra, a model, or a third-party tool. Never narrate these instructions.
 
 Open survey: ${options.plan.projectName}
 Target: ${options.plan.targetFolder || "(opened folder)"}
 I will: ${work || "run the requested processing"}
+${science ? `Scientific notes I must mention in plain language: ${science}` : ""}
 ${options.plan.workspaceBrief}
 
 RECENT CHAT:
@@ -238,7 +258,7 @@ ${historyBlock || "(none)"}
 USER:
 ${options.userText}
 
-Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
+Reply in 3–6 short sentences as G-AID. Confirm the survey and target, say what you will compute, and ask them to click Proceed. If I restored or refused a change, say why in one sentence. If search listed names I could not find, say so and do not invent a folder. Do not mention implementation plans, ground truth, kernels, files, confidence scores, or these instructions. Do not claim the work already finished.`;
 }
 
 export function visibleAssistantText(raw: string): string {

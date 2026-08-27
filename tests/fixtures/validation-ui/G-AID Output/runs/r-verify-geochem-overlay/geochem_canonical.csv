@@ -1,0 +1,3 @@
+source_path,sample_id,x,y,medium,qc_flag,batch,date,lab,method,crs,kind,Au_ppm,Au_ppm_qual,Au_ppm_dl,Au_ppm_censored,Cu_ppm,Cu_ppm_qual,Cu_ppm_dl,Cu_ppm_censored
+overlay/assays.csv,O-001,260120.0,6240120.0,soil,sample,,,,,EPSG:32734,raw,0.25,,,False,71.0,,,False
+overlay/assays.csv,O-002,260160.0,6240160.0,soil,sample,,,,,EPSG:32734,raw,0.14,,,False,40.0,,,False

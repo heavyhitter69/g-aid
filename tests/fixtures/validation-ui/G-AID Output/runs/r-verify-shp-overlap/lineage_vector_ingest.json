@@ -1,0 +1,16 @@
+{
+  "node_id": "vector_ingest",
+  "formula": "Documented GIS vector ingest",
+  "parameters": {
+    "n": 2
+  },
+  "inputs": [
+    "overlap/tenure.shp",
+    "overlap/samples.shp"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-overlap/vector_canonical.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-shp-overlap/vector_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T19:45:45.108062Z"
+}

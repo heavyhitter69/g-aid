@@ -1,0 +1,14 @@
+{
+  "runId": "r-verify-las-collar",
+  "planHash": "fixture-r-verify-las-collar",
+  "intent": "borehole",
+  "status": "complete",
+  "capabilities": [
+    "borehole.ingest_las",
+    "borehole.view_logs",
+    "borehole.interpret",
+    "borehole.map_collar"
+  ],
+  "product": "G-AID LAS 2.0 measured-depth log",
+  "parameters": {}
+}

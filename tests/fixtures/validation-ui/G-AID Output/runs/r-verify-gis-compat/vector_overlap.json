@@ -1,0 +1,34 @@
+{
+  "kind": "gis-overlap",
+  "rows": [
+    {
+      "left_path": "compat/crs84.geojson",
+      "right_path": "compat/legacy-4326.geojson",
+      "left_id": "r1",
+      "right_id": "e1",
+      "left_role": "generic-vector",
+      "right_role": "generic-vector",
+      "crs": "OGC:CRS84+EPSG:4326",
+      "compatibility_decision": "geojson-lonlat-no-axis-swap",
+      "relation": "contains",
+      "reason": "Geometric contains. OGC:CRS84 and EPSG:4326 are different CRS identities. Documented compatibility uses stored GeoJSON [lon, lat] without an axis swap or reprojection. Spatial overlap does not establish geological, mineral, or causal relationships."
+    }
+  ],
+  "blocked": [],
+  "crs_decisions": [
+    {
+      "left": "compat/crs84.geojson",
+      "right": "compat/legacy-4326.geojson",
+      "code": "crs84-epsg4326-geojson-lonlat",
+      "compatibility_decision": "geojson-lonlat-no-axis-swap",
+      "left_crs": "OGC:CRS84",
+      "right_crs": "EPSG:4326",
+      "left_axis_order": "lon-lat",
+      "right_axis_order": "lat-lon",
+      "left_coordinate_order": "lon-lat",
+      "right_coordinate_order": "lon-lat"
+    }
+  ],
+  "reprojected": false,
+  "axis_swap": false
+}

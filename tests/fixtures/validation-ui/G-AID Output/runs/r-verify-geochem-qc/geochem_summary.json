@@ -1,0 +1,76 @@
+{
+  "product_name": "G-AID documented geochemical sample table",
+  "elements": [
+    {
+      "key": "Au_ppm",
+      "symbol": "Au",
+      "units": "ppm",
+      "n": 6,
+      "n_censored": 1,
+      "n_uncensored": 5,
+      "min": 0.08,
+      "max": 0.21,
+      "median": 0.12,
+      "mean": 0.126,
+      "kind": "raw",
+      "log_transformed": false
+    },
+    {
+      "key": "Cu_ppm",
+      "symbol": "Cu",
+      "units": "ppm",
+      "n": 6,
+      "n_censored": 1,
+      "n_uncensored": 5,
+      "min": 1.2,
+      "max": 47.0,
+      "median": 38.0,
+      "mean": 33.44,
+      "kind": "raw",
+      "log_transformed": false
+    }
+  ],
+  "selected": [
+    {
+      "key": "Au_ppm",
+      "symbol": "Au",
+      "units": "ppm",
+      "n": 6,
+      "n_censored": 1,
+      "n_uncensored": 5,
+      "min": 0.08,
+      "max": 0.21,
+      "median": 0.12,
+      "mean": 0.126,
+      "kind": "raw",
+      "log_transformed": false
+    },
+    {
+      "key": "Cu_ppm",
+      "symbol": "Cu",
+      "units": "ppm",
+      "n": 6,
+      "n_censored": 1,
+      "n_uncensored": 5,
+      "min": 1.2,
+      "max": 47.0,
+      "median": 38.0,
+      "mean": 33.44,
+      "kind": "raw",
+      "log_transformed": false
+    }
+  ],
+  "comparisons": [
+    {
+      "left": "Au_ppm",
+      "right": "Cu_ppm",
+      "blocked": false,
+      "reason": "Documented same-unit observation pair. Not a mineralisation index or ratio product."
+    }
+  ],
+  "kind": "raw",
+  "derived": false,
+  "display_only": false,
+  "log_transformed": false,
+  "note": "Statistics use uncensored values only. Censored below-detection samples are counted, not zeroed."
+}

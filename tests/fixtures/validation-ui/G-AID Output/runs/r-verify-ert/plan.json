@@ -1,0 +1,10 @@
+{
+  "runId": "r-verify-ert",
+  "planHash": "fixture-verify-ert",
+  "capabilities": [
+    "ert.ingest",
+    "ert.pseudosection",
+    "ert.invert2d",
+    "ert.interpret"
+  ]
+}

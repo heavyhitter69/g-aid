@@ -1,0 +1,13 @@
+{
+  "runId": "r-verify-gis-lines",
+  "planHash": "fixture-r-verify-gis-lines",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.interpret"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}

@@ -1,0 +1,12 @@
+{
+  "runId": "r-verify-gis-conflict",
+  "planHash": "fixture-r-verify-gis-conflict",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.spatial_overlap"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}

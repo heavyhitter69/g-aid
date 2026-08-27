@@ -1,0 +1,122 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "layers": [
+    {
+      "source_path": "overlap/tenure.geojson",
+      "catalog_id": "overlap/tenure.geojson",
+      "crs": "EPSG:32734",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "tenure",
+      "role_reviewed": true,
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "LICENCE"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 260050.0,
+        "minY": 6240050.0,
+        "maxX": 260250.0,
+        "maxY": 6240250.0
+      },
+      "features": [
+        {
+          "id": "t1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260050.0,
+              "y": 6240050.0
+            },
+            {
+              "x": 260250.0,
+              "y": 6240050.0
+            },
+            {
+              "x": 260250.0,
+              "y": 6240250.0
+            },
+            {
+              "x": 260050.0,
+              "y": 6240250.0
+            },
+            {
+              "x": 260050.0,
+              "y": 6240050.0
+            }
+          ],
+          "properties": {
+            "LICENCE": "L-9"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    },
+    {
+      "source_path": "overlap/samples.geojson",
+      "catalog_id": "overlap/samples.geojson",
+      "crs": "EPSG:32734",
+      "crs_source": "legacy-crs",
+      "geojson_contract": "legacy-geojson",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "sample-location",
+      "role_reviewed": true,
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "SAMPLE_ID"
+      ],
+      "feature_count": 2,
+      "bbox": {
+        "minX": 260150.0,
+        "minY": 6240150.0,
+        "maxX": 261000.0,
+        "maxY": 6241000.0
+      },
+      "features": [
+        {
+          "id": "s1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260150.0,
+              "y": 6240150.0
+            }
+          ],
+          "properties": {
+            "SAMPLE_ID": "IN"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "s2",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 261000.0,
+              "y": 6241000.0
+            }
+          ],
+          "properties": {
+            "SAMPLE_ID": "OUT"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

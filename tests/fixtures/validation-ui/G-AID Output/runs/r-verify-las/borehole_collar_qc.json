@@ -1,0 +1,9 @@
+{
+  "skipped": true,
+  "reason": "borehole_collar_xy_required",
+  "coordinate_kind": "unknown",
+  "location_quality": "missing",
+  "collar_mapped": false,
+  "trajectory_computed": false,
+  "message": "Collar mapping needs coordinates and a documented CRS (or an explicit user-confirmed CRS). A vertical log is still viewable. No map position was invented."
+}

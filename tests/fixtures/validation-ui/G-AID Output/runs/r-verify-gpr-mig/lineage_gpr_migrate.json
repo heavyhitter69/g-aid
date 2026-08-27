@@ -1,0 +1,16 @@
+{
+  "node_id": "gpr_migrate",
+  "formula": "2-D Kirchhoff time migration, zero-offset, constant velocity (Yilmaz 2001). z = 0.5 v t with the user velocity. No topography, no 3-D, not a measured depth model.",
+  "parameters": {
+    "velocityMs": 100000000.0,
+    "benchmark_passed": true
+  },
+  "inputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr-mig/gpr_processed.npz"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr-mig/gpr_migrated.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gpr-mig/gpr_migrate_qc.json"
+  ],
+  "created_at": "2026-08-27T14:40:38.225805Z"
+}
