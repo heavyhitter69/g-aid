@@ -343,14 +343,18 @@ def write_results(cases: list[dict]) -> str:
             {
                 "name": c.get("name"),
                 "issue": (
-                    "true resistivities not recovered"
+                    "preserved Gaussian kernel failure: 1-D layering not recovered"
+                    if c.get("preserved_failure")
+                    else "true resistivities not recovered"
                     if c.get("true_resistivities_recovered") is False
+                    else "self-consistent contrast/location not recovered; independent 2-D oracle not implemented"
+                    if str(c.get("name", "")).startswith("buried_") and not c.get("pass")
                     else c.get("remaining_limit") or c.get("note") or "see case"
                 ),
             }
             for c in cases
             if c.get("true_resistivities_recovered") is False
-            or (c.get("name", "").startswith("buried_") and not c.get("pass"))
+            or (str(c.get("name", "")).startswith("buried_") and not c.get("pass"))
             or c.get("preserved_failure")
         ],
         "support_bar": (

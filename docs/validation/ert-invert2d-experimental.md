@@ -55,9 +55,9 @@ support by themselves.
 |---|---|---|
 | Homogeneous 100 Ω·m + 5% noise (Wenner, dipole-dipole, Schlumberger) | median within 25% | pass |
 | Two-layer Wenner image series (independent) | polarity + shallow closer to overburden | pass |
-| True two-layer resistivities within 40% | required for **production** | **fail** (50/500 h=8 recovers ~69 / ~139) |
+| True two-layer resistivities within 40% | required for **production** | **fail** (50/500 h=8 recovers ~69 / ~139; 50/500 h=4 recovers ~91 / ~233; 200/40 h=8 happens to pass ~262 / ~47) |
 | Sharp layer boundary | not claimed | not recovered |
-| Buried conductive/resistive block | independent 2-D oracle | **not available**; self-consistent contrast not recovered |
+| Buried conductive/resistive block | independent 2-D oracle | **not available**; self-consistent contrast **not recovered** |
 | 12× outliers | median stays near background | pass (misfit may exceed 25% because outliers remain in the data) |
 | 2.5-D forward vs Wenner image series | median relative error < 30% | pass (~18%) |
 

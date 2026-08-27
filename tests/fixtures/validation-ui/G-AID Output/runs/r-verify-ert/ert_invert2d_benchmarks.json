@@ -5,10 +5,13 @@
   "not_res2dinv": true,
   "not_3d": true,
   "topography_in_forward": false,
+  "independent_2d_target_oracle": false,
+  "true_two_layer_resistivities_recovered": false,
   "thresholds": {
     "homogeneous_median_relative": 0.25,
     "two_layer_polarity_and_shallow_closer": true,
     "true_layer_resistivities_within_40pct": "required for production; not currently claimed",
+    "independent_2d_buried_target_oracle": "required for production; not implemented",
     "forward_vs_image_series_relative": 0.3
   },
   "cases": [
@@ -189,6 +192,21 @@
       "remaining_limit": "True layer resistivities and a sharp boundary are not required and typically not recovered."
     },
     {
+      "name": "two_layer_independent_oracle_array_coverage",
+      "kind": "programme_coverage",
+      "wenner": "Telford 1990 \u00a78.4 image series \u2014 independently scored",
+      "dipole_dipole": "no independent closed-form two-layer oracle in this programme",
+      "schlumberger": "no independent closed-form two-layer oracle in this programme",
+      "homogeneous_arrays_scored": [
+        "wenner",
+        "dipole_dipole",
+        "schlumberger"
+      ],
+      "pass": true,
+      "required_for_production": false,
+      "note": "Production two-layer scoring uses the Wenner image series only. Dipole-dipole and Schlumberger are scored on homogeneous recovery until independent layered oracles exist."
+    },
+    {
       "name": "buried_conductive_block_self_consistent_25d",
       "forward": "Self-consistent 2.5-D FD (same engine as invert) \u2014 not an independent 2-D oracle",
       "target_x_m": 40.0,
@@ -213,6 +231,33 @@
       "note": "Independent 2-D buried-target oracles are not implemented. This case cannot earn production support by itself."
     },
     {
+      "name": "jacobian_euler_and_depth_sensitivity",
+      "kind": "diagnostics",
+      "median_jacobian_row_sum_unscaled": 0.7365182493876782,
+      "row_sum_min": 0.3330697401529241,
+      "row_sum_max": 0.8389966209922619,
+      "depth_of_50pct_cumulative_abs_J_m": 4.836352732241567,
+      "z_nodes_m": [
+        1.5,
+        2.693423304711376,
+        4.836352732241567,
+        8.68423010588265,
+        15.593538500440316,
+        28.0
+      ],
+      "cumulative_abs_J_fraction": [
+        0.4782113870524137,
+        0.4782113870524137,
+        0.6958988566864147,
+        0.8863834891589342,
+        0.9780165156392072,
+        1.0
+      ],
+      "pass": true,
+      "required_for_production": false,
+      "note": "Unscaled \u2207\u03c6\u00b7\u2207\u03c6 Frechet row sums are not 1; invert_2d_smooth applies a median-row scale. Depth of 50% cumulative |J| is a sensitivity diagnostic, not a production DOI."
+    },
+    {
       "name": "homogeneous_with_two_12x_outliers",
       "recovered_median_ohm_m": 94.05450563215965,
       "misfit_percent": 28.711107261401413,
@@ -225,5 +270,27 @@
   ],
   "required_cases_passed": true,
   "all_passed": false,
+  "remaining_failure_cases": [
+    {
+      "name": "historical_gaussian_two_layer_50_over_500",
+      "issue": "preserved Gaussian kernel failure: 1-D layering not recovered"
+    },
+    {
+      "name": "two_layer_wenner_50_over_500_h8",
+      "issue": "true resistivities not recovered"
+    },
+    {
+      "name": "two_layer_wenner_50_over_500_h4",
+      "issue": "true resistivities not recovered"
+    },
+    {
+      "name": "buried_conductive_block_self_consistent_25d",
+      "issue": "self-consistent contrast/location not recovered; independent 2-D oracle not implemented"
+    },
+    {
+      "name": "buried_resistive_block_self_consistent_25d",
+      "issue": "self-consistent contrast/location not recovered; independent 2-D oracle not implemented"
+    }
+  ],
   "support_bar": "ert.ingest and ert.pseudosection are supported. ert.invert2d is experimental until independent two-layer true-resistivity recovery and 2-D target oracles pass. Not a production inversion pack. Not Res2DInv."
 }
