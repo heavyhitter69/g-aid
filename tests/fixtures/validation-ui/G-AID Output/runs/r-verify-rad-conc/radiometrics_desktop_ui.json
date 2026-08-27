@@ -1,0 +1,77 @@
+{
+  "product_name": "already-corrected G-AID RAD 1.0 radiometrics",
+  "capabilities": ["rad.ingest", "rad.grid", "rad.ternary", "rad.ratios", "rad.gis", "rad.interpret"],
+  "units_from_filename": false,
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["GridMapView", "TernaryView"],
+  "url": "http://127.0.0.1:3000/workspace/verify-radiometrics",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-27T12:48:00Z",
+  "electron_packaged_app": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same GridMapView and TernaryView).",
+    "A packaged Electron executable was not launched.",
+    "Map units came from versioned artifact metadata (.meta.json), not from rad_k_grid.asc filenames.",
+    "Bare filename mapValueUnits remains unknown until catalog/sidecar units are bound."
+  ],
+  "tabs": {
+    "grid": {
+      "passed": true,
+      "title": "K channel (%K)",
+      "crs": "EPSG:32630",
+      "units": "%K",
+      "map_visible": true,
+      "colorbar_range": "1.00 – 2.90 %K",
+      "warnings": "Radiometric grids interpolate already-corrected samples. G-AID did not apply height, stripping, or concentration conversion.",
+      "screenshot": "docs/validation/results/screenshots/radio-k-grid.webp"
+    },
+    "ternary": {
+      "passed": true,
+      "heading": "K-eTh-eU ternary (not lithology)",
+      "assignment": "R=K %, G=eTh ppm, B=eU ppm",
+      "channel_units": "K=%K, eU=ppm eU, eTh=ppm eTh",
+      "warnings": "Ternary RGB is a percentile colour stretch (R=K, G=eTh, B=eU), not lithology, mineralisation, or alteration.",
+      "screenshot": "docs/validation/results/screenshots/radio-ternary.webp"
+    },
+    "ratios": {
+      "passed": true,
+      "skipped": false,
+      "units_eu_k": "ppm eU / %K",
+      "columns": ["x", "y", "line", "eu_eth", "eu_k", "eth_k"],
+      "screenshot": "docs/validation/results/screenshots/radio-ratios.webp"
+    },
+    "count_rate": {
+      "passed": true,
+      "title": "K channel (cps)",
+      "units": "cps",
+      "map_visible": true,
+      "ternary_available": false,
+      "ratios_available": false,
+      "warnings": "These values are count rates. Ternary and concentration ratios are not justified. Ternary unavailable: Ternary needs Quantity=concentration. quantity=count_rate. Ratios unavailable: Concentration ratios need Quantity=concentration.",
+      "screenshot": "docs/validation/results/screenshots/radio-count-rate.webp"
+    },
+    "unknown_units": {
+      "passed": true,
+      "title": "K channel (unknown)",
+      "units": "unknown",
+      "map_visible": true,
+      "colorbar_range": "1.00 – 2.98 unknown",
+      "warnings": "Quantity/units are unknown. Unit-specific legend, ternary, ratio, and interpretation claims are blocked.",
+      "screenshot": "docs/validation/results/screenshots/radio-unknown-units.webp"
+    },
+    "provenance": {
+      "passed": true,
+      "concentration_run": "r-verify-rad-conc",
+      "parent_run_id": "r-verify-rad-parent",
+      "concentration_plan": "fixture-verify-rad-conc",
+      "count_rate_run": "r-verify-rad-cps",
+      "unknown_run": "r-verify-rad-unknown",
+      "count_rate_ternary_skipped": true,
+      "count_rate_ratios_skipped": true,
+      "unknown_interpretation_blocked": true,
+      "screenshot": "docs/validation/results/screenshots/radio-provenance.webp"
+    }
+  }
+}

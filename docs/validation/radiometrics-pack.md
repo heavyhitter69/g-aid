@@ -99,6 +99,12 @@ Already-corrected maps, ternaries, and ratios are **not geology**. Interpretatio
 JSON sets `affirmative_language_allowed: false` and lists mineralisation,
 lithology, alteration, and drill targets as **not established**.
 
+## Desktop / map verification
+
+See `radiometrics-desktop-ui.md`. Live React click-through of concentration
+grid, ternary, ratios, count-rate skip, unknown-unit warning, and versioned
+provenance is recorded in `results/radiometrics_desktop_ui.json`.
+
 ## Next recommended complete pack
 
 **Far-zone / intermediate-zone gravity terrain** is the only honest path toward
