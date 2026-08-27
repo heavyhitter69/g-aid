@@ -14,7 +14,7 @@
   "components": ["GridMapView", "DatasetExplorer-equivalent catalog table"],
   "url": "http://127.0.0.1:3000/workspace/verify-gis",
   "viewport": "1280x800",
-  "recorded_at": "2026-08-27T17:30:00Z",
+  "recorded_at": "2026-08-27T17:49:00Z",
   "electron_packaged_app": false,
   "shapefile_parsed": false,
   "geopackage_parsed": false,
