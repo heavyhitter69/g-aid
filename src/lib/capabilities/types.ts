@@ -1,5 +1,5 @@
 /**
- * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, GPR, LAS borehole, and documented GeoJSON vectors are the registered packs.
+ * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, GPR, LAS borehole, documented GeoJSON vectors, and documented geochemistry are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -47,6 +47,12 @@ export const USER_CAPABILITY_IDS = [
   "gis.spatial_overlap",
   "gis.export_vector",
   "gis.interpret",
+  "geochem.ingest",
+  "geochem.qc",
+  "geochem.map_points",
+  "geochem.summary",
+  "geochem.display_transform",
+  "geochem.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -62,7 +68,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log" | "gis-vector";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log" | "gis-vector" | "geochem-samples";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -80,7 +86,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr" | "borehole" | "gis";
+  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr" | "borehole" | "gis" | "geochemistry";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -98,7 +104,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" | "gis.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" | "gis.prereq" | "geochem.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -149,6 +155,30 @@ export interface BoundInput {
     reviewed: boolean;
     reviewedAt?: string;
   };
+  geochemMapping?: {
+    sampleId: string;
+    x: string;
+    y: string;
+    medium?: string;
+    elements: Array<{
+      column: string;
+      symbol: string;
+      units: string;
+      qualifierColumn?: string;
+      detectionLimitColumn?: string;
+    }>;
+    qcFlag?: string;
+    batch?: string;
+    date?: string;
+    lab?: string;
+    method?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  sampleMedium?: string;
+  lab?: string;
+  analyticalMethod?: string;
+  detectionLimitTreatment?: string;
   radioQuantity?: string;
   correctionHistory?: string;
   acquisitionPlatform?: string;

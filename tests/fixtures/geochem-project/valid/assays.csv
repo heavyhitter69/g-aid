@@ -1,0 +1,13 @@
+# G-AID GEOCHEM 1.0
+# / CRS=EPSG:32734
+# / Medium=soil
+# / Units=ppm
+# / Lab=ALS
+# / Method=ICP-MS
+# / DetectionLimitTreatment=censored
+SampleID,X,Y,Medium,Au_ppm,Cu_ppm,Batch,Date
+S-001,260100,6240100,soil,0.12,45,B1,2024-03-01
+S-002,260140,6240140,soil,0.08,38,B1,2024-03-01
+S-003,260180,6240180,soil,0.31,92,B1,2024-03-02
+S-004,260220,6240120,soil,0.05,21,B1,2024-03-02
+S-005,260160,6240160,soil,0.19,67,B1,2024-03-03

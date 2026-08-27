@@ -68,6 +68,12 @@ const NODE_SCRIPTS: Record<string, string> = {
   vector_overlap: SCIENCE,
   vector_export: SCIENCE,
   vector_interpret: SCIENCE,
+  geochem_ingest: SCIENCE,
+  geochem_qc: SCIENCE,
+  geochem_map_points: SCIENCE,
+  geochem_summary: SCIENCE,
+  geochem_display_transform: SCIENCE,
+  geochem_interpret: SCIENCE,
 };
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
@@ -80,6 +86,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     // GPR uses this same engine. Do not add a GprPipeline execution route.
     // LAS borehole uses this same engine. Do not add a WellLogPipeline / BoreholePipeline execution route.
     // GIS vectors use this same engine. Do not add a GisPipeline / VectorPipeline execution route.
+    // Geochemistry uses this same engine. Do not add a GeochemPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
     for (const id of KERNEL_NODE_ORDER) {
@@ -139,6 +146,13 @@ export class GisPipeline extends PipelineEngine {
 }
 
 export class VectorPipeline extends PipelineEngine {
+  constructor() {
+    super();
+  }
+}
+
+/** Unused stub. Geochemistry executes through MagneticPreprocessingPipeline + compileCapabilityDag. */
+export class GeochemPipeline extends PipelineEngine {
   constructor() {
     super();
   }

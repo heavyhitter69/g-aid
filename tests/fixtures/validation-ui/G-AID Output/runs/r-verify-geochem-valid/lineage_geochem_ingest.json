@@ -1,0 +1,17 @@
+{
+  "node_id": "geochem_ingest",
+  "formula": "Documented G-AID GEOCHEM 1.0 ingest",
+  "parameters": {
+    "n": 1
+  },
+  "inputs": [
+    "valid/assays.csv"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-valid/geochem_canonical.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-valid/geochem_canonical.csv",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-valid/geochem_ingest_qc.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-valid/geochem_mapping.json"
+  ],
+  "created_at": "2026-08-27T18:26:11.378106Z"
+}

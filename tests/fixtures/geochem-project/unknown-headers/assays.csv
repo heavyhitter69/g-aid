@@ -1,0 +1,7 @@
+# G-AID GEOCHEM 1.0
+# / CRS=EPSG:32734
+# / Medium=soil
+# / Units=ppm
+SITE,Easting,Northing,Au,Cu
+U-001,260100,6240100,0.12,45
+U-002,260140,6240140,0.08,38

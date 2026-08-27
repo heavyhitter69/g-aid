@@ -1,0 +1,6 @@
+# G-AID GEOCHEM 1.0
+# / Medium=soil
+# / Units=ppm
+SampleID,X,Y,Medium,Au_ppm,Cu_ppm
+N-001,260100,6240100,soil,0.12,45
+N-002,260140,6240140,soil,0.08,38

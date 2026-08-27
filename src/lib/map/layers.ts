@@ -6,6 +6,7 @@ import { displayAdapterFor, formatIdFromPath, isDemAscii } from "./display.ts";
 import { crsFromCatalog, crsFromPrj } from "./crs.ts";
 import { gravityProductWarnings, isNearZoneTerrainPath } from "../gravity-product.ts";
 import { gisLayerHeading, gisProductWarnings } from "../gis-product.ts";
+import { geochemLayerHeading, geochemProductWarnings } from "../geochem-product.ts";
 
 function posix(path: string): string {
   return path.replace(/\\/g, "/");
@@ -38,6 +39,7 @@ export function mapValueUnits(path: string, formatId?: string, recorded?: string
   if (formatId === "dem-ascii" || /\bdem\b/.test(n)) return "m";
   if (formatId === "geojson" || n.endsWith(".geojson")) {
     if (/gravity|bouguer|free_air|free-air/.test(n)) return "mGal";
+    if (/geochem_points/.test(n)) return recorded?.trim() || "assay-units";
     return "coordinate";
   }
   if (/near_zone_terrain_corrected_bouguer|bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
@@ -80,6 +82,19 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
     : record.formatId === "esri-prj"
       ? crsFromPrj(record.headerSummary)
       : undefined;
+  const geochemWarnings =
+    record.adapterId === "geochem-csv" || record.adapterId === "geochem-xyz"
+      ? geochemProductWarnings({
+          path: record.relativePath,
+          element: record.geochemMapping?.elements?.[0]?.symbol,
+          units: record.units,
+          mixedUnits: /mixed/i.test(record.units || ""),
+          censored: true,
+          qualifierVisible: true,
+          medium: record.sampleMedium,
+          crs: record.crs,
+        })
+      : undefined;
   const vectorWarnings =
     record.formatId === "geojson"
       ? gisProductWarnings({
@@ -92,7 +107,9 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
         })
       : undefined;
   const label =
-    record.formatId === "geojson"
+    record.adapterId === "geochem-csv" || record.adapterId === "geochem-xyz"
+      ? `${geochemLayerHeading(record.geochemMapping?.elements?.[0]?.symbol, record.units)} — ${record.filename}`
+      : record.formatId === "geojson"
       ? `${gisLayerHeading(record.vectorRole?.role, record.vectorRole?.reviewed)} — ${record.filename}`
       : dem
         ? `DEM ${record.filename}`
@@ -112,7 +129,7 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
     units: mapValueUnits(record.relativePath, formatId, record.units),
     reason: adapter?.reason,
     representation: decoded && viewable ? "full" : "undecoded",
-    warnings: vectorWarnings,
+    warnings: geochemWarnings || vectorWarnings,
     vectorRole: record.vectorRole,
     attributeNames: record.attributeNames,
     geometryTypes: record.geometryTypes,
@@ -126,7 +143,9 @@ export function layerSpecFromArtifact(artifact: RunArtifact, run?: CatalogRunPro
     id: artifact.artifactId,
     artifactId: artifact.artifactId,
     path: artifact.path,
-    label: `${layerLabel(artifact.path)} (${artifact.runId})`,
+    label: /geochem_points/.test(artifact.path)
+      ? `${geochemLayerHeading()} (${artifact.runId})`
+      : `${layerLabel(artifact.path)} (${artifact.runId})`,
     origin: "derived-run",
     displayStatus: viewable ? "viewable" : "recognised-not-decoded",
     formatId: artifact.formatId,
@@ -139,6 +158,13 @@ export function layerSpecFromArtifact(artifact: RunArtifact, run?: CatalogRunPro
     units: mapValueUnits(artifact.path, artifact.formatId),
     warnings: isNearZoneTerrainPath(artifact.path)
       ? [...gravityProductWarnings({ path: artifact.path })]
+      : /geochem_points/.test(artifact.path)
+        ? geochemProductWarnings({
+            path: artifact.path,
+            mixedUnits: /mixed/i.test(mapValueUnits(artifact.path, artifact.formatId)),
+            censored: true,
+            qualifierVisible: true,
+          })
       : artifact.formatId === "geojson"
         ? gisProductWarnings({ path: artifact.path, overlapComputed: /vector_overlap|vector_export/.test(artifact.path) })
         : undefined,

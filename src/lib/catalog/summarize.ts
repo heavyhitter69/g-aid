@@ -49,13 +49,16 @@ export function summarizeCatalog(catalog: ProjectCatalog | null, maxRecords = 80
   const gpr = catalog.records.filter((record) => record.adapterId === "gpr-csv" && record.supportStatus === "supported");
   const las = catalog.records.filter((record) => record.adapterId === "las-well" && record.supportStatus === "supported");
   const geojson = catalog.records.filter((record) => record.adapterId === "geojson" && record.supportStatus === "supported");
+  const geochem = catalog.records.filter(
+    (record) => (record.adapterId === "geochem-csv" || record.adapterId === "geochem-xyz") && record.supportStatus === "supported"
+  );
   const lines = [
     `Project catalog (${catalog.records.length} source files; G-AID Output skipped)`,
     `Support: supported ${counts.supported}, recognised-unsupported ${counts["recognised-unsupported"]}, unknown ${counts.unknown}`,
-    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}, radiometrics ${radio.length}, GPR ${gpr.length}, LAS ${las.length}, GeoJSON ${geojson.length}`,
+    `Supported processing inputs: MagArrow ${magarrow.length}, GSM-19 ${gsm19.length}, gravity ${gravity.length}, DEM ${dem.length}, ERT ${ert.length}, radiometrics ${radio.length}, GPR ${gpr.length}, LAS ${las.length}, GeoJSON ${geojson.length}, geochemistry ${geochem.length}`,
     catalog.truncated ? `Truncated: ${catalog.truncationReason || "file-count limit reached"}` : "",
     catalog.runs.length ? `Prior runs preserved: ${catalog.runs.map((run) => run.runId).join(", ")}` : "Prior runs preserved: (none)",
-    "This catalog does not imply a magnetic, gravity, ERT, radiometric, GPR, borehole, or GIS workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, LAS 2.0, and documented GeoJSON records can be processing inputs.",
+    "This catalog does not imply a magnetic, gravity, ERT, radiometric, GPR, borehole, GIS, or geochemistry workflow. Only supported MagArrow, GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, LAS 2.0, documented GeoJSON, and G-AID GEOCHEM 1.0 records can be processing inputs.",
   ].filter(Boolean);
 
   const shown = catalog.records.slice(0, maxRecords);
@@ -91,6 +94,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
   const gpr = catalog.records.filter((r) => r.adapterId === "gpr-csv" && r.supportStatus === "supported").length;
   const las = catalog.records.filter((r) => r.adapterId === "las-well" && r.supportStatus === "supported").length;
   const geojson = catalog.records.filter((r) => r.adapterId === "geojson" && r.supportStatus === "supported").length;
+  const geochem = catalog.records.filter(
+    (r) => (r.adapterId === "geochem-csv" || r.adapterId === "geochem-xyz") && r.supportStatus === "supported"
+  ).length;
   const formats = new Map<string, number>();
   for (const record of catalog.records) {
     formats.set(record.formatId, (formats.get(record.formatId) || 0) + 1);
@@ -102,7 +108,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     .join(", ");
   const lines = [
     `This folder has **${catalog.records.length}** source files in the project catalog (G-AID Output was skipped).`,
-    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}, radiometrics ${radio}, GPR ${gpr}, LAS ${las}, GeoJSON ${geojson}`,
+    `- **supported** (can be processing inputs): ${counts.supported} — MagArrow ${magarrow}, GSM-19 ${gsm19}, gravity ${gravity}, DEM ${dem}, ERT ${ert}, radiometrics ${radio}, GPR ${gpr}, LAS ${las}, GeoJSON ${geojson}, geochemistry ${geochem}`,
     `- **recognised-unsupported** (identified, not processed in this release): ${counts["recognised-unsupported"]}`,
     `- **unknown** (not identified reliably): ${counts.unknown}`,
     formatList ? `Formats: ${formatList}.` : "",
@@ -134,6 +140,9 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
     geojson
       ? "I can plan documented GeoJSON ingest, source-layer viewing, same-CRS overlap tables, and GeoJSON export if you ask. Layer roles are user-assigned. Shapefile and GeoPackage stay recognised-unsupported."
       : "GIS vector processing needs documented GeoJSON with an EPSG. Shapefile sidecars and GeoPackage are recognised, not parsed.",
+    geochem
+      ? "I can plan G-AID GEOCHEM 1.0 ingest, QC, sample-point maps, uncensored summaries, and evidence-bound interpretation if you ask. Below-detection stays censored. An arbitrary Fe/Cu CSV is not geochemistry."
+      : "Geochemistry processing needs a documented G-AID GEOCHEM 1.0 table (CRS, Medium, SampleID, X, Y, element units), not the first chemistry CSV.",
     "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
   ].filter(Boolean);
   return lines.join("\n");

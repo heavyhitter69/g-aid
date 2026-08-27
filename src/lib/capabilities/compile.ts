@@ -73,6 +73,15 @@ export const GIS_NODE_ORDER = [
   "vector_interpret",
 ] as const;
 
+export const GEOCHEM_NODE_ORDER = [
+  "geochem_ingest",
+  "geochem_qc",
+  "geochem_map_points",
+  "geochem_summary",
+  "geochem_display_transform",
+  "geochem_interpret",
+] as const;
+
 export const KERNEL_NODE_ORDER = [
   ...MAGNETIC_NODE_ORDER,
   ...GRAVITY_NODE_ORDER,
@@ -81,6 +90,7 @@ export const KERNEL_NODE_ORDER = [
   ...GPR_NODE_ORDER,
   ...LAS_NODE_ORDER,
   ...GIS_NODE_ORDER,
+  ...GEOCHEM_NODE_ORDER,
 ] as const;
 
 export const MAGNETIC_NODE_DEPS: Record<string, string[]> = {
@@ -154,6 +164,15 @@ export const GIS_NODE_DEPS: Record<string, string[]> = {
   vector_interpret: ["vector_ingest", "vector_view", "vector_overlap"],
 };
 
+export const GEOCHEM_NODE_DEPS: Record<string, string[]> = {
+  geochem_ingest: [],
+  geochem_qc: ["geochem_ingest"],
+  geochem_map_points: ["geochem_ingest"],
+  geochem_summary: ["geochem_qc"],
+  geochem_display_transform: ["geochem_qc"],
+  geochem_interpret: ["geochem_summary", "geochem_map_points", "geochem_display_transform"],
+};
+
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...MAGNETIC_NODE_DEPS,
   ...GRAVITY_NODE_DEPS,
@@ -162,6 +181,7 @@ export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...GPR_NODE_DEPS,
   ...LAS_NODE_DEPS,
   ...GIS_NODE_DEPS,
+  ...GEOCHEM_NODE_DEPS,
 };
 
 const NODE_LABELS: Record<string, string> = {
@@ -215,6 +235,12 @@ const NODE_LABELS: Record<string, string> = {
   vector_overlap: "Same-CRS geometric overlap table (not geological proof)",
   vector_export: "Export ingested vectors as GeoJSON",
   vector_interpret: "GIS interpretation limits",
+  geochem_ingest: "Read bound G-AID GEOCHEM 1.0 catalog records",
+  geochem_qc: "Geochemistry QC (duplicates, mixed units, censored BDL)",
+  geochem_map_points: "Map sample points when CRS is documented",
+  geochem_summary: "Summary statistics of uncensored assays",
+  geochem_display_transform: "Approved display-only log10 of positive uncensored values",
+  geochem_interpret: "Geochemistry interpretation limits",
 };
 
 export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
@@ -235,11 +261,12 @@ export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
 function ownerCapability(
   nodeId: string,
   expanded: UserCapabilityId[]
-): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" | "gis.prereq" {
+): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" | "gis.prereq" | "geochem.prereq" {
   for (const id of expanded) {
     const capability = getCapability(id);
     if (capability?.kernelNodeIds.includes(nodeId)) return id;
   }
+  if (nodeFamily(nodeId) === "geochem") return "geochem.prereq";
   if (nodeFamily(nodeId) === "gis") return "gis.prereq";
   if (nodeFamily(nodeId) === "borehole") return "borehole.prereq";
   if (nodeFamily(nodeId) === "gpr") return "gpr.prereq";
@@ -249,7 +276,8 @@ function ownerCapability(
   return "mag.prereq";
 }
 
-function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "borehole" | "gis" {
+function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "borehole" | "gis" | "geochem" {
+  if ((GEOCHEM_NODE_ORDER as readonly string[]).includes(nodeId)) return "geochem";
   if ((GIS_NODE_ORDER as readonly string[]).includes(nodeId)) return "gis";
   if ((LAS_NODE_ORDER as readonly string[]).includes(nodeId)) return "borehole";
   if ((GPR_NODE_ORDER as readonly string[]).includes(nodeId)) return "gpr";
@@ -259,7 +287,7 @@ function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "b
   return "mag";
 }
 
-/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, GPR, borehole, and GIS never wait on each other. */
+/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, GPR, borehole, GIS, and geochemistry never wait on each other. */
 export function remapKernelDeps(nodeId: string, compiled: Set<string>): string[] {
   const original = KERNEL_NODE_DEPS[nodeId] || [];
   const present = original.filter((dep) => compiled.has(dep));
@@ -301,7 +329,8 @@ export function compileCapabilityDag(requested: string[]): CompiledDag {
       capabilityId === "rad.prereq" ||
       capabilityId === "gpr.prereq" ||
       capabilityId === "borehole.prereq" ||
-      capabilityId === "gis.prereq"
+      capabilityId === "gis.prereq" ||
+      capabilityId === "geochem.prereq"
         ? undefined
         : getCapability(capabilityId);
     nodes.push({

@@ -1,0 +1,4 @@
+source_path,sample_id,x,y,medium,qc_flag,batch,date,lab,method,crs,kind,Au_ppm,Au_ppm_qual,Au_ppm_dl,Au_ppm_censored,Fe_pct,Fe_pct_qual,Fe_pct_dl,Fe_pct_censored
+mixed-units/assays.csv,M-001,260100.0,6240100.0,soil,sample,,,ALS,ICP-MS,EPSG:32734,raw,0.11,,,False,4.2,,,False
+mixed-units/assays.csv,M-002,260140.0,6240140.0,soil,sample,,,ALS,ICP-MS,EPSG:32734,raw,0.07,,,False,3.8,,,False
+mixed-units/assays.csv,M-003,260180.0,6240180.0,soil,sample,,,ALS,ICP-MS,EPSG:32734,raw,0.22,,,False,6.1,,,False

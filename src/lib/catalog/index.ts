@@ -18,6 +18,7 @@ export { classifyPeek, isSupportedProcessingRecord } from "./classify.ts";
 export { applyReviewedGravityMapping } from "./gravity-mapping.ts";
 export { applyReviewedRadioMapping } from "./radio-mapping.ts";
 export { applyReviewedVectorRole, mergeVectorRoleFromPrevious } from "./vector-role.ts";
+export { applyReviewedGeochemMapping, mergeGeochemMappingFromPrevious } from "./geochem-mapping.ts";
 export {
   GRAVITY_ADAPTER_IDS,
   inspectGravityText,
@@ -30,6 +31,12 @@ export {
   ternaryJustified,
   ratioJustified,
 } from "./radio-contract.ts";
+export {
+  GEOCHEM_ADAPTER_IDS,
+  inspectGeochemText,
+  isGeochemAdapterId,
+  geochemReadyForSupport,
+} from "./geochem-contract.ts";
 export {
   VECTOR_ROLES,
   UNASSIGNED_VECTOR_ROLE,

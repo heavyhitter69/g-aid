@@ -64,6 +64,7 @@ export function intentToSteps(
   if (intent === "gpr") next.gpr = true;
   if (intent === "borehole") next.borehole = true;
   if (intent === "gis") next.gisVector = true;
+  if (intent === "geochemistry") next.geochem = true;
 
   const mag =
     intent === "diurnal" ||
@@ -93,7 +94,7 @@ export function inferIntentFromFiles(
 ): AnalysisIntent | "none" {
   if (detected) return detected;
   const m = message.toLowerCase();
-  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay)\b/.test(m)) {
+  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay|geochem|assay|soil sample|stream[\s-]?sediment)\b/.test(m)) {
     return detectAnalysisIntent(message) || "none";
   }
   void index;
@@ -124,6 +125,10 @@ export function collectPlanInputs(
       formatId: record.formatId,
       columnMapping: record.columnMapping,
       radioMapping: record.radioMapping,
+      geochemMapping: record.geochemMapping,
+      sampleMedium: record.sampleMedium,
+      lab: record.lab,
+      analyticalMethod: record.analyticalMethod,
       radioQuantity: record.radioQuantity,
       correctionHistory: record.correctionHistory,
       acquisitionPlatform: record.acquisitionPlatform,

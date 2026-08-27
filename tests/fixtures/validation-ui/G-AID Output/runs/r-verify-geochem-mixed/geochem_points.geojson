@@ -1,0 +1,173 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "M-001",
+      "properties": {
+        "sample_id": "M-001",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.11,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "mixed-units/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260100.0,
+          6240100.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "M-001",
+      "properties": {
+        "sample_id": "M-001",
+        "medium": "soil",
+        "element": "Fe",
+        "element_key": "Fe_pct",
+        "value": 4.2,
+        "unit": "pct",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "mixed-units/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260100.0,
+          6240100.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "M-002",
+      "properties": {
+        "sample_id": "M-002",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.07,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "mixed-units/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260140.0,
+          6240140.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "M-002",
+      "properties": {
+        "sample_id": "M-002",
+        "medium": "soil",
+        "element": "Fe",
+        "element_key": "Fe_pct",
+        "value": 3.8,
+        "unit": "pct",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "mixed-units/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260140.0,
+          6240140.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "M-003",
+      "properties": {
+        "sample_id": "M-003",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.22,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "mixed-units/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260180.0,
+          6240180.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "M-003",
+      "properties": {
+        "sample_id": "M-003",
+        "medium": "soil",
+        "element": "Fe",
+        "element_key": "Fe_pct",
+        "value": 6.1,
+        "unit": "pct",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "mixed-units/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260180.0,
+          6240180.0
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
+}

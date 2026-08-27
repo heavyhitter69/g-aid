@@ -299,6 +299,13 @@ def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = Fals
     return impl(path, role=role, role_reviewed=role_reviewed)
 
 
+def parse_geochem(path: str, mapping=None) -> dict:
+    """Documented G-AID GEOCHEM 1.0 assay table. Element-like names are not geochemistry."""
+    from formats.geochem import parse_geochem_table
+
+    return parse_geochem_table(path, mapping=mapping)
+
+
 def parse_dzt(path: str) -> dict:
     """Recognised-unsupported. G-AID does not invent dt, dx, or antenna from a DZT header."""
     raise ValueError(

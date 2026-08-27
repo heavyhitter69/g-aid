@@ -92,6 +92,12 @@ def get_handler(node_id: str):
         "vector_overlap": vector_overlap,
         "vector_export": vector_export,
         "vector_interpret": vector_interpret,
+        "geochem_ingest": geochem_ingest,
+        "geochem_qc": geochem_qc,
+        "geochem_map_points": geochem_map_points,
+        "geochem_summary": geochem_summary,
+        "geochem_display_transform": geochem_display_transform,
+        "geochem_interpret": geochem_interpret,
         "crs_reproject": crs_reproject,
         "xyz_ingest": xyz_ingest,
     }
@@ -969,6 +975,36 @@ def vector_export(payload: dict) -> dict:
 
 def vector_interpret(payload: dict) -> dict:
     from kernels.vector import vector_interpret as impl
+    return impl(payload)
+
+
+def geochem_ingest(payload: dict) -> dict:
+    from kernels.geochem import geochem_ingest as impl
+    return impl(payload)
+
+
+def geochem_qc(payload: dict) -> dict:
+    from kernels.geochem import geochem_qc as impl
+    return impl(payload)
+
+
+def geochem_map_points(payload: dict) -> dict:
+    from kernels.geochem import geochem_map_points as impl
+    return impl(payload)
+
+
+def geochem_summary(payload: dict) -> dict:
+    from kernels.geochem import geochem_summary as impl
+    return impl(payload)
+
+
+def geochem_display_transform(payload: dict) -> dict:
+    from kernels.geochem import geochem_display_transform as impl
+    return impl(payload)
+
+
+def geochem_interpret(payload: dict) -> dict:
+    from kernels.geochem import geochem_interpret as impl
     return impl(payload)
 
 

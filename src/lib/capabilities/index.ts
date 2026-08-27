@@ -20,6 +20,8 @@ export {
   LAS_NODE_ORDER,
   GIS_NODE_DEPS,
   GIS_NODE_ORDER,
+  GEOCHEM_NODE_DEPS,
+  GEOCHEM_NODE_ORDER,
   KERNEL_NODE_DEPS,
   KERNEL_NODE_ORDER,
 } from "./compile.ts";
@@ -34,5 +36,6 @@ export {
   GPR_DEFAULT,
   BOREHOLE_DEFAULT,
   GIS_DEFAULT,
+  GEOCHEM_DEFAULT,
 } from "./propose.ts";
 export { dagForPlan, generateTasksMarkdown, taskNodeIdsFromMarkdown } from "./tasks.ts";

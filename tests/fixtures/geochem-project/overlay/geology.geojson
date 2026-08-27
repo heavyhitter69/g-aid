@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "g1",
+      "properties": {
+        "UNIT": "Qal",
+        "LITHOLOGY": "alluvium"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [260000, 6240000],
+            [260300, 6240000],
+            [260300, 6240300],
+            [260000, 6240300],
+            [260000, 6240000]
+          ]
+        ]
+      }
+    }
+  ]
+}

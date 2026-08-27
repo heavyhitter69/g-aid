@@ -26,6 +26,7 @@ import { RADIO_STATEMENTS } from "./radio-product.ts";
 import { GPR_STATEMENTS, GPR_MIGRATION_BENCHMARK_PASSED, DEFAULT_DEWOW_WINDOW, DEFAULT_FILTER_ORDER, DEFAULT_SEC_POWER, gprFrozenNyquistLine } from "./gpr-product.ts";
 import { BOREHOLE_STATEMENTS } from "./borehole-product.ts";
 import { GIS_STATEMENTS } from "./gis-product.ts";
+import { GEOCHEM_STATEMENTS } from "./geochem-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -51,6 +52,7 @@ export type PlanSteps = {
   gpr: boolean;
   borehole: boolean;
   gisVector: boolean;
+  geochem: boolean;
 };
 
 export const EMPTY_STEPS: PlanSteps = {
@@ -75,6 +77,7 @@ export const EMPTY_STEPS: PlanSteps = {
   gpr: false,
   borehole: false,
   gisVector: false,
+  geochem: false,
 };
 
 export type PlanIntent = AnalysisIntent | "none";
@@ -119,6 +122,29 @@ export interface PlanInput {
     reviewed: boolean;
     reviewedAt?: string;
   };
+  geochemMapping?: {
+    sampleId: string;
+    x: string;
+    y: string;
+    medium?: string;
+    elements: Array<{
+      column: string;
+      symbol: string;
+      units: string;
+      qualifierColumn?: string;
+      detectionLimitColumn?: string;
+    }>;
+    qcFlag?: string;
+    batch?: string;
+    date?: string;
+    lab?: string;
+    method?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  sampleMedium?: string;
+  lab?: string;
+  analyticalMethod?: string;
   radioQuantity?: string;
   correctionHistory?: string;
   acquisitionPlatform?: string;
@@ -229,6 +255,30 @@ export interface AgentPlan {
       reviewed: boolean;
       reviewedAt?: string;
     };
+    geochemMapping?: {
+      sampleId: string;
+      x: string;
+      y: string;
+      medium?: string;
+      elements: Array<{
+        column: string;
+        symbol: string;
+        units: string;
+        qualifierColumn?: string;
+        detectionLimitColumn?: string;
+      }>;
+      qcFlag?: string;
+      batch?: string;
+      date?: string;
+      lab?: string;
+      method?: string;
+      reviewed: boolean;
+      reviewedAt?: string;
+    };
+    displayTransform?: string;
+    displayTransformApproved?: boolean;
+    displayElement?: string;
+    approved?: boolean;
   };
   workspaceBrief: string;
   rev?: number;
@@ -292,6 +342,7 @@ export const STEP_KEYS = [
   "gpr",
   "borehole",
   "gisVector",
+  "geochem",
 ] as const satisfies readonly (keyof PlanSteps)[];
 
 type StepKey = (typeof STEP_KEYS)[number];
@@ -347,6 +398,8 @@ export const BOREHOLE_STEP_KEYS = ["borehole"] as const satisfies readonly StepK
 
 export const GIS_STEP_KEYS = ["gisVector"] as const satisfies readonly StepKey[];
 
+export const GEOCHEM_STEP_KEYS = ["geochem"] as const satisfies readonly StepKey[];
+
 export const UNSUPPORTED_STEP_KEYS = ["seismic"] as const satisfies readonly StepKey[];
 
 export const STEP_NODE_IDS: Record<StepKey, string[]> = {
@@ -371,6 +424,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   gpr: ["gpr_ingest", "gpr_process", "gpr_interpret"],
   borehole: ["las_ingest", "borehole_view", "borehole_interpret"],
   gisVector: ["vector_ingest", "vector_view", "vector_interpret"],
+  geochem: ["geochem_ingest", "geochem_qc", "geochem_map_points", "geochem_summary", "geochem_interpret"],
 };
 
 export function magneticStepsEnabled(steps: PlanSteps): boolean {
@@ -399,6 +453,10 @@ export function boreholeStepsEnabled(steps: PlanSteps): boolean {
 
 export function gisVectorStepsEnabled(steps: PlanSteps): boolean {
   return GIS_STEP_KEYS.some((key) => steps[key]);
+}
+
+export function geochemStepsEnabled(steps: PlanSteps): boolean {
+  return GEOCHEM_STEP_KEYS.some((key) => steps[key]);
 }
 
 export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
@@ -432,6 +490,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "gpr", re: /\bgpr\b|ground[ -]?penetrating/i },
   { key: "borehole", re: /\bborehole\b|\bwell[ -]?log\b|\blas\b|cwls/i },
   { key: "gisVector", re: /\bgeojson\b|\bshapefile\b|\bgeopackage\b|\bvector overlay\b|\bspatial overlap\b|\bgeology layer\b|\btenure layer\b/i },
+  { key: "geochem", re: /\bgeochem|\bassay\b|\bsoil sample\b|\bstream[\s-]?sediment\b|\brock[\s-]?chip\b/i },
 ];
 
 export function cloneSteps(steps: PlanSteps = EMPTY_STEPS): PlanSteps {
@@ -505,6 +564,8 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
       return "Ingest CWLS LAS 2.0 WRAP.NO, view measured-depth logs, and write evidence-bound interpretation limits (not lithology or a well path)";
     case "gisVector":
       return "Ingest documented GeoJSON vectors, display source geometry, and write evidence-bound interpretation limits (not geology proof or mineral targets)";
+    case "geochem":
+      return "Ingest G-AID GEOCHEM 1.0 assays, QC censored below-detection values, map sample points, and write evidence-bound interpretation limits (not ore or drill targets)";
   }
 }
 
@@ -589,6 +650,11 @@ export function renderImplementationPlan(opts: {
       if (!notes.includes(line)) notes.push(line);
     }
   }
+  if (geochemStepsEnabled(opts.steps)) {
+    for (const line of GEOCHEM_STATEMENTS) {
+      if (!notes.includes(line)) notes.push(line);
+    }
+  }
   const bound = (opts.inputs || []).map((item) => `- \`${item.catalogId}\` ${item.path} (${item.adapterId || item.kind || "bound"})`);
   const artifacts = dag.requestedCapabilityIds.flatMap((id) =>
     (getCapability(id)?.expectedArtifacts || []).map((name) => `- ${name}`)
@@ -609,7 +675,8 @@ export function renderImplementationPlan(opts: {
   const gprInputs = (opts.inputs || []).some((item) => item.adapterId === "gpr-csv");
   const lasInputs = (opts.inputs || []).some((item) => item.adapterId === "las-well");
   const gisInputs = (opts.inputs || []).some((item) => item.adapterId === "geojson");
-  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs, gisInputs].filter(Boolean).length;
+  const geochemInputs = (opts.inputs || []).some((item) => item.adapterId === "geochem-csv" || item.adapterId === "geochem-xyz");
+  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs, gisInputs, geochemInputs].filter(Boolean).length;
   const mixed = mixedCount > 1;
   const field = [
     typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
@@ -636,6 +703,9 @@ export function renderImplementationPlan(opts: {
     gisVectorStepsEnabled(opts.steps)
       ? "GIS product: documented GeoJSON source layers. Roles are user-assigned. Spatial overlap is geometric coincidence, not geological proof."
       : "",
+    geochemStepsEnabled(opts.steps)
+      ? "Geochemistry product: G-AID GEOCHEM 1.0 assays. Below-detection stays censored. High values are observations, not ore."
+      : "",
     opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
     opts.requestIntent ? `Frozen request intent: ${opts.requestIntent}` : "",
     opts.steps.farZoneTerrain
@@ -654,7 +724,9 @@ export function renderImplementationPlan(opts: {
         ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless a named terrain plan is approved."
         : "",
   ].filter(Boolean);
-  const thisRunFallback = gisVectorStepsEnabled(opts.steps)
+  const thisRunFallback = geochemStepsEnabled(opts.steps)
+    ? "- Ask for a registered geochemistry, GIS vector, borehole, GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
+    : gisVectorStepsEnabled(opts.steps)
     ? "- Ask for a registered GIS vector, borehole, GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
     : boreholeStepsEnabled(opts.steps)
     ? "- Ask for a registered borehole, GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
@@ -678,7 +750,7 @@ export function renderImplementationPlan(opts: {
 ${items.join("\n") || thisRunFallback}
 
 ## Bound inputs
-${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, LAS 2.0, and/or documented GeoJSON catalog IDs before Proceed."}
+${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, LAS 2.0, documented GeoJSON, and/or G-AID GEOCHEM 1.0 catalog IDs before Proceed."}
 
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
@@ -691,8 +763,8 @@ ${dagLines.join("\n") || "- (none)"}
 ${artifacts.length ? [...new Set(artifacts)].join("\n") : "- None until a registered capability is approved."}
 
 ## Assumptions and limits
-${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic, gravity, ERT, radiometric, GPR, borehole, and GIS capabilities run."}
-${mixed ? "- Products from different methods may display together. Joint inversion and combined interpretation are not registered capabilities.\n" : ""}${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
+${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic, gravity, ERT, radiometric, GPR, borehole, GIS, and geochemistry capabilities run."}
+${mixed ? "- Products from different methods may display together. Joint inversion and combined interpretation are not registered capabilities.\n" : ""}${mixed && geochemInputs && gisInputs ? "- Spatial association of assays with geology or other vector layers is geometric coincidence, not causal evidence.\n" : ""}${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
 
 ## Review record
 ${reviews.length ? reviews.join("\n") : "- No review comments recorded yet."}
@@ -892,6 +964,12 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
     parameters.columnMappingReviewed = true;
     if (parameters.gravityMapping) parameters.gravityMapping = { ...parameters.gravityMapping, reviewed: true };
     if (parameters.radioMapping) parameters.radioMapping = { ...parameters.radioMapping, reviewed: true };
+    if (parameters.geochemMapping) parameters.geochemMapping = { ...parameters.geochemMapping, reviewed: true };
+  }
+  if (/\b(approve(?:d)? (?:the )?(?:log10|log transform|display transform)|display transform approved)\b/i.test(raw)) {
+    parameters.displayTransform = "log10";
+    parameters.displayTransformApproved = true;
+    parameters.approved = true;
   }
   const inc = raw.match(/\binclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
   const dec = raw.match(/\bdeclination\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i);
@@ -1045,6 +1123,18 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
                   ? "Accepted GeoJSON export. Shapefile/GeoPackage writers are not implemented."
                 : id === "gis.interpret"
                   ? "Accepted evidence-bound GIS interpretation limits. Mineral targets, prospectivity, resources, and drill recommendations are not established from overlays."
+                : id === "geochem.ingest"
+                  ? "Accepted G-AID GEOCHEM 1.0 ingest. An arbitrary CSV with Fe/Cu/Au columns is not geochemistry. Below-detection stays censored."
+                : id === "geochem.qc"
+                  ? "Accepted geochemistry QC. Blanks/standards/duplicates are summarised only when those records and expected-value rules are present."
+                : id === "geochem.map_points"
+                  ? "Accepted sample-point mapping only with a documented CRS. High values are observations, not ore."
+                : id === "geochem.summary"
+                  ? "Accepted uncensored summary statistics. Mixed or unknown units block direct comparison."
+                : id === "geochem.display_transform"
+                  ? "Accepted display-only log10 of strictly positive uncensored values. Originals are preserved. This is not an anomaly score."
+                : id === "geochem.interpret"
+                  ? "Accepted evidence-bound geochemistry interpretation limits. Ore, economic grade, mineralisation, and drill targets are not established."
                 : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
@@ -1090,6 +1180,10 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const dag = compileCapabilityDag(proposed);
   if (proposed.includes("grav.terrain_intermediate_zone")) parameters.applyIntermediateZone = true;
   if (proposed.includes("grav.terrain_far_zone")) parameters.applyFarZone = true;
+  if (proposed.includes("geochem.display_transform") && parameters.displayTransformApproved) {
+    parameters.displayTransform = parameters.displayTransform || "log10";
+    parameters.approved = true;
+  }
   return {
     ...plan,
     steps,
@@ -1150,6 +1244,11 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
   if (gisVectorStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps) || boreholeStepsEnabled(steps))) {
     notes.push(
       "Vector layers may display with magnetic, gravity, ERT, radiometric, GPR, or borehole maps. Spatial overlap is geometric coincidence, not a joint geological or mineral interpretation."
+    );
+  }
+  if (geochemStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps) || boreholeStepsEnabled(steps) || gisVectorStepsEnabled(steps))) {
+    notes.push(
+      "Geochemical samples may display with magnetic, gravity, ERT, radiometric, GPR, borehole, or vector maps. Spatial association is coincidence, not causal evidence or mineralisation proof."
     );
   }
   const dag = compileCapabilityDag(capabilities);
@@ -1293,18 +1392,18 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
     });
   }
 
-  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps) && !gisVectorStepsEnabled(plan.steps)) {
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps) && !gisVectorStepsEnabled(plan.steps) && !geochemStepsEnabled(plan.steps)) {
     blockers.push({
       level: "blocker",
       code: "unsupported_method",
       message:
-        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, already-corrected radiometric ingest, G-AID GPR 1.0, CWLS LAS 2.0 well logs, or documented GeoJSON vectors after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic is not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities. Lithology classification and well trajectories are not live borehole capabilities. Shapefile/GeoPackage ingest, buffer/clip/dissolve, and mineral targeting from overlays are not live GIS capabilities.",
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, already-corrected radiometric ingest, G-AID GPR 1.0, CWLS LAS 2.0 well logs, documented GeoJSON vectors, or G-AID GEOCHEM 1.0 assays after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic is not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities. Lithology classification and well trajectories are not live borehole capabilities. Shapefile/GeoPackage ingest, buffer/clip/dissolve, and mineral targeting from overlays are not live GIS capabilities. Anomaly detection, prospectivity, targeting, and resource estimation are not live geochemistry capabilities.",
     });
   } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({
       level: "warning",
       code: "unsupported_method",
-      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric/GPR/borehole/GIS DAG is executed.",
+      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric/GPR/borehole/GIS/geochemistry DAG is executed.",
     });
   }
 
@@ -1432,6 +1531,27 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
         code: "no_geojson_files",
         message:
           "GIS vector processing needs a supported geojson catalog record. A shapefile sidecar set or GeoPackage is not a processing input.",
+      });
+    }
+  }
+
+  if (geochemStepsEnabled(plan.steps)) {
+    const geochemFiles = inputs.filter(
+      (item) => item.adapterId === "geochem-csv" || item.adapterId === "geochem-xyz" || item.kind === "geochem-csv" || item.kind === "geochem-xyz"
+    );
+    if (inputs.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_geochem_files",
+        message:
+          "Geochemistry processing needs a supported G-AID GEOCHEM 1.0 catalog record (SampleID, X, Y, Medium, documented CRS, element units). I will not take the first CSV because it has Fe or Cu columns.",
+      });
+    } else if (geochemFiles.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_geochem_files",
+        message:
+          "Geochemistry processing needs a supported geochem-csv or geochem-xyz catalog record. An arbitrary chemistry table is not assay data.",
       });
     }
   }

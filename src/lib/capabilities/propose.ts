@@ -48,6 +48,14 @@ export const GIS_DEFAULT: UserCapabilityId[] = [
   "gis.interpret",
 ];
 
+export const GEOCHEM_DEFAULT: UserCapabilityId[] = [
+  "geochem.ingest",
+  "geochem.qc",
+  "geochem.map_points",
+  "geochem.summary",
+  "geochem.interpret",
+];
+
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
 }
@@ -64,6 +72,7 @@ export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id.startsWith("gpr.")) return "gpr";
   if (id.startsWith("borehole.")) return "borehole";
   if (id.startsWith("gis.")) return "gisVector";
+  if (id.startsWith("geochem.")) return "geochem";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
   return found?.[0] || id;
 }
@@ -135,6 +144,11 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
       if (!ids.includes(id)) ids.push(id);
     }
   }
+  if (steps.geochem) {
+    for (const id of GEOCHEM_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
   return ids;
 }
 
@@ -152,6 +166,7 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.gpr = false;
   steps.borehole = false;
   steps.gisVector = false;
+  steps.geochem = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
     if (id === "grav.residual") {
@@ -203,6 +218,10 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
     }
     if (id.startsWith("gis.")) {
       steps.gisVector = true;
+      continue;
+    }
+    if (id.startsWith("geochem.")) {
+      steps.geochem = true;
       continue;
     }
     steps[stepKeyFromCapability(id)] = true;
@@ -344,11 +363,30 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     if (/\bexport\b/.test(m)) next.add("gis.export_vector");
   }
 
+  const geochemDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(geochem|assay|soil sample)\b/.test(m);
+  const geochemAsk =
+    /\b(geochem|geochemical|assay|soil sample|stream[\s-]?sediment|rock[\s-]?chip|rock sample)\b/.test(m) &&
+    !/\b(radiometr|spectrometer|airborne gamma|geojson|shapefile)\b/.test(m);
+  if (geochemAsk && !geochemDeny) {
+    for (const id of GEOCHEM_DEFAULT) next.add(id);
+    if (/\b(log10|log transform|display transform)\b/.test(m) && !/\b(skip|omit|without|no)\b.{0,24}\b(log|transform)/.test(m)) {
+      next.add("geochem.display_transform");
+    }
+  }
+
   return USER_CAPABILITY_IDS.filter((id) => next.has(id));
 }
 
 export function unregisteredProposal(message: string): string | undefined {
   const m = message.toLowerCase();
+  if (
+    /\b(anomal(?:y|ies)|prospectiv(?:ity)?|mineral targets?|drill targets?|resource estimat\w*|machine[\s-]?learning|ml classif)\b/.test(
+      m
+    ) &&
+    /\b(geochem|assay|soil sample|stream[\s-]?sediment)\b/.test(m)
+  ) {
+    return "geochem.anomaly";
+  }
   if (/\b(seismic|segy|nmo)\b/.test(m)) return "seismic";
   if (/\b(litholog(?:y|ies)?|aquifer|minerali[sz]ations?|minerali[sz]e|drill[\s-]?targets?|resource estimat\w*|well correlation|pay zone|reservoir)\b/.test(m) && !/\b(overlay|geojson|vector|gis)\b/.test(m)) {
     return "borehole.classify";

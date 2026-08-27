@@ -1,0 +1,281 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "S-001",
+      "properties": {
+        "sample_id": "S-001",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.12,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260100.0,
+          6240100.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-001",
+      "properties": {
+        "sample_id": "S-001",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 45.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260100.0,
+          6240100.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-002",
+      "properties": {
+        "sample_id": "S-002",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.08,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260140.0,
+          6240140.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-002",
+      "properties": {
+        "sample_id": "S-002",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 38.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260140.0,
+          6240140.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-003",
+      "properties": {
+        "sample_id": "S-003",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.31,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260180.0,
+          6240180.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-003",
+      "properties": {
+        "sample_id": "S-003",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 92.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260180.0,
+          6240180.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-004",
+      "properties": {
+        "sample_id": "S-004",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.05,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260220.0,
+          6240120.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-004",
+      "properties": {
+        "sample_id": "S-004",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 21.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260220.0,
+          6240120.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-005",
+      "properties": {
+        "sample_id": "S-005",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.19,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260160.0,
+          6240160.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "S-005",
+      "properties": {
+        "sample_id": "S-005",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 67.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "valid/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260160.0,
+          6240160.0
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
+}

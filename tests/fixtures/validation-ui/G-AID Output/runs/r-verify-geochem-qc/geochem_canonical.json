@@ -1,0 +1,266 @@
+{
+  "kind": "geochem-samples",
+  "tables": [
+    {
+      "kind": "geochem-samples",
+      "product_name": "G-AID documented geochemical sample table",
+      "source_path": "qc/assays.csv",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "medium": "soil",
+      "lab": "ALS",
+      "method": "ICP-MS",
+      "detection_limit_treatment": "censored",
+      "standard_expected": "STD-1:Au_ppm=0.20",
+      "mapping": {
+        "sampleId": "SampleID",
+        "x": "X",
+        "y": "Y",
+        "medium": "Medium",
+        "elements": [
+          {
+            "column": "Au_ppm",
+            "symbol": "Au",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          },
+          {
+            "column": "Cu_ppm",
+            "symbol": "Cu",
+            "units": "ppm",
+            "qualifierColumn": null,
+            "detectionLimitColumn": null
+          }
+        ],
+        "qcFlag": "QCFlag",
+        "batch": "Batch",
+        "date": null,
+        "lab": null,
+        "method": null,
+        "reviewed": false
+      },
+      "columns": [
+        "SampleID",
+        "X",
+        "Y",
+        "Medium",
+        "Au_ppm",
+        "Cu_ppm",
+        "QCFlag",
+        "Batch"
+      ],
+      "units": [
+        "ppm"
+      ],
+      "mixed_units": false,
+      "samples": [
+        {
+          "sample_id": "S-101",
+          "x": 260100.0,
+          "y": 6240100.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B2",
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.12,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 45.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "BLK-1",
+          "x": 260101.0,
+          "y": 6240101.0,
+          "medium": "soil",
+          "qc_flag": "blank",
+          "batch": "B2",
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": null,
+              "censored": true,
+              "qualifier": "<",
+              "detection_limit": 0.01,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": null,
+              "censored": true,
+              "qualifier": "<",
+              "detection_limit": 0.5,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "STD-1",
+          "x": 260102.0,
+          "y": 6240102.0,
+          "medium": "soil",
+          "qc_flag": "standard",
+          "batch": "B2",
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.21,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 1.2,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-101-FD",
+          "x": 260100.0,
+          "y": 6240100.0,
+          "medium": "soil",
+          "qc_flag": "field_duplicate",
+          "batch": "B2",
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.13,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 47.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-102",
+          "x": 260140.0,
+          "y": 6240140.0,
+          "medium": "soil",
+          "qc_flag": "sample",
+          "batch": "B2",
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.08,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 38.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        },
+        {
+          "sample_id": "S-102-LD",
+          "x": 260141.0,
+          "y": 6240141.0,
+          "medium": "soil",
+          "qc_flag": "lab_duplicate",
+          "batch": "B2",
+          "date": null,
+          "lab": "ALS",
+          "method": "ICP-MS",
+          "values": {
+            "Au_ppm": {
+              "symbol": "Au",
+              "units": "ppm",
+              "value": 0.09,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Au_ppm",
+              "kind": "raw"
+            },
+            "Cu_ppm": {
+              "symbol": "Cu",
+              "units": "ppm",
+              "value": 36.0,
+              "censored": false,
+              "qualifier": null,
+              "detection_limit": null,
+              "source_column": "Cu_ppm",
+              "kind": "raw"
+            }
+          }
+        }
+      ],
+      "n": 6,
+      "replaced_bdl_with_zero": false,
+      "imputed": false,
+      "log_transformed": false,
+      "catalog_id": "cat-r-verify-geochem-qc",
+      "checksum": null
+    }
+  ],
+  "product_kind": "raw"
+}

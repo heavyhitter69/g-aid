@@ -31,6 +31,7 @@ export type DomainHint =
   | "radiometrics"
   | "gis"
   | "geology"
+  | "geochemistry"
   | "report"
   | "unknown";
 
@@ -111,6 +112,30 @@ export interface CatalogRecord {
     reviewed: boolean;
     reviewedAt?: string;
   };
+  geochemMapping?: {
+    sampleId: string;
+    x: string;
+    y: string;
+    medium?: string;
+    elements: Array<{
+      column: string;
+      symbol: string;
+      units: string;
+      qualifierColumn?: string;
+      detectionLimitColumn?: string;
+    }>;
+    qcFlag?: string;
+    batch?: string;
+    date?: string;
+    lab?: string;
+    method?: string;
+    reviewed: boolean;
+    reviewedAt?: string;
+  };
+  sampleMedium?: string;
+  lab?: string;
+  analyticalMethod?: string;
+  detectionLimitTreatment?: string;
   radioQuantity?: string;
   correctionHistory?: string;
   acquisitionPlatform?: string;

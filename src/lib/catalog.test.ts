@@ -117,6 +117,8 @@ test("catalog classifies mixed folder without defaulting to magnetics", () => {
     assert.equal(chem.formatId, "delimited-table");
     assert.equal(chem.domainHint, "unknown");
     assert.notEqual(chem.adapterId, "magarrow");
+    assert.notEqual(chem.adapterId, "geochem-csv");
+    assert.notEqual(chem.adapterId, "geochem-xyz");
 
     const dem = byPath(catalog.records, "gis/dem.asc");
     assert.equal(dem.supportStatus, "recognised-unsupported");

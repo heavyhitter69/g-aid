@@ -103,7 +103,8 @@ export type AnalysisIntent =
   | "radiometrics"
   | "gpr"
   | "borehole"
-  | "gis";
+  | "gis"
+  | "geochemistry";
 
 export function splitUserAndContext(message: string): { userText: string; context: string } {
   const match = message.match(/\n\n--- (?:Workspace|File Context) ---/);
@@ -126,6 +127,12 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   if (/\b(ert|resistivity|wenner|schlumberger|dipole[\s-]?dipole|pseudosection)\b/.test(m)) return "resistivity";
   if (/\b(bouguer|free[\s-]?air|gravity|mgal)\b/.test(m)) return "gravity";
   if (/\b(radiometr|spectrometer|nasvd)\b/.test(m)) return "radiometrics";
+  if (
+    /\b(geochem|geochemical|assay|soil sample|stream[\s-]?sediment|rock[\s-]?chip|rock sample)\b/.test(m) &&
+    !/\b(radiometr|spectrometer|airborne gamma|geojson|shapefile)\b/.test(m)
+  ) {
+    return "geochemistry";
+  }
   const otherSurvey =
     /\b(gpr|ground[\s-]?penetrating|radargram|borehole|well[\s-]?log|cwls|\blas\b|segy|seismic|ert|resistivity|bouguer|gravity|mgal|radiometr|magarrow|tmi|igrf|airborne mag|gsm-?19|diurnal)\b/.test(
       m

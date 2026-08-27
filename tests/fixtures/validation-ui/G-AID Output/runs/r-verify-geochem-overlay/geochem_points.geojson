@@ -1,0 +1,119 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "O-001",
+      "properties": {
+        "sample_id": "O-001",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.25,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "overlay/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260120.0,
+          6240120.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "O-001",
+      "properties": {
+        "sample_id": "O-001",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 71.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "overlay/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260120.0,
+          6240120.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "O-002",
+      "properties": {
+        "sample_id": "O-002",
+        "medium": "soil",
+        "element": "Au",
+        "element_key": "Au_ppm",
+        "value": 0.14,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "overlay/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260160.0,
+          6240160.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "O-002",
+      "properties": {
+        "sample_id": "O-002",
+        "medium": "soil",
+        "element": "Cu",
+        "element_key": "Cu_ppm",
+        "value": 40.0,
+        "unit": "ppm",
+        "qualifier": null,
+        "censored": false,
+        "detection_limit": null,
+        "qc_flag": "sample",
+        "source": "overlay/assays.csv",
+        "kind": "raw",
+        "filter_state": "unfiltered",
+        "crs": "EPSG:32734"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260160.0,
+          6240160.0
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
+}

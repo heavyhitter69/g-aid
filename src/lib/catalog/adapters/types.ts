@@ -41,6 +41,11 @@ export interface CatalogInspection {
   supportStatus?: SupportStatus;
   columnMapping?: CatalogRecord["columnMapping"];
   radioMapping?: CatalogRecord["radioMapping"];
+  geochemMapping?: CatalogRecord["geochemMapping"];
+  sampleMedium?: string;
+  lab?: string;
+  analyticalMethod?: string;
+  detectionLimitTreatment?: string;
   radioQuantity?: string;
   correctionHistory?: string;
   acquisitionPlatform?: string;

@@ -1,0 +1,14 @@
+{
+  "node_id": "geochem_interpret",
+  "formula": "Geochemistry interpretation limits",
+  "parameters": {
+    "n": 2
+  },
+  "inputs": [
+    "geochem_canonical.json"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-overlay/geochem_interpretation.json"
+  ],
+  "created_at": "2026-08-27T18:26:11.388955Z"
+}

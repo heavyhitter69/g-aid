@@ -65,6 +65,17 @@ export function validateCapabilityContracts(options: {
       tc?: string;
       reviewed: boolean;
     };
+    geochemMapping?: {
+      sampleId: string;
+      x: string;
+      y: string;
+      medium?: string;
+      elements: Array<{ column: string; symbol: string; units: string }>;
+      reviewed: boolean;
+    };
+    displayTransform?: string;
+    displayTransformApproved?: boolean;
+    approved?: boolean;
     velocityMs?: number;
     fLowHz?: number;
     fHighHz?: number;
@@ -534,6 +545,69 @@ export function validateCapabilityContracts(options: {
           message: `Conflicting CRS among vector layers (${crsKeys.join(", ")}). Overlay and overlap are blocked. Reprojection and silent axis swaps are not registered capabilities.`,
         });
       }
+    }
+  }
+
+  const geochemInputs = [...boundSupported(options.inputs, "geochem-csv"), ...boundSupported(options.inputs, "geochem-xyz")];
+  const needsGeochem = expanded.some((id) => id.startsWith("geochem."));
+  if (needsGeochem && options.inputs.length && geochemInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_geochem_files",
+      message:
+        "Geochemistry processing needs a supported G-AID GEOCHEM 1.0 catalog record. I will not take the first CSV because it has Fe or Cu columns.",
+    });
+  }
+  if (needsGeochem && geochemInputs.length) {
+    const records = catalogRecordsForInputs(geochemInputs, options.catalog || null);
+    const unreviewed = records.filter((record) => {
+      const mapping = record.geochemMapping || options.parameters.geochemMapping;
+      if (!mapping || mapping.reviewed || options.parameters.columnMappingReviewed) return false;
+      const canonical =
+        mapping.sampleId === "SampleID" &&
+        mapping.x === "X" &&
+        mapping.y === "Y" &&
+        mapping.elements.every((el) => /_(ppm|ppb|pct|percent)$/i.test(el.column));
+      return !canonical;
+    });
+    if (unreviewed.length) {
+      issues.push({
+        level: "blocker",
+        code: "mapping_review_required",
+        message:
+          "Geochemistry column names differ from SampleID, X, Y, Medium, Element_unit. Confirm a column mapping before Proceed. I will not guess Au from gold.",
+      });
+    }
+    if (expanded.includes("geochem.map_points")) {
+      const anyCrs = records.some((record) => record.crs) || geochemInputs.some((item) => item.crs);
+      if (!anyCrs) {
+        issues.push({
+          level: "blocker",
+          code: "geochem_crs_required",
+          message:
+            "Sample-point mapping needs a documented CRS (/ CRS=EPSG:… or / CRS=OGC:CRS84). Ingest without a map CRS is not a processing input in this pack.",
+        });
+      }
+    }
+    const mixed = records.some((record) => /mixed/i.test(record.units || "")) || geochemInputs.some((item) => /mixed/i.test(item.units || ""));
+    if (mixed) {
+      issues.push({
+        level: "warning",
+        code: "geochem_mixed_units",
+        message: "Mixed element units are present. Direct comparison of those elements is blocked.",
+      });
+    }
+  }
+  if (expanded.includes("geochem.display_transform")) {
+    const transform = String(options.parameters.displayTransform || "").toLowerCase();
+    const approved = Boolean(options.parameters.displayTransformApproved || options.parameters.approved);
+    if (transform !== "log10" || !approved) {
+      issues.push({
+        level: "blocker",
+        code: "geochem_transform_not_approved",
+        message:
+          "Display transforms require explicit approval and displayTransform=log10. I will not silently log-transform or impute below-detection values.",
+      });
     }
   }
 

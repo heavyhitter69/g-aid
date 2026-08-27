@@ -59,6 +59,12 @@ const NODE_LABELS: Record<string, { running: string; done: string }> = {
   vector_overlap: { running: "Computing same-CRS geometric overlap", done: "Wrote geometric overlap table" },
   vector_export: { running: "Exporting GeoJSON vectors", done: "Exported GeoJSON vectors" },
   vector_interpret: { running: "Writing GIS interpretation limits", done: "Wrote GIS interpretation limits" },
+  geochem_ingest: { running: "Reading G-AID GEOCHEM 1.0 assays", done: "Read G-AID GEOCHEM 1.0 assays" },
+  geochem_qc: { running: "Checking geochemistry QC", done: "Wrote geochemistry QC" },
+  geochem_map_points: { running: "Mapping geochemical sample points", done: "Wrote geochemical sample points" },
+  geochem_summary: { running: "Summarising uncensored assays", done: "Wrote geochemistry summary" },
+  geochem_display_transform: { running: "Applying approved display transform", done: "Wrote display-only transform" },
+  geochem_interpret: { running: "Writing geochemistry interpretation limits", done: "Wrote geochemistry interpretation limits" },
   excel_export_adapter: { running: "Writing tables", done: "Wrote tables" },
   report_export_adapter: { running: "Writing QC notes", done: "Wrote QC notes" },
 };

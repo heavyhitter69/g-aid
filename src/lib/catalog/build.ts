@@ -19,6 +19,7 @@ import type { SniffContext } from "./adapters/types.ts";
 import { mergeGravityMappingFromPrevious } from "./gravity-mapping.ts";
 import { mergeRadioMappingFromPrevious } from "./radio-mapping.ts";
 import { mergeVectorRoleFromPrevious } from "./vector-role.ts";
+import { mergeGeochemMappingFromPrevious } from "./geochem-mapping.ts";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -139,6 +140,11 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     parseErrors: parseErrors.length ? parseErrors : undefined,
     columnMapping: classified.inspect.columnMapping,
     radioMapping: classified.inspect.radioMapping,
+    geochemMapping: classified.inspect.geochemMapping,
+    sampleMedium: classified.inspect.sampleMedium,
+    lab: classified.inspect.lab,
+    analyticalMethod: classified.inspect.analyticalMethod,
+    detectionLimitTreatment: classified.inspect.detectionLimitTreatment,
     radioQuantity: classified.inspect.radioQuantity,
     correctionHistory: classified.inspect.correctionHistory,
     acquisitionPlatform: classified.inspect.acquisitionPlatform,
@@ -315,8 +321,11 @@ export function buildProjectCatalog(root: string, options: BuildCatalogOptions =
   walk(resolvedRoot);
   records.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   const merged = records.map((record) =>
-    mergeVectorRoleFromPrevious(
-      mergeRadioMappingFromPrevious(mergeGravityMappingFromPrevious(record, options.previous), options.previous),
+    mergeGeochemMappingFromPrevious(
+      mergeVectorRoleFromPrevious(
+        mergeRadioMappingFromPrevious(mergeGravityMappingFromPrevious(record, options.previous), options.previous),
+        options.previous
+      ),
       options.previous
     )
   );

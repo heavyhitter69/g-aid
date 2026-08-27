@@ -1,0 +1,15 @@
+{
+  "node_id": "geochem_map_points",
+  "formula": "Geochemistry sample points",
+  "parameters": {
+    "n": 10
+  },
+  "inputs": [
+    "geochem_canonical.json"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-bdl/geochem_points.geojson",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-geochem-bdl/geochem_points.meta.json"
+  ],
+  "created_at": "2026-08-27T18:26:11.381479Z"
+}

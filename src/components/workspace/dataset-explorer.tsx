@@ -33,6 +33,26 @@ function RecordRow({ record }: { record: CatalogRecord }) {
     const catalog = await res.json();
     setProjectCatalog(catalog);
   }
+  async function reviewGeochemMapping() {
+    if (!workspaceRoot || !record.geochemMapping) return;
+    const res = await fetch("/api/workspace/catalog/geochem-mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        root: workspaceRoot,
+        catalogId: record.id,
+        mapping: record.geochemMapping,
+        crs: record.crs,
+        units: record.units,
+        medium: record.sampleMedium,
+        lab: record.lab,
+        method: record.analyticalMethod,
+      }),
+    });
+    if (!res.ok) return;
+    const catalog = await res.json();
+    setProjectCatalog(catalog);
+  }
   return (
     <tr
       className={`border-b border-[#3c3c3c] align-top ${spatial ? "cursor-pointer hover:bg-[#2a2d2e]" : ""}`}
@@ -74,6 +94,18 @@ function RecordRow({ record }: { record: CatalogRecord }) {
               </option>
             ))}
           </select>
+        ) : record.adapterId === "geochem-csv" || record.adapterId === "geochem-xyz" ? (
+          <button
+            type="button"
+            data-testid={`geochem-mapping-${record.id}`}
+            className="bg-[#2a2d2e] border border-[#3c3c3c] rounded px-1 py-0.5 text-[11px] text-[#cccccc]"
+            onClick={(e) => {
+              e.stopPropagation();
+              void reviewGeochemMapping();
+            }}
+          >
+            {record.geochemMapping?.reviewed ? "mapping reviewed" : "review mapping"}
+          </button>
         ) : (
           "—"
         )}
@@ -119,8 +151,8 @@ export function DatasetExplorer() {
       <p className="text-sm text-[#858585] mb-4">
         {catalog.records.length} source files
         {catalog.truncated ? " (truncated)" : ""}. Supported {supported}, recognised-unsupported {recognised}, unknown {unknown}.
-        Mixed folders do not start a magnetic workflow. Only supported MagArrow, GSM-19, gravity-contract, ERT, radiometric, GPR, LAS 2.0, and documented GeoJSON records can be processing inputs.
-        Click a raster or vector row to locate it on the map workspace. Shapefile, GeoPackage, LAS/LAZ point clouds, and SEG-Y will not decode as map layers. GeoJSON layer roles are user-assigned and are not inferred from filenames.
+        Mixed folders do not start a magnetic workflow. Only supported MagArrow, GSM-19, gravity-contract, ERT, radiometric, GPR, LAS 2.0, documented GeoJSON, and G-AID GEOCHEM 1.0 records can be processing inputs.
+        Click a raster or vector row to locate it on the map workspace. Shapefile, GeoPackage, LAS/LAZ point clouds, and SEG-Y will not decode as map layers. GeoJSON layer roles are user-assigned and are not inferred from filenames. Geochemistry mappings are user-reviewed; Fe/Cu column names are not a contract.
       </p>
       {catalog.records.length === 0 ? (
         <p className="text-sm text-[#858585]">No source files were catalogued in this folder.</p>
@@ -133,7 +165,7 @@ export function DatasetExplorer() {
               <th className="px-3 py-2 font-medium">Format / media</th>
               <th className="px-3 py-2 font-medium">Confidence</th>
               <th className="px-3 py-2 font-medium">CRS</th>
-              <th className="px-3 py-2 font-medium">Vector role</th>
+              <th className="px-3 py-2 font-medium">Vector role / mapping</th>
               <th className="px-3 py-2 font-medium">Parse errors</th>
             </tr>
           </thead>
