@@ -96,6 +96,10 @@ test("catalog parses valid point, polyline, and polygon shapefiles and does not 
   const lines = byPath(catalog.records, "lines/faults.shp");
   assert.equal(lines.supportStatus, "supported");
   assert.ok(lines.geometryTypes?.includes("LineString"));
+  const shx = catalog.records.find((item) => item.relativePath.replace(/\\/g, "/") === "points/samples.shx");
+  assert.ok(shx);
+  assert.notEqual(shx.adapterId, "shapefile");
+  assert.notEqual(shx.formatId, "shapefile");
 });
 
 test("missing sidecars, unknown CRS, corrupt DBF, PointZ, and invalid geometry stay recognised-unsupported", () => {

@@ -131,6 +131,7 @@ function inspectFromContext(ctx: SniffContext): ShapefileInspect {
 }
 
 function shapefileSniff(ctx: SniffContext): AdapterSniff | null {
+  if (ctx.extension !== "shp" && !ctx.filename.toLowerCase().endsWith(".shp")) return null;
   if (!looksLikeShapefilePeek(ctx.peek)) return null;
   const inspected = inspectFromContext(ctx);
   const ready = shapefileReadyForSupport(inspected);
