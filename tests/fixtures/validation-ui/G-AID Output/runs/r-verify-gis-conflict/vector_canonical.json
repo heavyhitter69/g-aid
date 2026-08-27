@@ -1,0 +1,91 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "product_name": "G-AID documented GeoJSON vector layer",
+      "format": "geojson",
+      "crs_epsg": 32734,
+      "crs": "EPSG:32734",
+      "crs_source": "geojson-crs",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": 0,
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            }
+          ],
+          "properties": {},
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240100.0,
+        "maxX": 260100.0,
+        "maxY": 6240100.0
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "conflict-crs/a.geojson",
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+      ],
+      "errors": [],
+      "formula": "GeoJSON Feature/FeatureCollection with documented EPSG. Overlay is not geological proof.",
+      "catalog_id": "conflict-crs/a.geojson",
+      "checksum": "conflict-crs/a.geojson"
+    },
+    {
+      "product_name": "G-AID documented GeoJSON vector layer",
+      "format": "geojson",
+      "crs_epsg": 4326,
+      "crs": "EPSG:4326",
+      "crs_source": "geojson-crs",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": 0,
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 18.42,
+              "y": -33.92
+            }
+          ],
+          "properties": {},
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 18.42,
+        "minY": -33.92,
+        "maxX": 18.42,
+        "maxY": -33.92
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "conflict-crs/b.geojson",
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+      ],
+      "errors": [],
+      "formula": "GeoJSON Feature/FeatureCollection with documented EPSG. Overlay is not geological proof.",
+      "catalog_id": "conflict-crs/b.geojson",
+      "checksum": "conflict-crs/b.geojson"
+    }
+  ]
+}

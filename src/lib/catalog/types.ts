@@ -138,6 +138,20 @@ export interface CatalogRecord {
   coordinateKind?: "geographic" | "easting-northing" | "unknown";
   locationQuality?: "documented" | "user-confirmed" | "missing";
   collarMappable?: boolean;
+  geometryTypes?: string[];
+  attributeNames?: string[];
+  vectorRole?: {
+    role: "geology" | "structure" | "tenure" | "alteration" | "mine-feature" | "sample-location" | "generic-vector";
+    reviewed: boolean;
+    reviewedAt?: string;
+    source: "user-assigned" | "unassigned";
+  };
+  shapefileSidecars?: {
+    shp: boolean;
+    shx: boolean;
+    dbf: boolean;
+    prj: boolean;
+  };
   provenance: CatalogProvenance;
 }
 

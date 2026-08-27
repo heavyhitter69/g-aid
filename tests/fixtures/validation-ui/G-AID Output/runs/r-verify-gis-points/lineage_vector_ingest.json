@@ -1,0 +1,15 @@
+{
+  "node_id": "vector_ingest",
+  "formula": "Documented GeoJSON ingest",
+  "parameters": {
+    "n": 1
+  },
+  "inputs": [
+    "valid-points/samples.geojson"
+  ],
+  "outputs": [
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-points/vector_canonical.json",
+    "/workspace/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-gis-points/vector_ingest_qc.json"
+  ],
+  "created_at": "2026-08-27T16:39:57.334959Z"
+}

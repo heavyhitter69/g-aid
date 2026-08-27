@@ -18,6 +18,8 @@ export {
   GPR_NODE_ORDER,
   LAS_NODE_DEPS,
   LAS_NODE_ORDER,
+  GIS_NODE_DEPS,
+  GIS_NODE_ORDER,
   KERNEL_NODE_DEPS,
   KERNEL_NODE_ORDER,
 } from "./compile.ts";
@@ -31,5 +33,6 @@ export {
   GRAVITY_DEFAULT,
   GPR_DEFAULT,
   BOREHOLE_DEFAULT,
+  GIS_DEFAULT,
 } from "./propose.ts";
 export { dagForPlan, generateTasksMarkdown, taskNodeIdsFromMarkdown } from "./tasks.ts";

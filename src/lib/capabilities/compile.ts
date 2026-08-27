@@ -65,6 +65,14 @@ export const LAS_NODE_ORDER = [
   "borehole_interpret",
 ] as const;
 
+export const GIS_NODE_ORDER = [
+  "vector_ingest",
+  "vector_view",
+  "vector_overlap",
+  "vector_export",
+  "vector_interpret",
+] as const;
+
 export const KERNEL_NODE_ORDER = [
   ...MAGNETIC_NODE_ORDER,
   ...GRAVITY_NODE_ORDER,
@@ -72,6 +80,7 @@ export const KERNEL_NODE_ORDER = [
   ...RADIO_NODE_ORDER,
   ...GPR_NODE_ORDER,
   ...LAS_NODE_ORDER,
+  ...GIS_NODE_ORDER,
 ] as const;
 
 export const MAGNETIC_NODE_DEPS: Record<string, string[]> = {
@@ -137,6 +146,14 @@ export const LAS_NODE_DEPS: Record<string, string[]> = {
   borehole_interpret: ["las_ingest", "borehole_view", "borehole_map_collar"],
 };
 
+export const GIS_NODE_DEPS: Record<string, string[]> = {
+  vector_ingest: [],
+  vector_view: ["vector_ingest"],
+  vector_overlap: ["vector_ingest"],
+  vector_export: ["vector_ingest"],
+  vector_interpret: ["vector_ingest", "vector_view", "vector_overlap"],
+};
+
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...MAGNETIC_NODE_DEPS,
   ...GRAVITY_NODE_DEPS,
@@ -144,6 +161,7 @@ export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...RADIO_NODE_DEPS,
   ...GPR_NODE_DEPS,
   ...LAS_NODE_DEPS,
+  ...GIS_NODE_DEPS,
 };
 
 const NODE_LABELS: Record<string, string> = {
@@ -192,6 +210,11 @@ const NODE_LABELS: Record<string, string> = {
   borehole_view: "Build measured-depth log tracks",
   borehole_map_collar: "Map borehole collar when coordinates and CRS are documented",
   borehole_interpret: "Borehole interpretation limits",
+  vector_ingest: "Read bound documented GeoJSON catalog records",
+  vector_view: "Build source vector viewer metadata",
+  vector_overlap: "Same-CRS geometric overlap table (not geological proof)",
+  vector_export: "Export ingested vectors as GeoJSON",
+  vector_interpret: "GIS interpretation limits",
 };
 
 export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
@@ -212,11 +235,12 @@ export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
 function ownerCapability(
   nodeId: string,
   expanded: UserCapabilityId[]
-): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" {
+): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" | "gis.prereq" {
   for (const id of expanded) {
     const capability = getCapability(id);
     if (capability?.kernelNodeIds.includes(nodeId)) return id;
   }
+  if (nodeFamily(nodeId) === "gis") return "gis.prereq";
   if (nodeFamily(nodeId) === "borehole") return "borehole.prereq";
   if (nodeFamily(nodeId) === "gpr") return "gpr.prereq";
   if (nodeFamily(nodeId) === "rad") return "rad.prereq";
@@ -225,7 +249,8 @@ function ownerCapability(
   return "mag.prereq";
 }
 
-function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "borehole" {
+function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "borehole" | "gis" {
+  if ((GIS_NODE_ORDER as readonly string[]).includes(nodeId)) return "gis";
   if ((LAS_NODE_ORDER as readonly string[]).includes(nodeId)) return "borehole";
   if ((GPR_NODE_ORDER as readonly string[]).includes(nodeId)) return "gpr";
   if ((RADIO_NODE_ORDER as readonly string[]).includes(nodeId)) return "rad";
@@ -234,7 +259,7 @@ function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "b
   return "mag";
 }
 
-/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, GPR, and borehole never wait on each other. */
+/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, GPR, borehole, and GIS never wait on each other. */
 export function remapKernelDeps(nodeId: string, compiled: Set<string>): string[] {
   const original = KERNEL_NODE_DEPS[nodeId] || [];
   const present = original.filter((dep) => compiled.has(dep));
@@ -275,7 +300,8 @@ export function compileCapabilityDag(requested: string[]): CompiledDag {
       capabilityId === "ert.prereq" ||
       capabilityId === "rad.prereq" ||
       capabilityId === "gpr.prereq" ||
-      capabilityId === "borehole.prereq"
+      capabilityId === "borehole.prereq" ||
+      capabilityId === "gis.prereq"
         ? undefined
         : getCapability(capabilityId);
     nodes.push({

@@ -53,6 +53,8 @@ export interface RasterGrid {
 export interface VectorFeature {
   type: "Point" | "LineString" | "Polygon";
   coordinates: { x: number; y: number }[];
+  id?: string | number;
+  properties?: Record<string, unknown>;
 }
 
 export interface VectorLayerData {
@@ -82,6 +84,12 @@ export interface MapLayerSpec {
   reason?: string;
   representation: "full" | "preview" | "undecoded";
   warnings?: string[];
+  vectorRole?: {
+    role: string;
+    reviewed: boolean;
+  };
+  attributeNames?: string[];
+  geometryTypes?: string[];
 }
 
 export interface OverlayDecision {

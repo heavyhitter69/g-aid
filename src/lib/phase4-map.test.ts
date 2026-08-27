@@ -266,7 +266,7 @@ test("unsupported formats cannot appear as falsely decoded layers", () => {
   const catalog = buildProjectCatalog(root);
   const layers = buildMapLayers({ catalog, files: [] });
 
-  for (const formatId of ["shapefile", "las-point-cloud", "segy"]) {
+  for (const formatId of ["shapefile", "geopackage", "las-point-cloud", "segy"]) {
     assert.equal(isFalselyDecodable(formatId), true);
   }
 

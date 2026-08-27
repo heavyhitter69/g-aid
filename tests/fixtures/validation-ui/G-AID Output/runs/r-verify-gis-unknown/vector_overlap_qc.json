@@ -1,0 +1,6 @@
+{
+  "skipped": true,
+  "reason": "gis_overlap_needs_two_layers",
+  "message": "Spatial overlap needs at least two documented same-CRS vector layers. I will not invent a second layer.",
+  "geological_certainty_improved": false
+}

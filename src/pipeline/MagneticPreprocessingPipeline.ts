@@ -63,6 +63,11 @@ const NODE_SCRIPTS: Record<string, string> = {
   borehole_view: SCIENCE,
   borehole_map_collar: SCIENCE,
   borehole_interpret: SCIENCE,
+  vector_ingest: SCIENCE,
+  vector_view: SCIENCE,
+  vector_overlap: SCIENCE,
+  vector_export: SCIENCE,
+  vector_interpret: SCIENCE,
 };
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
@@ -74,6 +79,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     // Radiometrics uses this same engine. Do not add a RadiometricsPipeline execution route.
     // GPR uses this same engine. Do not add a GprPipeline execution route.
     // LAS borehole uses this same engine. Do not add a WellLogPipeline / BoreholePipeline execution route.
+    // GIS vectors use this same engine. Do not add a GisPipeline / VectorPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
     for (const id of KERNEL_NODE_ORDER) {
@@ -120,6 +126,19 @@ export class RadiometricPipeline extends PipelineEngine {
 
 /** Unused stub. LAS borehole executes through MagneticPreprocessingPipeline + compileCapabilityDag. */
 export class WellLogPipeline extends PipelineEngine {
+  constructor() {
+    super();
+  }
+}
+
+/** Unused stub. GIS vectors execute through MagneticPreprocessingPipeline + compileCapabilityDag. */
+export class GisPipeline extends PipelineEngine {
+  constructor() {
+    super();
+  }
+}
+
+export class VectorPipeline extends PipelineEngine {
   constructor() {
     super();
   }

@@ -63,6 +63,7 @@ export function intentToSteps(
   if (intent === "radiometrics") next.radiometrics = true;
   if (intent === "gpr") next.gpr = true;
   if (intent === "borehole") next.borehole = true;
+  if (intent === "gis") next.gisVector = true;
 
   const mag =
     intent === "diurnal" ||
@@ -92,7 +93,7 @@ export function inferIntentFromFiles(
 ): AnalysisIntent | "none" {
   if (detected) return detected;
   const m = message.toLowerCase();
-  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b)\b/.test(m)) {
+  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay)\b/.test(m)) {
     return detectAnalysisIntent(message) || "none";
   }
   void index;
@@ -153,6 +154,9 @@ export function collectPlanInputs(
       coordinateKind: record.coordinateKind,
       locationQuality: record.locationQuality,
       collarMappable: record.collarMappable,
+      geometryTypes: record.geometryTypes,
+      attributeNames: record.attributeNames,
+      vectorRole: record.vectorRole,
     }));
   }
   void index;

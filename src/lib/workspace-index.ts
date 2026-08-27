@@ -102,7 +102,8 @@ export type AnalysisIntent =
   | "seismic"
   | "radiometrics"
   | "gpr"
-  | "borehole";
+  | "borehole"
+  | "gis";
 
 export function splitUserAndContext(message: string): { userText: string; context: string } {
   const match = message.match(/\n\n--- (?:Workspace|File Context) ---/);
@@ -125,6 +126,17 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   if (/\b(ert|resistivity|wenner|schlumberger|dipole[\s-]?dipole|pseudosection)\b/.test(m)) return "resistivity";
   if (/\b(bouguer|free[\s-]?air|gravity|mgal)\b/.test(m)) return "gravity";
   if (/\b(radiometr|spectrometer|nasvd)\b/.test(m)) return "radiometrics";
+  const otherSurvey =
+    /\b(gpr|ground[\s-]?penetrating|radargram|borehole|well[\s-]?log|cwls|\blas\b|segy|seismic|ert|resistivity|bouguer|gravity|mgal|radiometr|magarrow|tmi|igrf|airborne mag|gsm-?19|diurnal)\b/.test(
+      m
+    );
+  const gisTokens =
+    /\b(geojson|shapefile|geopackage|\.gpkg\b|vector overlay|spatial overlap|geology layer|tenure layer|fault layer|vector ingest)\b/.test(
+      m
+    );
+  if (!otherSurvey && gisTokens && (wantsWork || /\bspatial overlap\b|\bvector ingest\b|\bvector overlay\b/.test(m))) {
+    return "gis";
+  }
   const diurnal =
     /\bdiurnal\b/.test(m) ||
     (/\bbase[\s-]?station\b/.test(m) && /\b(correct|correction|reduc)/.test(m));

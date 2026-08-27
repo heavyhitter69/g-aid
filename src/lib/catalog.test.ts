@@ -141,6 +141,9 @@ test("catalog classifies mixed folder without defaulting to magnetics", () => {
 
     const shp = byPath(catalog.records, "gis/clip.shp");
     assert.equal(shp.formatId, "shapefile");
+    assert.equal(shp.supportStatus, "recognised-unsupported");
+    assert.equal(shp.shapefileSidecars?.shx, false);
+    assert.ok(shp.parseErrors?.some((line) => /sidecar/i.test(line)));
 
     const well = byPath(catalog.records, "logs/well.las");
     assert.equal(well.formatId, "las-well");

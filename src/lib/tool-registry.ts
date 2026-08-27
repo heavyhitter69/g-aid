@@ -1,7 +1,7 @@
 /**
  * ScientificTool registry — kernel bindings from the live capability registry.
  * Seismic is not registered for execution. Radiometrics and GPR use the same
- * engine as magnetics/gravity/ERT. Do not add a RadiometricsPipeline, GprPipeline, or BoreholePipeline.
+ * engine as magnetics/gravity/ERT. Do not add a RadiometricsPipeline, GprPipeline, BoreholePipeline, or GisPipeline.
  */
 
 import crypto from "crypto";
@@ -65,6 +65,11 @@ const NODE_SCRIPTS: Record<string, string> = {
   borehole_view: SCIENCE,
   borehole_map_collar: SCIENCE,
   borehole_interpret: SCIENCE,
+  vector_ingest: SCIENCE,
+  vector_view: SCIENCE,
+  vector_overlap: SCIENCE,
+  vector_export: SCIENCE,
+  vector_interpret: SCIENCE,
 };
 
 function toolsFromLiveRegistry(): ScientificTool[] {

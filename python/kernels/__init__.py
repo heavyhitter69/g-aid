@@ -87,6 +87,11 @@ def get_handler(node_id: str):
         "borehole_view": borehole_view,
         "borehole_map_collar": borehole_map_collar,
         "borehole_interpret": borehole_interpret,
+        "vector_ingest": vector_ingest,
+        "vector_view": vector_view,
+        "vector_overlap": vector_overlap,
+        "vector_export": vector_export,
+        "vector_interpret": vector_interpret,
         "crs_reproject": crs_reproject,
         "xyz_ingest": xyz_ingest,
     }
@@ -939,6 +944,31 @@ def borehole_map_collar(payload: dict) -> dict:
 
 def borehole_interpret(payload: dict) -> dict:
     from kernels.borehole import borehole_interpret as impl
+    return impl(payload)
+
+
+def vector_ingest(payload: dict) -> dict:
+    from kernels.vector import vector_ingest as impl
+    return impl(payload)
+
+
+def vector_view(payload: dict) -> dict:
+    from kernels.vector import vector_view as impl
+    return impl(payload)
+
+
+def vector_overlap(payload: dict) -> dict:
+    from kernels.vector import vector_overlap as impl
+    return impl(payload)
+
+
+def vector_export(payload: dict) -> dict:
+    from kernels.vector import vector_export as impl
+    return impl(payload)
+
+
+def vector_interpret(payload: dict) -> dict:
+    from kernels.vector import vector_interpret as impl
     return impl(payload)
 
 

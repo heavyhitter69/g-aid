@@ -1,0 +1,6 @@
+{
+  "kind": "gis-vector",
+  "crs_required_for_overlay": true,
+  "silent_reprojection": false,
+  "role_inferred_from_filename": false
+}

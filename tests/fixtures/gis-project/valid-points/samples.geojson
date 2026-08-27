@@ -1,0 +1,43 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "s1",
+      "properties": {
+        "SAMPLE_ID": "A1",
+        "ROCK": "unknown-field",
+        "GRADE": 0.12
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260100,
+          6240100
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "s2",
+      "properties": {
+        "SAMPLE_ID": "A2",
+        "ROCK": "unknown-field",
+        "GRADE": 0.08
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260180,
+          6240180
+        ]
+      }
+    }
+  ]
+}

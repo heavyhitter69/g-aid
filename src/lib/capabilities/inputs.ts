@@ -101,5 +101,8 @@ export function catalogInputsPayload(workspaceRoot: string, inputs: BoundInput[]
     collarMappable: item.collarMappable,
     lasVersion: item.lasVersion,
     wrap: item.wrap,
+    geometryTypes: item.geometryTypes,
+    attributeNames: item.attributeNames,
+    vectorRole: item.vectorRole,
   }));
 }

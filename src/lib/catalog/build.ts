@@ -18,6 +18,7 @@ import { RUNS_SUBDIR } from "../run-layout.ts";
 import type { SniffContext } from "./adapters/types.ts";
 import { mergeGravityMappingFromPrevious } from "./gravity-mapping.ts";
 import { mergeRadioMappingFromPrevious } from "./radio-mapping.ts";
+import { mergeVectorRoleFromPrevious } from "./vector-role.ts";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -60,9 +61,26 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
   const parseErrors: string[] = [];
   let peek = Buffer.alloc(0);
   try {
-    peek = peekFile(absPath, stat.size, extension === "las" ? 65536 : undefined);
+    peek = peekFile(absPath, stat.size, extension === "las" || extension === "geojson" ? 65536 : undefined);
   } catch (err) {
     parseErrors.push(`Peek failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const parent = path.dirname(absPath);
+  let siblingNames: string[] = [];
+  try {
+    siblingNames = fs.readdirSync(parent);
+  } catch {
+    siblingNames = [];
+  }
+  const stem = filename.replace(/\.[^.]+$/, "");
+  const prjSibling = siblingNames.find((name) => name.toLowerCase() === `${stem.toLowerCase()}.prj`);
+  let companionPrjText: string | undefined;
+  if (prjSibling) {
+    try {
+      companionPrjText = fs.readFileSync(path.join(parent, prjSibling), "utf8").slice(0, 8000);
+    } catch {
+      companionPrjText = undefined;
+    }
   }
   const ctx: SniffContext = {
     relativePath,
@@ -72,6 +90,8 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     peek,
     peekText: peekText(peek),
     absPath,
+    siblingNames,
+    companionPrjText,
   };
   const classified = classifyPeek(ctx);
   if (classified.sniff?.parseErrors) parseErrors.push(...classified.sniff.parseErrors);
@@ -146,6 +166,10 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     coordinateKind: classified.inspect.coordinateKind,
     locationQuality: classified.inspect.locationQuality,
     collarMappable: classified.inspect.collarMappable,
+    geometryTypes: classified.inspect.geometryTypes,
+    attributeNames: classified.inspect.attributeNames,
+    vectorRole: classified.inspect.vectorRole,
+    shapefileSidecars: classified.inspect.shapefileSidecars,
     provenance: {
       method: classified.method,
       adapterId: classified.adapterId || undefined,
@@ -287,7 +311,10 @@ export function buildProjectCatalog(root: string, options: BuildCatalogOptions =
   walk(resolvedRoot);
   records.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   const merged = records.map((record) =>
-    mergeRadioMappingFromPrevious(mergeGravityMappingFromPrevious(record, options.previous), options.previous)
+    mergeVectorRoleFromPrevious(
+      mergeRadioMappingFromPrevious(mergeGravityMappingFromPrevious(record, options.previous), options.previous),
+      options.previous
+    )
   );
 
   return {

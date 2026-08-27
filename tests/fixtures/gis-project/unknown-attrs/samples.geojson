@@ -1,0 +1,26 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "properties": {
+        "FOO": "bar",
+        "UNIT": "X"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260120,
+          6240120
+        ]
+      }
+    }
+  ]
+}

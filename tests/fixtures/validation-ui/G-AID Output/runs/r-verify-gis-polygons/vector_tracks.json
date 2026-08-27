@@ -1,0 +1,65 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "layers": [
+    {
+      "source_path": "valid-polygons/geology.geojson",
+      "catalog_id": "valid-polygons/geology.geojson",
+      "crs": "EPSG:32734",
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "LITHOLOGY",
+        "UNIT"
+      ],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 260000.0,
+        "minY": 6240000.0,
+        "maxX": 260300.0,
+        "maxY": 6240300.0
+      },
+      "features": [
+        {
+          "id": "g1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260000.0,
+              "y": 6240000.0
+            },
+            {
+              "x": 260300.0,
+              "y": 6240000.0
+            },
+            {
+              "x": 260300.0,
+              "y": 6240300.0
+            },
+            {
+              "x": 260000.0,
+              "y": 6240300.0
+            },
+            {
+              "x": 260000.0,
+              "y": 6240000.0
+            }
+          ],
+          "properties": {
+            "UNIT": "Qal",
+            "LITHOLOGY": "alluvium"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

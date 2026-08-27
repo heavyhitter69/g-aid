@@ -6,6 +6,7 @@ import { ertCsvAdapter, ertDatAdapter } from "./adapters/ert.ts";
 import { radiometricCsvAdapter, radiometricSpectrumAdapter, radiometricXyzAdapter } from "./adapters/radio.ts";
 import { gprCsvAdapter, gprDztAdapter } from "./adapters/gpr.ts";
 import { lasWellAdapter } from "./adapters/las.ts";
+import { geojsonAdapter } from "./adapters/geojson.ts";
 import { recognisedAdapters } from "./adapters/recognised.ts";
 import type { CatalogAdapter } from "./adapters/types.ts";
 
@@ -23,6 +24,7 @@ const adapters: CatalogAdapter[] = [
   gprCsvAdapter,
   gprDztAdapter,
   lasWellAdapter,
+  geojsonAdapter,
   ...recognisedAdapters,
 ];
 

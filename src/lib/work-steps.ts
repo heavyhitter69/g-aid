@@ -54,6 +54,11 @@ const NODE_LABELS: Record<string, { running: string; done: string }> = {
   borehole_view: { running: "Building measured-depth log tracks", done: "Wrote measured-depth log tracks" },
   borehole_map_collar: { running: "Mapping borehole collar", done: "Wrote borehole collar" },
   borehole_interpret: { running: "Writing borehole interpretation limits", done: "Wrote borehole interpretation limits" },
+  vector_ingest: { running: "Reading documented GeoJSON vectors", done: "Read documented GeoJSON vectors" },
+  vector_view: { running: "Building vector viewer metadata", done: "Wrote vector viewer metadata" },
+  vector_overlap: { running: "Computing same-CRS geometric overlap", done: "Wrote geometric overlap table" },
+  vector_export: { running: "Exporting GeoJSON vectors", done: "Exported GeoJSON vectors" },
+  vector_interpret: { running: "Writing GIS interpretation limits", done: "Wrote GIS interpretation limits" },
   excel_export_adapter: { running: "Writing tables", done: "Wrote tables" },
   report_export_adapter: { running: "Writing QC notes", done: "Wrote QC notes" },
 };

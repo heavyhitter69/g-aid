@@ -1,5 +1,5 @@
 /**
- * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, GPR, and LAS borehole are the registered packs.
+ * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, GPR, LAS borehole, and documented GeoJSON vectors are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -42,6 +42,11 @@ export const USER_CAPABILITY_IDS = [
   "borehole.view_logs",
   "borehole.map_collar",
   "borehole.interpret",
+  "gis.vector_ingest",
+  "gis.vector_view",
+  "gis.spatial_overlap",
+  "gis.export_vector",
+  "gis.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -57,7 +62,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log" | "gis-vector";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -75,7 +80,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr" | "borehole";
+  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr" | "borehole" | "gis";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -93,7 +98,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" | "borehole.prereq" | "gis.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -179,4 +184,12 @@ export interface BoundInput {
   coordinateKind?: "geographic" | "easting-northing" | "unknown";
   locationQuality?: "documented" | "user-confirmed" | "missing";
   collarMappable?: boolean;
+  geometryTypes?: string[];
+  attributeNames?: string[];
+  vectorRole?: {
+    role: "geology" | "structure" | "tenure" | "alteration" | "mine-feature" | "sample-location" | "generic-vector";
+    reviewed: boolean;
+    reviewedAt?: string;
+    source: "user-assigned" | "unassigned";
+  };
 }

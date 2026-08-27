@@ -230,6 +230,7 @@ export function GridMapView({
   note,
   overlay,
   overlayLines,
+  overlayPolygons,
   units = "nT",
   warnings,
   opacity = 1,
@@ -242,6 +243,7 @@ export function GridMapView({
   note?: string;
   overlay?: { x: number; y: number }[];
   overlayLines?: { x: number; y: number }[][];
+  overlayPolygons?: { x: number; y: number }[][];
   units?: string;
   warnings?: string[];
   opacity?: number;
@@ -259,6 +261,7 @@ export function GridMapView({
   const [showHillshade, setShowHillshade] = useState(true);
   const [showContours, setShowContours] = useState(true);
   const [showLineaments, setShowLineaments] = useState(true);
+  const [showPolygons, setShowPolygons] = useState(true);
   const [cursor, setCursor] = useState<string>("");
   const [fitted, setFitted] = useState(0);
   const profileA = useRef<{ x: number; y: number } | null>(null);
@@ -288,6 +291,7 @@ export function GridMapView({
 
   const sampledOverlay = useMemo(() => downsample(overlay || [], 40000), [overlay]);
   const sampledLines = useMemo(() => (overlayLines || []).slice(0, 4000), [overlayLines]);
+  const sampledPolygons = useMemo(() => (overlayPolygons || []).slice(0, 2000), [overlayPolygons]);
   const contourCache = useMemo(() => {
     if (!grid || !stats) return [];
     const lo = stretch === "pct" ? stats.p2 : stats.min;
@@ -380,6 +384,26 @@ export function GridMapView({
         ctx.stroke();
       }
     }
+    if (showPolygons && sampledPolygons.length) {
+      ctx.fillStyle = "rgba(78, 201, 176, 0.28)";
+      ctx.strokeStyle = "rgba(78, 201, 176, 0.95)";
+      ctx.lineWidth = 1.5;
+      for (const ring of sampledPolygons) {
+        if (ring.length < 3) continue;
+        ctx.beginPath();
+        ring.forEach((p, i) => {
+          const col = (p.x - grid.xllcorner) / grid.cellsize;
+          const row = grid.nrows - (p.y - grid.yllcorner) / grid.cellsize;
+          const sx = panX + col * scale;
+          const sy = panY + row * scale;
+          if (i === 0) ctx.moveTo(sx, sy);
+          else ctx.lineTo(sx, sy);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
     if (showLineaments && sampledLines.length) {
       ctx.strokeStyle = "rgba(255, 214, 102, 0.95)";
       ctx.lineWidth = 1.5;
@@ -400,7 +424,7 @@ export function GridMapView({
     const lo = stretch === "pct" ? stats.p2 : stats.min;
     const hi = stretch === "pct" ? stats.p98 : stats.max;
     drawMapChrome(ctx, w, h, grid.cellsize, scale, ramp, lo, hi);
-  }, [grid, sampledOverlay, sampledLines, showPath, showContours, showLineaments, contourCache, stats, stretch, ramp, opacity]);
+  }, [grid, sampledOverlay, sampledLines, sampledPolygons, showPath, showContours, showLineaments, showPolygons, contourCache, stats, stretch, ramp, opacity]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -510,7 +534,7 @@ export function GridMapView({
           {sampledOverlay.length > 0 && (
             <label className="flex items-center gap-1 text-[#858585]">
               <input type="checkbox" checked={showPath} onChange={(e) => setShowPath(e.target.checked)} />
-              Flight path
+              Points
             </label>
           )}
           <label className="flex items-center gap-1 text-[#858585]">
@@ -524,7 +548,13 @@ export function GridMapView({
           {sampledLines.length > 0 && (
             <label className="flex items-center gap-1 text-[#858585]">
               <input type="checkbox" checked={showLineaments} onChange={(e) => setShowLineaments(e.target.checked)} />
-              Lineaments
+              Lines
+            </label>
+          )}
+          {sampledPolygons.length > 0 && (
+            <label className="flex items-center gap-1 text-[#858585]">
+              <input type="checkbox" checked={showPolygons} onChange={(e) => setShowPolygons(e.target.checked)} />
+              Polygons
             </label>
           )}
           <span className="text-[#858585] font-mono hidden sm:inline">

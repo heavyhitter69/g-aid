@@ -17,6 +17,7 @@ export { adapterRegistry, getAdapter, supportedAdapterIds } from "./registry.ts"
 export { classifyPeek, isSupportedProcessingRecord } from "./classify.ts";
 export { applyReviewedGravityMapping } from "./gravity-mapping.ts";
 export { applyReviewedRadioMapping } from "./radio-mapping.ts";
+export { applyReviewedVectorRole, mergeVectorRoleFromPrevious } from "./vector-role.ts";
 export {
   GRAVITY_ADAPTER_IDS,
   inspectGravityText,
@@ -29,7 +30,13 @@ export {
   ternaryJustified,
   ratioJustified,
 } from "./radio-contract.ts";
-export { inspectDemText, demReadyForSupport, DEM_ASCII_FORMAT } from "./dem-contract.ts";
+export {
+  VECTOR_ROLES,
+  UNASSIGNED_VECTOR_ROLE,
+  inspectGeojsonText,
+  geojsonReadyForSupport,
+  GEOJSON_ADAPTER_ID,
+} from "./geojson-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";
 export {

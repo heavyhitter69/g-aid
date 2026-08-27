@@ -60,6 +60,7 @@ const SUPPORTED_ADAPTER_IDS = new Set([
   "radiometric-xyz",
   "gpr-csv",
   "las-well",
+  "geojson",
 ]);
 
 export function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {

@@ -8,7 +8,7 @@ import { folderOf } from "@/lib/job-results";
 import { companionAsciiPath } from "@/lib/survey-file-kinds";
 import { compareRunLayers, provenanceLabel } from "@/lib/map/compare";
 import { overlayDecision, crsFromPrj, type CrsInfo } from "@/lib/map/crs";
-import { parseGeojson, pointsFromVector, linesFromVector } from "@/lib/map/geojson";
+import { parseGeojson, pointsFromVector, linesFromVector, polygonsFromVector } from "@/lib/map/geojson";
 import { sampleProfile, type ProfileResult } from "@/lib/map/inspect";
 import {
   buildMapLayers,
@@ -29,12 +29,38 @@ import { gravityProductWarnings } from "@/lib/gravity-product";
 import { radioProductWarnings } from "@/lib/radio-product";
 import { gprProductWarnings, gprProductWarningsFromQc } from "@/lib/gpr-product";
 import { boreholeProductWarnings, layersOverlappingCollar } from "@/lib/borehole-product";
+import { gisProductWarnings, layersOverlappingVectors } from "@/lib/gis-product";
 import { isRadioTernaryPath, parseRadioTernaryJson } from "@/lib/radio/ternary";
 import { TernaryView } from "@/components/workspace/ternary-view";
 
 interface LayerUiState {
   visible: boolean;
   opacity: number;
+}
+
+function vectorExtent(features: { coordinates: { x: number; y: number }[] }[]): {
+  xllcorner: number;
+  yllcorner: number;
+  cellsize: number;
+} {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const feature of features) {
+    for (const p of feature.coordinates) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+  }
+  if (!Number.isFinite(minX)) {
+    return { xllcorner: 0, yllcorner: 0, cellsize: 1 };
+  }
+  const span = Math.max(maxX - minX, maxY - minY, 1);
+  const pad = Math.max(span * 0.08, 1);
+  return { xllcorner: minX - pad, yllcorner: minY - pad, cellsize: (span + 2 * pad) / 2 };
 }
 
 function originBadge(origin: MapLayerSpec["origin"]): string {
@@ -310,57 +336,101 @@ export function VisualizationStudio() {
   }, [workspaceRoot, active]);
 
   const activeCrs = prjCrs ? crsFromPrj(prjCrs) : active?.crs || vector?.crs;
-  const overlayLayer = viewable.find(
-    (layer) =>
-      layer.id !== active?.id &&
-      layer.formatId === "geojson" &&
-      ui[layer.id]?.visible &&
-      (layer.origin === "derived-run" || layer.path.toLowerCase().includes("flight_path"))
+  const overlayLayers = useMemo(
+    () =>
+      orderedLayers.filter(
+        (layer) =>
+          layer.id !== active?.id &&
+          layer.formatId === "geojson" &&
+          layer.displayStatus === "viewable" &&
+          ui[layer.id]?.visible
+      ),
+    [orderedLayers, active?.id, ui]
   );
 
   const [overlayPrj, setOverlayPrj] = useState<string>("");
   const [overlayParsedCrs, setOverlayParsedCrs] = useState<CrsInfo | undefined>(undefined);
   const [overlayPts, setOverlayPts] = useState<{ x: number; y: number }[]>([]);
   const [overlayLines, setOverlayLines] = useState<{ x: number; y: number }[][]>([]);
+  const [overlayPolygons, setOverlayPolygons] = useState<{ x: number; y: number }[][]>([]);
+  const [overlayBlock, setOverlayBlock] = useState<string>("");
   useEffect(() => {
     const desktop = window.gaidDesktop;
-    if (!overlayLayer || !workspaceRoot || !desktop?.readWorkspaceFile) {
+    if (!overlayLayers.length || !workspaceRoot || !desktop?.readWorkspaceFile) {
       setOverlayPrj("");
       setOverlayParsedCrs(undefined);
       setOverlayPts([]);
       setOverlayLines([]);
+      setOverlayPolygons([]);
+      setOverlayBlock("");
       return;
     }
-    const prj = overlayLayer.path.replace(/\.(geojson)$/i, ".prj");
     let cancelled = false;
-    void Promise.all([
-      desktop.readWorkspaceFile(workspaceRoot, overlayLayer.path),
-      desktop.readWorkspaceFile(workspaceRoot, prj).catch(() => ({ text: "" })),
-    ]).then(([file, prjFile]) => {
-      if (cancelled) return;
-      const parsed = file?.text ? parseGeojson(file.text) : null;
-      setOverlayPrj(prjFile?.text || "");
-      setOverlayParsedCrs(parsed?.crs);
-      setOverlayPts(parsed ? pointsFromVector(parsed.data) : []);
-      setOverlayLines(parsed ? linesFromVector(parsed.data) : []);
-    }).catch(() => {
-      if (!cancelled) {
-        setOverlayPrj("");
-        setOverlayParsedCrs(undefined);
-        setOverlayPts([]);
-        setOverlayLines([]);
-      }
-    });
+    void Promise.all(
+      overlayLayers.map((layer) => {
+        const prj = layer.path.replace(/\.(geojson)$/i, ".prj");
+        return Promise.all([
+          desktop.readWorkspaceFile(workspaceRoot, layer.path),
+          desktop.readWorkspaceFile(workspaceRoot, prj).catch(() => ({ text: "" })),
+        ]).then(([file, prjFile]) => ({ layer, file, prjFile }));
+      })
+    )
+      .then((packs) => {
+        if (cancelled) return;
+        const pts: { x: number; y: number }[] = [];
+        const lines: { x: number; y: number }[][] = [];
+        const polygons: { x: number; y: number }[][] = [];
+        const blocked: string[] = [];
+        let firstCrs: CrsInfo | undefined;
+        let firstPrj = "";
+        for (const pack of packs) {
+          const parsed = pack.file?.text ? parseGeojson(pack.file.text) : null;
+          const prjCrs = pack.prjFile?.text ? crsFromPrj(pack.prjFile.text) : undefined;
+          const layerCrs = prjCrs || pack.layer.crs || parsed?.crs;
+          const decision = overlayDecision(activeCrs, layerCrs);
+          if (!decision.allowed) {
+            blocked.push(`${pack.layer.label}: ${decision.message}`);
+            continue;
+          }
+          if (parsed) {
+            pts.push(...pointsFromVector(parsed.data));
+            lines.push(...linesFromVector(parsed.data));
+            polygons.push(...polygonsFromVector(parsed.data));
+          }
+          if (!firstCrs && layerCrs) firstCrs = layerCrs;
+          if (!firstPrj && pack.prjFile?.text) firstPrj = pack.prjFile.text;
+        }
+        setOverlayPrj(firstPrj);
+        setOverlayParsedCrs(firstCrs);
+        setOverlayPts(pts);
+        setOverlayLines(lines);
+        setOverlayPolygons(polygons);
+        setOverlayBlock(blocked.join(" "));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOverlayPrj("");
+          setOverlayParsedCrs(undefined);
+          setOverlayPts([]);
+          setOverlayLines([]);
+          setOverlayPolygons([]);
+          setOverlayBlock("");
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [overlayLayer, workspaceRoot]);
+  }, [overlayLayers, workspaceRoot, activeCrs]);
 
   const overlayCrs: CrsInfo | undefined = overlayPrj
     ? crsFromPrj(overlayPrj)
-    : overlayLayer?.crs || overlayParsedCrs;
-  const overlayDecisionResult = overlayLayer ? overlayDecision(activeCrs, overlayCrs) : null;
-  const overlayAllowed = Boolean(overlayDecisionResult?.allowed);
+    : overlayLayers[0]?.crs || overlayParsedCrs;
+  const overlayDecisionResult = overlayBlock
+    ? { allowed: false, message: overlayBlock }
+    : overlayLayers.length
+      ? overlayDecision(activeCrs, overlayCrs)
+      : null;
+  const overlayAllowed = Boolean(overlayLayers.length) && !overlayBlock && Boolean(overlayDecisionResult?.allowed !== false);
 
   const geojsonExtentNote =
     active?.formatId === "geojson"
@@ -447,12 +517,26 @@ export function VisualizationStudio() {
     return layersOverlappingCollar(sources, { x: pt.x, y: pt.y, crs: activeCrs?.key });
   }, [active, vector, orderedLayers, projectCatalog, activeCrs]);
 
+  const vectorOverlapHits = useMemo(() => {
+    const sources = orderedLayers
+      .filter((layer) => layer.formatId === "geojson" && layer.bbox)
+      .map((layer) => ({
+        path: layer.path,
+        label: layer.label,
+        formatId: layer.formatId,
+        bbox: layer.bbox,
+        crs: layer.crs,
+        id: layer.id,
+      }));
+    return layersOverlappingVectors(sources);
+  }, [orderedLayers]);
+
   const quantity = raster?.quantity || sidecar.quantity || ternary?.quantity || "";
   const recordedUnits = raster?.units || sidecar.units || ternary?.units || active?.units;
   const units = mapValueUnits(active?.path || "", active?.formatId, recordedUnits);
 
   const warnings = [
-    overlayDecisionResult && !overlayDecisionResult.allowed ? overlayDecisionResult.message : "",
+    overlayBlock || (overlayDecisionResult && !overlayDecisionResult.allowed ? overlayDecisionResult.message : ""),
     active?.reason && active.displayStatus !== "viewable" ? active.reason : "",
     raster?.previewNote,
     vector?.data.previewNote,
@@ -466,6 +550,15 @@ export function VisualizationStudio() {
       : []),
     ...(active && isBoreholeCollarPath(active.path)
       ? boreholeProductWarnings({ path: active.path, collarMapped: true, crs: activeCrs?.key })
+      : []),
+    ...(active?.formatId === "geojson"
+      ? gisProductWarnings({
+          path: active.path,
+          role: active.vectorRole?.role,
+          roleReviewed: active.vectorRole?.reviewed,
+          crs: activeCrs?.key,
+          overlapComputed: overlayAllowed,
+        })
       : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
@@ -578,6 +671,8 @@ export function VisualizationStudio() {
                   <div className="text-[10px] text-[#858585] pl-5 leading-snug">
                     {originBadge(layer.origin)} · {layer.displayStatus}
                     {layer.supportStatus ? ` · ${layer.supportStatus}` : ""}
+                    {layer.crs?.label ? ` · ${layer.crs.label}` : " · CRS unknown"}
+                    {layer.vectorRole?.reviewed ? ` · role ${layer.vectorRole.role}` : layer.formatId === "geojson" ? " · role unassigned" : ""}
                   </div>
                   <div className="text-[10px] text-[#6a6a6a] pl-5 truncate">{provenanceLabel(layer)}</div>
                 </button>
@@ -613,7 +708,7 @@ export function VisualizationStudio() {
           })}
         </ul>
         <p className="px-3 py-2 text-[10px] text-[#6a6a6a] leading-snug border-t border-[#2b2b2b]">
-          Display is not processing. Shapefile, LAS/LAZ point clouds, FileGDB, and SEG-Y stay undecoded. LAS well logs use the log viewer, not LiDAR.
+          Display is not processing. Shapefile, GeoPackage, LAS/LAZ point clouds, FileGDB, and SEG-Y stay undecoded. Spatial overlay is not geological proof.
         </p>
       </aside>
       <div className="flex-1 min-w-0 min-h-0 relative flex flex-col">
@@ -640,20 +735,47 @@ export function VisualizationStudio() {
                 grid={{
                   ncols: 2,
                   nrows: 2,
-                  xllcorner: (vector.data.features[0]?.coordinates[0]?.x ?? 0) - 1,
-                  yllcorner: (vector.data.features[0]?.coordinates[0]?.y ?? 0) - 1,
-                  cellsize: 1,
+                  xllcorner: vectorExtent(vector.data.features).xllcorner,
+                  yllcorner: vectorExtent(vector.data.features).yllcorner,
+                  cellsize: vectorExtent(vector.data.features).cellsize,
                   nodata: -9999,
                   values: new Float64Array([0, 0, 0, 0]),
                   units: "coordinate",
                 }}
                 overlay={pointsFromVector(vector.data)}
-                overlayLines={linesFromVector(vector.data)}
+                overlayLines={[...linesFromVector(vector.data), ...(overlayAllowed ? overlayLines : [])]}
+                overlayPolygons={[...polygonsFromVector(vector.data), ...(overlayAllowed ? overlayPolygons : [])]}
                 units={units}
                 warnings={warnings}
                 crsLabel={activeCrs?.label}
                 opacity={ui[active.id]?.opacity ?? 1}
               />
+            </div>
+            <div className="border-t border-[#2b2b2b] px-3 py-2 text-[11px] bg-[#181818]" data-testid="vector-legend">
+              <p className="text-[#858585] uppercase tracking-wide text-[10px]">Legend and attributes</p>
+              <p data-testid="vector-role">
+                Role: {active.vectorRole?.reviewed ? `${active.vectorRole.role} (user-assigned catalog label)` : "unassigned generic vector"}
+              </p>
+              <p data-testid="vector-crs">CRS: {activeCrs?.assumed ? "unknown/assumed — overlay blocked" : activeCrs?.label || "undocumented"}</p>
+              <p>Geometries: {(active.geometryTypes || vector.data.features.map((f) => f.type)).join(", ") || "none"}</p>
+              <p>Attributes (unknown semantics): {(active.attributeNames || Object.keys(vector.data.features[0]?.properties || {})).join(", ") || "none"}</p>
+              <p>Provenance: {provenanceLabel(active)} · {originBadge(active.origin)}</p>
+            </div>
+            <div className="border-t border-[#2b2b2b] px-3 py-2 text-[11px] bg-[#181818]" data-testid="vector-overlap">
+              <p className="text-[#858585] uppercase tracking-wide text-[10px]">Same-CRS geometric overlap</p>
+              {vectorOverlapHits.length ? (
+                <ul className="mt-1 space-y-1">
+                  {vectorOverlapHits.map((hit) => (
+                    <li key={`${hit.leftPath}:${hit.rightPath}`}>
+                      {hit.relation}: {hit.reason}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-[#858585]">
+                  No same-CRS bounding-box overlap among visible vector layers. Overlap is geometric coincidence, not a mineral relationship.
+                </p>
+              )}
             </div>
             {isBoreholeCollarPath(active.path) ? (
               <div className="border-t border-[#2b2b2b] px-3 py-2 text-[11px] bg-[#181818]" data-testid="collar-overlap">
@@ -680,6 +802,7 @@ export function VisualizationStudio() {
             grid={raster}
             overlay={overlayAllowed ? overlayPts : []}
             overlayLines={overlayAllowed ? overlayLines : []}
+            overlayPolygons={overlayAllowed ? overlayPolygons : []}
             units={units}
             warnings={warnings}
             crsLabel={activeCrs?.label}

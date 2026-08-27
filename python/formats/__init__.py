@@ -292,6 +292,13 @@ def parse_las(path: str) -> dict:
     return parse_las_20(path)
 
 
+def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = False) -> dict:
+    """Documented GeoJSON. RFC 7946 default CRS84 is not assumed."""
+    from formats.geojson import parse_geojson as impl
+
+    return impl(path, role=role, role_reviewed=role_reviewed)
+
+
 def parse_dzt(path: str) -> dict:
     """Recognised-unsupported. G-AID does not invent dt, dx, or antenna from a DZT header."""
     raise ValueError(

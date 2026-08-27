@@ -1,0 +1,28 @@
+{
+  "kind": "gis-overlap",
+  "rows": [
+    {
+      "left_path": "overlap/tenure.geojson",
+      "right_path": "overlap/samples.geojson",
+      "left_id": "t1",
+      "right_id": "s1",
+      "left_role": "tenure",
+      "right_role": "sample-location",
+      "crs": "EPSG:32734",
+      "relation": "contains",
+      "reason": "Geometric contains under EPSG:32734. Spatial overlap does not establish geological, mineral, or causal relationships."
+    },
+    {
+      "left_path": "overlap/tenure.geojson",
+      "right_path": "overlap/samples.geojson",
+      "left_id": "t1",
+      "right_id": "s2",
+      "left_role": "tenure",
+      "right_role": "sample-location",
+      "crs": "EPSG:32734",
+      "relation": "bbox-overlap",
+      "reason": "Geometric bbox-overlap under EPSG:32734. Spatial overlap does not establish geological, mineral, or causal relationships."
+    }
+  ],
+  "blocked": []
+}

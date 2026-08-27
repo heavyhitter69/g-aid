@@ -15,6 +15,8 @@ export interface SniffContext {
   peek: Buffer;
   peekText: string;
   absPath?: string;
+  siblingNames?: string[];
+  companionPrjText?: string;
 }
 
 export interface AdapterSniff {
@@ -66,6 +68,15 @@ export interface CatalogInspection {
   coordinateKind?: "geographic" | "easting-northing" | "unknown";
   locationQuality?: "documented" | "user-confirmed" | "missing";
   collarMappable?: boolean;
+  geometryTypes?: string[];
+  attributeNames?: string[];
+  vectorRole?: CatalogRecord["vectorRole"];
+  shapefileSidecars?: {
+    shp: boolean;
+    shx: boolean;
+    dbf: boolean;
+    prj: boolean;
+  };
 }
 
 export interface AdapterValidation {

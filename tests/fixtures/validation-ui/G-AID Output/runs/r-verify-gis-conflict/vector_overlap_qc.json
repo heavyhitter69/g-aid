@@ -1,0 +1,14 @@
+{
+  "skipped": false,
+  "n_rows": 0,
+  "blocked": [
+    {
+      "left": "conflict-crs/a.geojson",
+      "right": "conflict-crs/b.geojson",
+      "reason": "Conflicting CRS EPSG:32734 vs EPSG:4326. Reprojection is not a registered capability."
+    }
+  ],
+  "reprojected": false,
+  "geological_certainty_improved": false,
+  "interpretation_limit": "Overlap is a geometric table, not a prospectivity map."
+}

@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/store/app-store";
 import type { CatalogRecord, SupportStatus } from "@/lib/catalog/types";
+import { VECTOR_ROLES, type VectorRoleId } from "@/lib/catalog/geojson-contract";
 
 function statusLabel(status: SupportStatus): string {
   if (status === "supported") return "supported";
@@ -17,8 +18,21 @@ function statusClass(status: SupportStatus): string {
 
 function RecordRow({ record }: { record: CatalogRecord }) {
   const setMapFocus = useAppStore((s) => s.setMapFocus);
+  const workspaceRoot = useAppStore((s) => s.workspaceRoot);
+  const setProjectCatalog = useAppStore((s) => s.setProjectCatalog);
   const errors = record.parseErrors?.join("; ");
   const spatial = record.mediaClass === "raster" || record.mediaClass === "vector";
+  async function assignRole(role: VectorRoleId) {
+    if (!workspaceRoot) return;
+    const res = await fetch("/api/workspace/catalog/vector-role", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ root: workspaceRoot, catalogId: record.id, role }),
+    });
+    if (!res.ok) return;
+    const catalog = await res.json();
+    setProjectCatalog(catalog);
+  }
   return (
     <tr
       className={`border-b border-[#3c3c3c] align-top ${spatial ? "cursor-pointer hover:bg-[#2a2d2e]" : ""}`}
@@ -41,6 +55,29 @@ function RecordRow({ record }: { record: CatalogRecord }) {
         <div className="text-[10px] text-[#858585]">{record.mediaClass}</div>
       </td>
       <td className="px-3 py-2 text-xs text-[#858585]">{record.sniffConfidence.toFixed(2)}</td>
+      <td className="px-3 py-2 text-xs text-[#858585] whitespace-nowrap">{record.crs || "—"}</td>
+      <td className="px-3 py-2 text-xs text-[#858585]">
+        {record.adapterId === "geojson" ? (
+          <select
+            data-testid={`vector-role-${record.id}`}
+            className="bg-[#2a2d2e] border border-[#3c3c3c] rounded px-1 py-0.5 text-[11px] text-[#cccccc] max-w-[9rem]"
+            value={record.vectorRole?.role || "generic-vector"}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              void assignRole(e.target.value as VectorRoleId);
+            }}
+          >
+            {VECTOR_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {role}
+                {record.vectorRole?.reviewed && record.vectorRole.role === role ? " (reviewed)" : ""}
+              </option>
+            ))}
+          </select>
+        ) : (
+          "—"
+        )}
+      </td>
       <td className="px-3 py-2 text-xs text-[#f0c674] max-w-[20rem]">
         {errors || "—"}
       </td>
@@ -82,8 +119,8 @@ export function DatasetExplorer() {
       <p className="text-sm text-[#858585] mb-4">
         {catalog.records.length} source files
         {catalog.truncated ? " (truncated)" : ""}. Supported {supported}, recognised-unsupported {recognised}, unknown {unknown}.
-        Mixed folders do not start a magnetic workflow. Only supported MagArrow and GSM-19 records can be processing inputs.
-        Click a raster or vector row to locate it on the map workspace. Shapefile, LAS, and SEG-Y will not decode as map layers.
+        Mixed folders do not start a magnetic workflow. Only supported MagArrow, GSM-19, gravity-contract, ERT, radiometric, GPR, LAS 2.0, and documented GeoJSON records can be processing inputs.
+        Click a raster or vector row to locate it on the map workspace. Shapefile, GeoPackage, LAS/LAZ point clouds, and SEG-Y will not decode as map layers. GeoJSON layer roles are user-assigned and are not inferred from filenames.
       </p>
       {catalog.records.length === 0 ? (
         <p className="text-sm text-[#858585]">No source files were catalogued in this folder.</p>
@@ -95,6 +132,8 @@ export function DatasetExplorer() {
               <th className="px-3 py-2 font-medium">Support</th>
               <th className="px-3 py-2 font-medium">Format / media</th>
               <th className="px-3 py-2 font-medium">Confidence</th>
+              <th className="px-3 py-2 font-medium">CRS</th>
+              <th className="px-3 py-2 font-medium">Vector role</th>
               <th className="px-3 py-2 font-medium">Parse errors</th>
             </tr>
           </thead>

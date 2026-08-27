@@ -1,0 +1,57 @@
+{
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "format": "geojson",
+  "layers": [
+    {
+      "source_path": "conflict-crs/a.geojson",
+      "catalog_id": "conflict-crs/a.geojson",
+      "checksum": "conflict-crs/a.geojson",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "geojson-crs",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240100.0,
+        "maxX": 260100.0,
+        "maxY": 6240100.0
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+      ]
+    },
+    {
+      "source_path": "conflict-crs/b.geojson",
+      "catalog_id": "conflict-crs/b.geojson",
+      "checksum": "conflict-crs/b.geojson",
+      "crs": "EPSG:4326",
+      "crs_epsg": 4326,
+      "crs_source": "geojson-crs",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [],
+      "feature_count": 1,
+      "bbox": {
+        "minX": 18.42,
+        "minY": -33.92,
+        "maxX": 18.42,
+        "maxY": -33.92
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "warnings": [
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames."
+      ]
+    }
+  ],
+  "n_layers": 2,
+  "reprojected": false,
+  "geoprocessing": false
+}

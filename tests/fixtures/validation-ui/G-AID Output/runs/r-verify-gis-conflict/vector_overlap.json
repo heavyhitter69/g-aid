@@ -1,0 +1,11 @@
+{
+  "kind": "gis-overlap",
+  "rows": [],
+  "blocked": [
+    {
+      "left": "conflict-crs/a.geojson",
+      "right": "conflict-crs/b.geojson",
+      "reason": "Conflicting CRS EPSG:32734 vs EPSG:4326. Reprojection is not a registered capability."
+    }
+  ]
+}

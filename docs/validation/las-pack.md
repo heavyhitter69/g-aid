@@ -75,7 +75,8 @@ Desktop click-through of `/workspace/verify-las` is recorded in
 
 ## Next recommended pack
 
-Additional **field-instrument contracts** that broaden real survey coverage
-(documented GIS/vector overlays already partly live, or further magnetic /
-gravity instrument formats) — not production `ert.invert2d` and not Complete
+Documented **GIS / vector overlays** as first-class catalog, map, and
+provenance assets on the shared platform — not production `ert.invert2d`
+and not Complete Bouguer.
+
 Bouguer.

@@ -42,6 +42,12 @@ export const BOREHOLE_DEFAULT: UserCapabilityId[] = [
   "borehole.interpret",
 ];
 
+export const GIS_DEFAULT: UserCapabilityId[] = [
+  "gis.vector_ingest",
+  "gis.vector_view",
+  "gis.interpret",
+];
+
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
 }
@@ -57,6 +63,7 @@ export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id.startsWith("rad.")) return "radiometrics";
   if (id.startsWith("gpr.")) return "gpr";
   if (id.startsWith("borehole.")) return "borehole";
+  if (id.startsWith("gis.")) return "gisVector";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
   return found?.[0] || id;
 }
@@ -123,6 +130,11 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
       if (!ids.includes(id)) ids.push(id);
     }
   }
+  if (steps.gisVector) {
+    for (const id of GIS_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
   return ids;
 }
 
@@ -139,6 +151,7 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.radiometrics = false;
   steps.gpr = false;
   steps.borehole = false;
+  steps.gisVector = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
     if (id === "grav.residual") {
@@ -186,6 +199,10 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
     }
     if (id.startsWith("borehole.")) {
       steps.borehole = true;
+      continue;
+    }
+    if (id.startsWith("gis.")) {
+      steps.gisVector = true;
       continue;
     }
     steps[stepKeyFromCapability(id)] = true;
@@ -303,17 +320,53 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     if (/\b(geojson|gis|map|collar|location)\b/.test(m)) next.add("borehole.map_collar");
   }
 
+  const otherSurvey =
+    gravityAsk ||
+    ertAsk ||
+    radioAsk ||
+    gprAsk ||
+    boreholeAsk ||
+    /\b(magarrow|tmi|igrf|airborne mag|gsm-?19|diurnal|reduction to (the )?pole)\b/.test(m);
+  const gisDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(geojson|vector overlay|gis vector)\b/.test(
+    m
+  );
+  const gisAsk =
+    !otherSurvey &&
+    (/\bgeojson\b/.test(m) ||
+      /\bshapefile\b/.test(m) ||
+      /\bgeopackage\b|\.gpkg\b/.test(m) ||
+      /\bvector (layer|overlay|ingest)\b/.test(m) ||
+      /\bspatial overlap\b/.test(m) ||
+      /\bgeology layer\b|\btenure layer\b|\bfault layer\b/.test(m));
+  if (gisAsk && !gisDeny) {
+    for (const id of GIS_DEFAULT) next.add(id);
+    if (/\b(overlap|intersect|spatial query|overlay query)\b/.test(m)) next.add("gis.spatial_overlap");
+    if (/\bexport\b/.test(m)) next.add("gis.export_vector");
+  }
+
   return USER_CAPABILITY_IDS.filter((id) => next.has(id));
 }
 
 export function unregisteredProposal(message: string): string | undefined {
   const m = message.toLowerCase();
   if (/\b(seismic|segy|nmo)\b/.test(m)) return "seismic";
-  if (/\b(litholog(?:y|ies)?|aquifer|minerali[sz]ations?|minerali[sz]e|drill[\s-]?targets?|resource estimat\w*|well correlation|pay zone|reservoir)\b/.test(m)) {
+  if (/\b(litholog(?:y|ies)?|aquifer|minerali[sz]ations?|minerali[sz]e|drill[\s-]?targets?|resource estimat\w*|well correlation|pay zone|reservoir)\b/.test(m) && !/\b(overlay|geojson|vector|gis)\b/.test(m)) {
     return "borehole.classify";
   }
   if (/\b(deviation survey|well path|directional (well|survey)|true vertical depth|\btvd\b|3d trajectory)\b/.test(m)) {
     return "borehole-trajectory";
+  }
+  if (
+    /\b(prospectiv(?:ity)?|mineral targets?|resource\/reserve|reserve claims?|drill recommendations?)\b/.test(m) &&
+    /\b(overlay|geojson|vector|gis|geology|tenure)\b/.test(m)
+  ) {
+    return "gis.prospectivity";
+  }
+  if (
+    (/\b(buffer|clip|dissolve|geoprocess|attribute edit)\b/.test(m) && /\b(vector|geojson|shapefile|polygon|layer|gis)\b/.test(m)) ||
+    (/\breproject\b/.test(m) && /\b(vector|geojson|shapefile|layer)\b/.test(m))
+  ) {
+    return "gis.geoprocess";
   }
   if (
     /\b(nasvd|stripp(?:ing|ed)|height[\s-]?correct|dead[\s-]?time|background[\s-]?correct|concentration conversion|window[\s-]?strip)\b/.test(

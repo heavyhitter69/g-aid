@@ -25,6 +25,7 @@ import { NEAR_ZONE_STATEMENTS, ZONED_PLANAR_OFFER, ZONED_PLANAR_PRODUCT_NAME, ZO
 import { RADIO_STATEMENTS } from "./radio-product.ts";
 import { GPR_STATEMENTS, GPR_MIGRATION_BENCHMARK_PASSED, DEFAULT_DEWOW_WINDOW, DEFAULT_FILTER_ORDER, DEFAULT_SEC_POWER, gprFrozenNyquistLine } from "./gpr-product.ts";
 import { BOREHOLE_STATEMENTS } from "./borehole-product.ts";
+import { GIS_STATEMENTS } from "./gis-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
 
@@ -49,6 +50,7 @@ export type PlanSteps = {
   radiometrics: boolean;
   gpr: boolean;
   borehole: boolean;
+  gisVector: boolean;
 };
 
 export const EMPTY_STEPS: PlanSteps = {
@@ -72,6 +74,7 @@ export const EMPTY_STEPS: PlanSteps = {
   radiometrics: false,
   gpr: false,
   borehole: false,
+  gisVector: false,
 };
 
 export type PlanIntent = AnalysisIntent | "none";
@@ -142,6 +145,14 @@ export interface PlanInput {
   coordinateKind?: "geographic" | "easting-northing" | "unknown";
   locationQuality?: "documented" | "user-confirmed" | "missing";
   collarMappable?: boolean;
+  geometryTypes?: string[];
+  attributeNames?: string[];
+  vectorRole?: {
+    role: "geology" | "structure" | "tenure" | "alteration" | "mine-feature" | "sample-location" | "generic-vector";
+    reviewed: boolean;
+    reviewedAt?: string;
+    source: "user-assigned" | "unassigned";
+  };
 }
 
 export interface AgentPlan {
@@ -276,6 +287,7 @@ export const STEP_KEYS = [
   "radiometrics",
   "gpr",
   "borehole",
+  "gisVector",
 ] as const satisfies readonly (keyof PlanSteps)[];
 
 type StepKey = (typeof STEP_KEYS)[number];
@@ -329,6 +341,8 @@ export const GPR_STEP_KEYS = ["gpr"] as const satisfies readonly StepKey[];
 
 export const BOREHOLE_STEP_KEYS = ["borehole"] as const satisfies readonly StepKey[];
 
+export const GIS_STEP_KEYS = ["gisVector"] as const satisfies readonly StepKey[];
+
 export const UNSUPPORTED_STEP_KEYS = ["seismic"] as const satisfies readonly StepKey[];
 
 export const STEP_NODE_IDS: Record<StepKey, string[]> = {
@@ -352,6 +366,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   radiometrics: ["rad_ingest", "rad_grid", "rad_ternary", "rad_ratios", "rad_gis_export", "rad_interpret"],
   gpr: ["gpr_ingest", "gpr_process", "gpr_interpret"],
   borehole: ["las_ingest", "borehole_view", "borehole_interpret"],
+  gisVector: ["vector_ingest", "vector_view", "vector_interpret"],
 };
 
 export function magneticStepsEnabled(steps: PlanSteps): boolean {
@@ -378,6 +393,10 @@ export function boreholeStepsEnabled(steps: PlanSteps): boolean {
   return BOREHOLE_STEP_KEYS.some((key) => steps[key]);
 }
 
+export function gisVectorStepsEnabled(steps: PlanSteps): boolean {
+  return GIS_STEP_KEYS.some((key) => steps[key]);
+}
+
 export function unsupportedStepsEnabled(steps: PlanSteps): boolean {
   return UNSUPPORTED_STEP_KEYS.some((key) => steps[key]);
 }
@@ -396,7 +415,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "rtp", re: /\brtp\b|reduction to (the )?pole|\bto the pole\b/i },
   { key: "derivatives", re: /\banalytic signal\b|\btilt\b|\bcontinuation\b|\bmagmap\b/i },
   { key: "lineaments", re: /\blineament/i },
-  { key: "gis", re: /\bgeotiff\b|\bgeojson\b|\bgis\b/i },
+  { key: "gis", re: /\bgeotiff\b|\bgis export\b|\bflight.?path\.geojson\b|\bwrite (?:the )?geojson\b/i },
   { key: "gravity", re: /\bbouguer\b|\bfree[ -]?air\b|\blatitude\b/i },
   { key: "farZoneTerrain", re: /\bfar[\s-]?zone\s+terrain/i },
   { key: "intermediateZoneTerrain", re: /\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km/i },
@@ -408,6 +427,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "radiometrics", re: /\bradiometr/i },
   { key: "gpr", re: /\bgpr\b|ground[ -]?penetrating/i },
   { key: "borehole", re: /\bborehole\b|\bwell[ -]?log\b|\blas\b|cwls/i },
+  { key: "gisVector", re: /\bgeojson\b|\bshapefile\b|\bgeopackage\b|\bvector overlay\b|\bspatial overlap\b|\bgeology layer\b|\btenure layer\b/i },
 ];
 
 export function cloneSteps(steps: PlanSteps = EMPTY_STEPS): PlanSteps {
@@ -479,6 +499,8 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
       return "Ingest G-AID GPR 1.0, dewow/time-zero/SEC/bandpass, and write a two-way-time radargram (not depth, not utilities)";
     case "borehole":
       return "Ingest CWLS LAS 2.0 WRAP.NO, view measured-depth logs, and write evidence-bound interpretation limits (not lithology or a well path)";
+    case "gisVector":
+      return "Ingest documented GeoJSON vectors, display source geometry, and write evidence-bound interpretation limits (not geology proof or mineral targets)";
   }
 }
 
@@ -558,6 +580,11 @@ export function renderImplementationPlan(opts: {
       if (!notes.includes(line)) notes.push(line);
     }
   }
+  if (gisVectorStepsEnabled(opts.steps)) {
+    for (const line of GIS_STATEMENTS) {
+      if (!notes.includes(line)) notes.push(line);
+    }
+  }
   const bound = (opts.inputs || []).map((item) => `- \`${item.catalogId}\` ${item.path} (${item.adapterId || item.kind || "bound"})`);
   const artifacts = dag.requestedCapabilityIds.flatMap((id) =>
     (getCapability(id)?.expectedArtifacts || []).map((name) => `- ${name}`)
@@ -577,7 +604,8 @@ export function renderImplementationPlan(opts: {
   );
   const gprInputs = (opts.inputs || []).some((item) => item.adapterId === "gpr-csv");
   const lasInputs = (opts.inputs || []).some((item) => item.adapterId === "las-well");
-  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs].filter(Boolean).length;
+  const gisInputs = (opts.inputs || []).some((item) => item.adapterId === "geojson");
+  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs, gisInputs].filter(Boolean).length;
   const mixed = mixedCount > 1;
   const field = [
     typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
@@ -601,6 +629,9 @@ export function renderImplementationPlan(opts: {
     boreholeStepsEnabled(opts.steps)
       ? "Borehole product: CWLS LAS 2.0 WRAP.NO measured-depth log. Depth is not TVD. A collar is mapped only with coordinates and CRS."
       : "",
+    gisVectorStepsEnabled(opts.steps)
+      ? "GIS product: documented GeoJSON source layers. Roles are user-assigned. Spatial overlap is geometric coincidence, not geological proof."
+      : "",
     opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
     opts.requestIntent ? `Frozen request intent: ${opts.requestIntent}` : "",
     opts.steps.farZoneTerrain
@@ -619,7 +650,9 @@ export function renderImplementationPlan(opts: {
         ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless a named terrain plan is approved."
         : "",
   ].filter(Boolean);
-  const thisRunFallback = boreholeStepsEnabled(opts.steps)
+  const thisRunFallback = gisVectorStepsEnabled(opts.steps)
+    ? "- Ask for a registered GIS vector, borehole, GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
+    : boreholeStepsEnabled(opts.steps)
     ? "- Ask for a registered borehole, GPR, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
     : gprStepsEnabled(opts.steps)
     ? "- Ask for a registered GPR, borehole, radiometric, ERT, gravity, or magnetic method I can run. Seismic is not in this release."
@@ -641,7 +674,7 @@ export function renderImplementationPlan(opts: {
 ${items.join("\n") || thisRunFallback}
 
 ## Bound inputs
-${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, and/or LAS 2.0 catalog IDs before Proceed."}
+${bound.length ? bound.join("\n") : "- No supported catalog records bound. Bind MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, GPR-contract, LAS 2.0, and/or documented GeoJSON catalog IDs before Proceed."}
 
 ## Parameters
 - Base station reference: ${baseRefLabel(opts.baseReference)}
@@ -654,7 +687,7 @@ ${dagLines.join("\n") || "- (none)"}
 ${artifacts.length ? [...new Set(artifacts)].join("\n") : "- None until a registered capability is approved."}
 
 ## Assumptions and limits
-${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic, gravity, ERT, and radiometric capabilities run."}
+${limits.length ? [...new Set(limits)].join("\n") : "- Only registered magnetic, gravity, ERT, radiometric, GPR, borehole, and GIS capabilities run."}
 ${mixed ? "- Products from different methods may display together. Joint inversion and combined interpretation are not registered capabilities.\n" : ""}${notes.length ? notes.map((note) => `- ${note}`).join("\n") : ""}
 
 ## Review record
@@ -998,6 +1031,16 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
                   ? "Accepted collar mapping only with documented or user-confirmed CRS. Vertical logs without location stay unmapped."
                 : id === "borehole.interpret"
                   ? "Accepted evidence-bound borehole interpretation limits. Lithology, aquifers, mineralisation, and drill targeting are not established."
+                : id === "gis.vector_ingest"
+                  ? "Accepted documented GeoJSON ingest. Shapefile and GeoPackage stay recognised-unsupported. Filename geology labels are not assigned as roles."
+                : id === "gis.vector_view"
+                  ? "Accepted source vector viewing. Overlay is not geological proof."
+                : id === "gis.spatial_overlap"
+                  ? "Accepted same-CRS geometric overlap table. Coincidence is not a mineral or causal relationship."
+                : id === "gis.export_vector"
+                  ? "Accepted GeoJSON export. Shapefile/GeoPackage writers are not implemented."
+                : id === "gis.interpret"
+                  ? "Accepted evidence-bound GIS interpretation limits. Mineral targets, prospectivity, resources, and drill recommendations are not established from overlays."
                 : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
@@ -1098,6 +1141,11 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
   if (boreholeStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps))) {
     notes.push(
       "Borehole products may display with magnetic, gravity, ERT, radiometric, or GPR maps. A collar overlay is coincidence, not a joint interpretation."
+    );
+  }
+  if (gisVectorStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps) || boreholeStepsEnabled(steps))) {
+    notes.push(
+      "Vector layers may display with magnetic, gravity, ERT, radiometric, GPR, or borehole maps. Spatial overlap is geometric coincidence, not a joint geological or mineral interpretation."
     );
   }
   const dag = compileCapabilityDag(capabilities);
@@ -1241,18 +1289,18 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
     });
   }
 
-  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps)) {
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps) && !gisVectorStepsEnabled(plan.steps)) {
     blockers.push({
       level: "blocker",
       code: "unsupported_method",
       message:
-        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, already-corrected radiometric ingest, G-AID GPR 1.0, or CWLS LAS 2.0 well logs after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic is not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities. Lithology classification and well trajectories are not live borehole capabilities.",
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, supported ERT ingest and a labelled pseudosection, already-corrected radiometric ingest, G-AID GPR 1.0, CWLS LAS 2.0 well logs, or documented GeoJSON vectors after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic is not available yet. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities. Lithology classification and well trajectories are not live borehole capabilities. Shapefile/GeoPackage ingest, buffer/clip/dissolve, and mineral targeting from overlays are not live GIS capabilities.",
     });
   } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({
       level: "warning",
       code: "unsupported_method",
-      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric/GPR/borehole DAG is executed.",
+      message: "Extra unregistered methods in this plan will not run. Only the compiled magnetic/gravity/ERT/radiometric/GPR/borehole/GIS DAG is executed.",
     });
   }
 
@@ -1361,6 +1409,25 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
         code: "no_las_files",
         message:
           "Borehole processing needs a supported las-well catalog record. An arbitrary .las or LASF/LAZ point cloud is not a well log.",
+      });
+    }
+  }
+
+  if (gisVectorStepsEnabled(plan.steps)) {
+    const geoFiles = inputs.filter((item) => item.adapterId === "geojson" || item.kind === "geojson");
+    if (inputs.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_geojson_files",
+        message:
+          "GIS vector processing needs a supported GeoJSON catalog record with documented EPSG. I will not take the first .geojson, shapefile, or GeoPackage.",
+      });
+    } else if (geoFiles.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_geojson_files",
+        message:
+          "GIS vector processing needs a supported geojson catalog record. A shapefile sidecar set or GeoPackage is not a processing input.",
       });
     }
   }

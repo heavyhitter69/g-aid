@@ -35,8 +35,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
   const runId = plan.runId || generateRunId();
   const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
   const notes = [...(plan.notes || [])];
-  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "gpr" && plan.intent !== "borehole" && plan.intent !== "none") {
-    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, radiometric, GPR, or borehole checklist.");
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "gpr" && plan.intent !== "borehole" && plan.intent !== "gis" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, radiometric, GPR, borehole, or GIS vector checklist.");
   }
   const next: AgentPlan = {
     ...plan,

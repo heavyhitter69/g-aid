@@ -458,6 +458,69 @@ export function validateCapabilityContracts(options: {
     }
   }
 
+  const geojsonInputs = boundSupported(options.inputs, "geojson");
+  const needsGis = expanded.some((id) => id.startsWith("gis."));
+  if (needsGis && options.inputs.length && geojsonInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_geojson_files",
+      message:
+        "GIS vector processing needs a supported GeoJSON catalog record with documented EPSG. I will not take a shapefile, GeoPackage, or a GeoJSON that has no CRS.",
+    });
+  }
+  const shapefileBound = options.inputs.filter(
+    (item) => item.adapterId === "shapefile" || item.formatId === "shapefile" || item.kind === "shapefile"
+  );
+  const gpkgBound = options.inputs.filter(
+    (item) => item.adapterId === "geopackage" || item.formatId === "geopackage" || item.kind === "geopackage"
+  );
+  if (shapefileBound.length) {
+    issues.push({
+      level: "blocker",
+      code: "shapefile_not_parsed",
+      message:
+        "Shapefile is recognised-unsupported. G-AID does not parse .shp/.shx/.dbf geometry or attributes in this pack. Convert to documented GeoJSON.",
+    });
+  }
+  if (gpkgBound.length) {
+    issues.push({
+      level: "blocker",
+      code: "geopackage_not_parsed",
+      message: "GeoPackage is recognised-unsupported. Tables and geometries were not loaded.",
+    });
+  }
+  if (expanded.includes("gis.spatial_overlap")) {
+    const records = catalogRecordsForInputs(geojsonInputs, options.catalog || null);
+    const crsKeys = [
+      ...new Set(
+        [
+          ...records.map((record) => record.crs).filter(Boolean),
+          ...geojsonInputs.map((item) => item.crs).filter(Boolean),
+        ] as string[]
+      ),
+    ];
+    if (geojsonInputs.length && geojsonInputs.length < 2) {
+      issues.push({
+        level: "blocker",
+        code: "gis_overlap_needs_two_layers",
+        message:
+          "Spatial overlap needs at least two documented same-CRS GeoJSON layers. I will not invent a second layer or silently reproject.",
+      });
+    } else if (geojsonInputs.length >= 2 && crsKeys.length > 1) {
+      issues.push({
+        level: "blocker",
+        code: "gis_crs_conflict",
+        message: `Conflicting CRS among vector layers (${crsKeys.join(", ")}). Overlay and overlap are blocked. Reprojection is not a registered capability.`,
+      });
+    } else if (geojsonInputs.length >= 2 && crsKeys.length === 0) {
+      issues.push({
+        level: "blocker",
+        code: "gis_crs_required",
+        message: "Spatial overlap needs a documented EPSG on every layer. RFC 7946 lon/lat is not assumed.",
+      });
+    }
+  }
+
   return issues;
 }
 

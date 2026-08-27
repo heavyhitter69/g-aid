@@ -9,6 +9,7 @@ export type DisplayAdapterId =
   | "geojson"
   | "esri-prj"
   | "shapefile"
+  | "geopackage"
   | "las-point-cloud"
   | "laz-point-cloud"
   | "segy"
@@ -65,6 +66,14 @@ const ADAPTERS: DisplayAdapter[] = [
     reason: "Shapefile is recognised but not decoded in this release.",
   },
   {
+    id: "geopackage",
+    formatIds: ["geopackage"],
+    viewable: false,
+    decoded: false,
+    kind: "none",
+    reason: "GeoPackage is recognised but not decoded in this release. Tables and geometries were not loaded.",
+  },
+  {
     id: "las-point-cloud",
     formatIds: ["las-point-cloud", "laz-point-cloud"],
     viewable: false,
@@ -108,6 +117,7 @@ export function formatIdFromPath(path: string): string {
   if (ext === "geojson") return "geojson";
   if (ext === "prj" || ext === "wkt") return "esri-prj";
   if (ext === "shp") return "shapefile";
+  if (ext === "gpkg") return "geopackage";
   if (ext === "laz") return "laz-point-cloud";
   if (ext === "las") return "unknown";
   if (ext === "sgy" || ext === "segy") return "segy";

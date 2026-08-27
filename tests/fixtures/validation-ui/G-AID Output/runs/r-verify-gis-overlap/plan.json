@@ -1,0 +1,13 @@
+{
+  "runId": "r-verify-gis-overlap",
+  "planHash": "fixture-r-verify-gis-overlap",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.spatial_overlap",
+    "gis.export_vector"
+  ],
+  "product": "G-AID documented GeoJSON vector layer",
+  "parameters": {}
+}
