@@ -91,16 +91,28 @@ than the DEM, spherical curvature of distant terrain, or atmospheric mass.
 1. Bind supported gravity-contract stations and a `dem-ascii` record.
 2. Confirm density, CRS, elevation datum, and near-zone radius (or DEM extent).
 3. Ask for near-zone terrain, intermediate-zone / Hayford–Bowie 166.7 km, and/or
-   far-zone terrain / Complete Bouguer. Chat may **grant** the zoned
-   capabilities; review copy still refuses Complete Bouguer naming.
+   far-zone terrain **by those names**. A request for **Complete Bouguer** does
+   **not** grant or execute `grav.terrain_near_zone`,
+   `grav.terrain_intermediate_zone`, or `grav.terrain_far_zone`. G-AID refuses
+   that request, lists the missing full-convention components (spherical
+   far-zone treatment, Hayford–Bowie or equivalent geometry, global/adequate
+   terrain coverage, atmospheric treatment), and offers the named alternative
+   **`zoned planar terrain-corrected Bouguer anomaly`**. Terrain-correction
+   capabilities stay off until the user explicitly approves that named plan.
 4. Supply `farRadiusM` &gt; 166.7 km to *attempt* far-zone TC. If the bound DEM
    does not cover that radius, the far ring is skipped and recorded.
 5. Click **Proceed** on the hash-frozen DAG. A rerun always creates a new run
    folder. Artifacts stay in `G-AID Output/runs/{runId}/`.
 
+Plan title, frozen request intent, outputs, map legends, QC `product_name`, and
+interpretation copy for the executed product never use the phrase Complete
+Bouguer. Machine QC may still record `complete_bouguer: false`.
+
 ## Is “Complete Bouguer Anomaly” justified?
 
-**No.** G-AID must not use that term as a product name. The implemented
-convention is a **zoned planar Nagy terrain-corrected Bouguer on a bound DEM**,
-with optional Bullard B, without atmosphere, without spherical far-zone theory,
-and without guaranteed 166.7 km (let alone global) coverage.
+**No.** G-AID must not use that term as a product name, and must not treat a
+Complete Bouguer request as approval to run planar near/intermediate/far
+terrain. The implemented convention, after explicit approval of the named
+alternative, is **zoned planar terrain-corrected Bouguer anomaly**: planar Nagy
+on a bound DEM, with optional Bullard B, without atmosphere, without spherical
+far-zone theory, and without guaranteed 166.7 km (let alone global) coverage.

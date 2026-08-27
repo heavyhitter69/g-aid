@@ -225,27 +225,51 @@ test("invalid density and mixed units still block", () => {
   }
 });
 
-test("chat requesting complete Bouguer grants grav.terrain_near_zone and does not label it Complete Bouguer", () => {
+test("chat requesting Complete Bouguer refuses terrain until the named zoned planar plan is approved", () => {
   const plan = terrainPlan("/tmp", {
     steps: { ...EMPTY_STEPS, gravity: true },
     capabilities: ["grav.ingest", "grav.freeair", "grav.bouguer", "grav.grid", "grav.gis", "grav.interpret"],
     parameters: { baseReference: "mean_base" },
   });
-  const patched = applyChatPatches(plan, "also run complete Bouguer with terrain correction radius 150 m density 2.67 g/cm3");
-  assert.ok(patched.capabilities?.includes("grav.terrain_near_zone"));
-  assert.ok(patched.capabilities?.includes("grav.terrain_intermediate_zone"));
-  assert.ok(patched.capabilities?.includes("grav.terrain_far_zone"));
-  assert.equal(patched.capabilities?.includes("grav.terrain"), false);
-  assert.equal(patched.steps.nearZoneTerrain, true);
-  assert.equal(patched.steps.intermediateZoneTerrain, true);
-  assert.equal(patched.steps.farZoneTerrain, true);
-  assert.equal(patched.parameters.density, 2.67);
-  assert.equal(patched.parameters.terrainRadiusM, 150);
+  const refused = applyChatPatches(plan, "also run complete Bouguer with terrain correction radius 150 m density 2.67 g/cm3");
+  assert.equal(refused.capabilities?.includes("grav.terrain_near_zone"), false);
+  assert.equal(refused.capabilities?.includes("grav.terrain_intermediate_zone"), false);
+  assert.equal(refused.capabilities?.includes("grav.terrain_far_zone"), false);
+  assert.equal(refused.steps.nearZoneTerrain, false);
+  assert.equal(refused.steps.intermediateZoneTerrain, false);
+  assert.equal(refused.steps.farZoneTerrain, false);
+  assert.equal(refused.parameters.density, 2.67);
+  assert.equal(refused.parameters.terrainRadiusM, 150);
+  assert.equal(refused.parameters.zonedPlanarOffered, true);
+  assert.equal(refused.parameters.zonedPlanarApproved, false);
+  assert.equal(refused.parameters.requestIntent, "simple Bouguer");
+  const refusal = refused.reviewDecisions?.find((d) => d.capabilityId === "complete-bouguer");
+  assert.equal(refusal?.status, "refused");
+  assert.match(refusal?.reason || "", /Complete Bouguer Anomaly is not supported/i);
+  assert.match(refusal?.reason || "", /spherical far-zone/i);
+  assert.match(refusal?.reason || "", /Hayford/);
+  assert.match(refusal?.reason || "", /global\/adequate terrain coverage/i);
+  assert.match(refusal?.reason || "", /atmospheric/i);
+  assert.match(refusal?.reason || "", /zoned planar terrain-corrected Bouguer anomaly/);
+  assert.ok(refused.notes?.some((line) => /zoned planar terrain-corrected Bouguer anomaly/.test(line)));
+
+  const approved = applyChatPatches(refused, "approve zoned planar terrain-corrected Bouguer anomaly");
+  assert.ok(approved.capabilities?.includes("grav.terrain_near_zone"));
+  assert.ok(approved.capabilities?.includes("grav.terrain_intermediate_zone"));
+  assert.ok(approved.capabilities?.includes("grav.terrain_far_zone"));
+  assert.equal(approved.steps.nearZoneTerrain, true);
+  assert.equal(approved.steps.intermediateZoneTerrain, true);
+  assert.equal(approved.steps.farZoneTerrain, true);
+  assert.equal(approved.parameters.zonedPlanarApproved, true);
+  assert.equal(approved.parameters.requestIntent, "zoned planar terrain-corrected Bouguer anomaly");
+  assert.equal(approved.parameters.productName, "zoned planar terrain-corrected Bouguer anomaly");
   assert.ok(
-    patched.reviewDecisions?.some(
+    approved.reviewDecisions?.some(
       (d) =>
-        String(d.capabilityId || "").startsWith("grav.terrain_") &&
-        /not a Complete Bouguer Anomaly|does not produce a Complete Bouguer/i.test(d.reason)
+        d.capabilityId === "grav.terrain_near_zone" &&
+        d.status !== "refused" &&
+        /zoned planar terrain-corrected Bouguer anomaly/.test(d.reason) &&
+        !/Complete Bouguer/.test(d.reason)
     )
   );
   const noDensity = applyChatPatches(plan, "add terrain correction");
@@ -276,7 +300,7 @@ test("implementation plan names near-zone terrain-corrected Bouguer and refuses 
   assert.match(md, /near-zone terrain-corrected Bouguer/i);
   assert.match(md, /Far-zone and intermediate-zone/i);
   assert.match(md, /Bullard B/);
-  assert.ok(!/product: complete bouguer anomaly/i.test(md));
+  assert.ok(!/complete bouguer/i.test(md));
 });
 
 test("valid terrain-corrected plan binds DEM provenance and a versioned run folder", () => {
@@ -306,17 +330,20 @@ test("near-zone terrain-corrected grids are labelled separately from simple Boug
   assert.equal(mapValueUnits(nz), "mGal");
   assert.equal(mapValueUnits("G-AID Output/runs/r1/bouguer_grid.asc"), "mGal");
   assert.match(layerLabel(nz), /near-zone terrain-corrected Bouguer/i);
-  assert.ok(!/complete bouguer anomaly/i.test(layerLabel(nz)));
+  assert.ok(!/complete bouguer/i.test(layerLabel(nz)));
   const warnings = gravityProductWarnings({ path: nz, densityGcc: 2.67, terrainRadiusM: 150, bullardB: false });
-  assert.ok(warnings.some((line) => /not equivalent/i.test(line)));
+  assert.ok(warnings.some((line) => /spherical far-zone/i.test(line)));
+  assert.ok(warnings.some((line) => /Hayford/i.test(line)));
   assert.ok(warnings.some((line) => /far-zone/i.test(line)));
   assert.ok(warnings.some((line) => /Bullard B/i.test(line)));
+  assert.ok(!warnings.some((line) => /complete bouguer/i.test(line)));
   const layers = buildMapLayers({
     catalog: null,
     files: [nz, "G-AID Output/runs/r1/bouguer_grid.asc"],
   });
   assert.ok(layers.some((layer) => /near_zone_terrain_corrected_bouguer/.test(layer.path)));
-  assert.ok(layers.some((layer) => /not complete Bouguer/i.test(layer.label)));
+  assert.ok(layers.some((layer) => /near-zone terrain-corrected Bouguer/i.test(layer.label)));
+  assert.ok(!layers.some((layer) => /complete bouguer/i.test(layer.label)));
 });
 
 test("inspectDemText requires documented CRS, metres, and vertical datum", () => {
@@ -411,7 +438,11 @@ test("end-to-end near-zone terrain-corrected Bouguer when science deps exist", (
     const report = JSON.parse(fs.readFileSync(path.join(run, "gravity_interpretation.json"), "utf8"));
     assert.ok(report.observations.some((line: string) => /near-zone terrain-corrected Bouguer/i.test(line)));
     assert.ok(report.not_established.some((line: string) => /drill/i.test(line)));
-    assert.ok(report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
+    assert.ok(report.not_established.some((line: string) => /spherical far-zone/i.test(line)));
+    assert.ok(report.not_established.some((line: string) => /Hayford/i.test(line)));
+    assert.ok(report.not_established.some((line: string) => /atmospheric/i.test(line)));
+    assert.ok(!report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
+    assert.ok(!/complete bouguer/i.test(report.product_name));
     const simpleQc = JSON.parse(fs.readFileSync(path.join(run, "gravity_bouguer_qc.json"), "utf8"));
     assert.match(simpleQc.convention, /simple Bouguer/i);
   } finally {
@@ -441,7 +472,8 @@ test("hayford/far-zone chat grants registered zoned caps and does not treat them
     dag.nodes.filter((n) => n.id === "gravity_terrain").map((n) => n.id),
     ["gravity_terrain"]
   );
-  assert.match(dag.nodes.find((n) => n.id === "gravity_terrain")?.label || "", /not Complete Bouguer/i);
+  assert.match(dag.nodes.find((n) => n.id === "gravity_terrain")?.label || "", /planar Nagy/i);
+  assert.ok(!/complete bouguer/i.test(dag.nodes.find((n) => n.id === "gravity_terrain")?.label || ""));
 });
 
 test("implementation plan for zoned terrain still refuses Complete Bouguer product copy", () => {
@@ -469,8 +501,8 @@ test("implementation plan for zoned terrain still refuses Complete Bouguer produ
     farRadiusM: 200000,
   });
   assert.match(md, /planar Nagy/i);
-  assert.match(md, /Not a Complete Bouguer Anomaly/i);
-  assert.ok(!/product: complete bouguer anomaly/i.test(md));
+  assert.match(md, /zoned planar terrain-corrected Bouguer anomaly/);
+  assert.ok(!/complete bouguer/i.test(md));
   const warnings = gravityProductWarnings({
     path: "G-AID Output/runs/r1/near_zone_terrain_corrected_bouguer_grid.asc",
     densityGcc: 2.67,
@@ -478,8 +510,10 @@ test("implementation plan for zoned terrain still refuses Complete Bouguer produ
     intermediateZone: true,
     farZone: false,
   });
-  assert.ok(warnings.some((line) => /not a Complete Bouguer/i.test(line)));
+  assert.ok(warnings.some((line) => /zoned planar terrain-corrected Bouguer anomaly/.test(line)));
   assert.ok(warnings.some((line) => /Hayford/i.test(line)));
+  assert.ok(warnings.some((line) => /spherical far-zone/i.test(line)));
+  assert.ok(!warnings.some((line) => /complete bouguer/i.test(line)));
 });
 
 test("end-to-end zoned request on a local DEM skips far-zone and never claims Complete Bouguer", () => {
@@ -569,10 +603,14 @@ test("end-to-end zoned request on a local DEM skips far-zone and never claims Co
     assert.equal(qc.complete_bouguer_justified, false);
     assert.equal(qc.far_zone, false);
     assert.ok(/does not cover|not invented|farRadiusM/i.test(qc.far.reason));
-    assert.ok(!/complete Bouguer Anomaly/i.test(qc.product_name));
+    assert.equal(qc.product_name, "zoned planar terrain-corrected Bouguer anomaly");
+    assert.ok(!/complete bouguer/i.test(qc.product_name));
     assert.equal(fs.existsSync(path.join(run, "near_zone_terrain_corrected_bouguer_grid.asc")), true);
     const report = JSON.parse(fs.readFileSync(path.join(run, "gravity_interpretation.json"), "utf8"));
-    assert.ok(report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
+    assert.ok(report.not_established.some((line: string) => /spherical far-zone/i.test(line)));
+    assert.ok(report.not_established.some((line: string) => /Hayford/i.test(line)));
+    assert.ok(!report.not_established.some((line: string) => /Complete Bouguer/i.test(line)));
+    assert.ok(!/complete bouguer/i.test(report.product_name));
     const gridQc = JSON.parse(fs.readFileSync(path.join(run, "gravity_grid_qc.json"), "utf8"));
     assert.ok(
       gridQc.source_column === "zoned_terrain_corrected_bouguer_mgal" ||

@@ -1,3 +1,5 @@
+import { NEAR_ZONE_MAP_LABEL } from "./gravity-product.ts";
+
 const GRID_RE = /\.(tif|tiff|asc|npz|npy)$/i;
 
 function posix(path: string): string {
@@ -64,10 +66,10 @@ export function layerLabel(pathOrStem: string): string {
   if (base.includes("rtp")) return "RTP";
   if (base.includes("pseudo_gravity")) return "Pseudo-gravity";
   if (base.includes("near_zone_terrain_corrected_bouguer")) {
-    return "Near-zone terrain-corrected Bouguer (not complete Bouguer)";
+    return NEAR_ZONE_MAP_LABEL;
   }
   if (base.includes("complete_bouguer")) {
-    return "Do not use — mislabelled complete Bouguer";
+    return "Do not use — mislabelled terrain grid";
   }
   if (base.includes("bouguer") && !base.includes("pseudo")) return "Simple Bouguer";
   if (base.includes("2vd")) return "2VD";

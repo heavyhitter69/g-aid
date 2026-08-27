@@ -130,7 +130,8 @@ test("validation-ui gravity fixture is a near-zone grid with honest QC and map l
     bullardB: qc.apply_bullard_b,
   });
   assert.ok(warnings.some((line) => /Bullard B/i.test(line)));
-  assert.ok(warnings.some((line) => /not equivalent/i.test(line)));
+  assert.ok(warnings.some((line) => /spherical far-zone/i.test(line)));
+  assert.ok(!warnings.some((line) => /complete bouguer/i.test(line)));
 });
 
 test("validation-ui ERT fixtures parse as labelled sections with invert QC", () => {

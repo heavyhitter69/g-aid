@@ -76,6 +76,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     applyFarZone: next.parameters.applyFarZone || next.steps.farZoneTerrain,
     intermediateRadiusM: next.parameters.intermediateRadiusM,
     farRadiusM: next.parameters.farRadiusM,
+    requestIntent: next.parameters.requestIntent,
+    productName: next.parameters.productName,
   });
   return next;
 }

@@ -33,16 +33,21 @@ export function intentToSteps(
     next.gravity = true;
     next.residual = true;
   }
-  if (/\bcomplete\s+bouguer\b|\bterrain\s+correct|\bnear[\s-]?zone\s+terrain/.test(m)) {
+  const completeBouguer = /\bcomplete\s+bouguer\b/.test(m);
+  const zonedPlanar = /\bzoned planar terrain-corrected bouguer(?: anomaly)?\b/.test(m);
+  if (!completeBouguer && (/\bterrain\s+correct|\bnear[\s-]?zone\s+terrain/.test(m) || zonedPlanar)) {
     next.gravity = true;
     next.nearZoneTerrain = true;
   }
-  if (/\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km|\bcomplete\s+bouguer\b/.test(m)) {
+  if (
+    zonedPlanar ||
+    (!completeBouguer && /\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km/.test(m))
+  ) {
     next.gravity = true;
     next.nearZoneTerrain = true;
     next.intermediateZoneTerrain = true;
   }
-  if (/\bfar[\s-]?zone\s+terrain|\bcomplete\s+bouguer\b/.test(m)) {
+  if (zonedPlanar || (!completeBouguer && /\bfar[\s-]?zone\s+terrain/.test(m))) {
     next.gravity = true;
     next.nearZoneTerrain = true;
     next.intermediateZoneTerrain = true;

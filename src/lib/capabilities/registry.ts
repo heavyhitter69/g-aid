@@ -313,7 +313,7 @@ const CAPABILITIES: ScientificCapability[] = [
     qcRequirements: ["density recorded", "Bullard B flag", "mean Bouguer"],
     viewerTypes: ["table", "json"],
     interpretationLimits: [
-      "Simple Bouguer is not a terrain-corrected Bouguer anomaly and is not a Complete Bouguer Anomaly. It does not prove lithology, mineralisation, or drill targets.",
+      "Simple Bouguer is not a terrain-corrected Bouguer anomaly. It does not prove lithology, mineralisation, or drill targets.",
     ],
     expectedArtifacts: ["gravity_bouguer.csv", "gravity_bouguer_qc.json"],
   }),
@@ -322,7 +322,7 @@ const CAPABILITIES: ScientificCapability[] = [
     version: "1.2.0",
     title: "Near-zone terrain-corrected Bouguer",
     description:
-      "Nagy 1966 rectangular-prism terrain correction inside a user radius or bound DEM extent, added to simple Bouguer. Intermediate- and far-zone rings are separate capabilities on the same kernel. This is not a Complete Bouguer Anomaly.",
+      "Nagy 1966 rectangular-prism terrain correction inside a user radius or bound DEM extent, added to simple Bouguer. Intermediate- and far-zone rings are separate capabilities on the same kernel. Spherical far-zone treatment, Hayford–Bowie geometry, global coverage, and atmospheric correction are excluded.",
     domain: "gravity",
     kernelNodeIds: ["gravity_terrain"],
     dependsOn: ["grav.bouguer"],
@@ -344,7 +344,7 @@ const CAPABILITIES: ScientificCapability[] = [
       {
         id: "near_zone_terrain_corrected_bouguer",
         type: "table",
-        description: "Near-zone terrain-corrected Bouguer anomaly mGal (not Complete Bouguer)",
+        description: "Near-zone terrain-corrected Bouguer anomaly mGal",
         viewer: "table",
       },
       { id: "terrain_qc", type: "qc", description: "Terrain-correction method, radius, DEM identity, coverage, Bullard B status", viewer: "json" },
@@ -376,7 +376,7 @@ const CAPABILITIES: ScientificCapability[] = [
       "Convention: Δg_NZTC = Δg_FA − 2πGρh [+ Bullard B if requested] + TC_Nagy(R or DEM extent).",
       "TC is |gz| of DEM-minus-slab prisms (Nagy 1966) inside the near-zone window. Always ≥ 0.",
       "Intermediate- and far-zone rings require grav.terrain_intermediate_zone / grav.terrain_far_zone. Hayford–Bowie compartments are not implemented.",
-      "Do not label this product Complete Bouguer Anomaly. It is not equivalent to a fully regional or commercial complete Bouguer.",
+      "Spherical far-zone treatment, Hayford–Bowie or equivalent geometry, global/adequate terrain coverage, and atmospheric correction are excluded.",
       "A DEM is never downloaded or invented.",
       "Density is never defaulted to 2.67 g/cm³.",
       "CRS is never silently reprojected.",
@@ -396,7 +396,7 @@ const CAPABILITIES: ScientificCapability[] = [
     viewerTypes: ["table", "json", "map"],
     interpretationLimits: [
       "A near-zone terrain-corrected Bouguer anomaly is not lithology, mineralisation, or a drill target.",
-      "Do not equate this product with Oasis montaj Complete Bouguer or any far-zone-corrected anomaly.",
+      "Do not equate this product with Oasis montaj full-convention Bouguer or any spherical far-zone product.",
     ],
     expectedArtifacts: [
       "near_zone_terrain_corrected_bouguer.csv",
@@ -409,7 +409,7 @@ const CAPABILITIES: ScientificCapability[] = [
     version: "1.0.0",
     title: "Intermediate-zone terrain correction",
     description:
-      "Planar Nagy prism terrain in the annulus from the near-zone radius out to min(166.7 km, bound DEM). Aggregated cells may be used. Not Hayford–Bowie compartments. Not a Complete Bouguer Anomaly.",
+      "Planar Nagy prism terrain in the annulus from the near-zone radius out to min(166.7 km, bound DEM). Aggregated cells may be used. Hayford–Bowie compartments are not implemented. Spherical far-zone treatment, global coverage, and atmospheric correction are excluded.",
     domain: "gravity",
     kernelNodeIds: ["gravity_terrain"],
     dependsOn: ["grav.terrain_near_zone"],
@@ -431,7 +431,7 @@ const CAPABILITIES: ScientificCapability[] = [
       {
         id: "intermediate_terrain_correction",
         type: "table",
-        description: "Intermediate-zone terrain correction mGal on the same near-zone product (not Complete Bouguer)",
+        description: "Intermediate-zone terrain correction mGal on the same near-zone product",
         viewer: "table",
       },
     ],
@@ -462,7 +462,7 @@ const CAPABILITIES: ScientificCapability[] = [
       "Convention: planar Nagy annulus R_near → min(R_int, DEM coverage). Default R_int = 166.7 km.",
       "The ring is skipped when DEM coverage inside it is < 95%. Terrain outside the bound DEM is not invented or downloaded.",
       "Hayford–Bowie compartment geometry is not implemented. Only the 166.7 km outer radius number is used.",
-      "Do not label this product Complete Bouguer Anomaly.",
+      "Hayford–Bowie compartment geometry is not implemented. Only the 166.7 km outer radius number is used. Spherical far-zone treatment, global coverage, and atmospheric correction remain excluded.",
     ],
     qcRequirements: [
       "intermediate.applied true or a recorded skip reason",
@@ -473,7 +473,7 @@ const CAPABILITIES: ScientificCapability[] = [
     viewerTypes: ["table", "json", "map"],
     interpretationLimits: [
       "An intermediate-zone planar ring on a local DEM is not a Hayford–Bowie complete terrain correction.",
-      "Do not equate this product with Oasis montaj Complete Bouguer.",
+      "Do not equate this product with Oasis montaj full-convention Bouguer.",
     ],
     expectedArtifacts: [
       "near_zone_terrain_corrected_bouguer.csv",
@@ -485,7 +485,7 @@ const CAPABILITIES: ScientificCapability[] = [
     version: "1.0.0",
     title: "Far-zone terrain correction",
     description:
-      "Planar Nagy prism terrain beyond 166.7 km, only when a bound DEM actually covers the requested far radius. G-AID never downloads ETOPO/SRTM. Not spherical-Earth far-zone theory. Not a Complete Bouguer Anomaly.",
+      "Planar Nagy prism terrain beyond 166.7 km, only when a bound DEM actually covers the requested far radius. G-AID never downloads ETOPO/SRTM. Spherical-Earth far-zone theory is not implemented. Atmospheric correction is excluded.",
     domain: "gravity",
     kernelNodeIds: ["gravity_terrain"],
     dependsOn: ["grav.terrain_near_zone"],
@@ -507,7 +507,7 @@ const CAPABILITIES: ScientificCapability[] = [
       {
         id: "far_terrain_correction",
         type: "table",
-        description: "Far-zone terrain correction mGal when the bound DEM covers the ring (otherwise skipped; not Complete Bouguer)",
+        description: "Far-zone terrain correction mGal when the bound DEM covers the ring (otherwise skipped)",
         viewer: "table",
       },
     ],
@@ -538,7 +538,7 @@ const CAPABILITIES: ScientificCapability[] = [
       "Applied only when the bound DEM covers farRadiusM with ≥ 95% coverage. Missing global DEM is a skip, never a silent pass.",
       "Planar Nagy only. Spherical-Earth far-zone theory, atmospheric correction, and Hayford–Bowie compartments are excluded.",
       "A DEM is never downloaded or invented.",
-      "Do not label this product Complete Bouguer Anomaly. Complete Bouguer is not scientifically justified in G-AID copy for this convention.",
+      "Spherical far-zone treatment, Hayford–Bowie geometry, global coverage, and atmospheric correction are excluded.",
     ],
     qcRequirements: [
       "far.applied true or a recorded skip reason",
@@ -548,8 +548,8 @@ const CAPABILITIES: ScientificCapability[] = [
     ],
     viewerTypes: ["table", "json", "map"],
     interpretationLimits: [
-      "A skipped or planar far ring is not a Complete Bouguer Anomaly.",
-      "Do not equate this product with Oasis montaj Complete Bouguer or any spherical far-zone product.",
+      "A skipped or planar far ring does not supply spherical far-zone treatment, Hayford–Bowie geometry, global coverage, or atmospheric correction.",
+      "Do not equate this product with Oasis montaj full-convention Bouguer or any spherical far-zone product.",
     ],
     expectedArtifacts: [
       "near_zone_terrain_corrected_bouguer.csv",
@@ -636,7 +636,7 @@ const CAPABILITIES: ScientificCapability[] = [
     viewerTypes: ["json"],
     interpretationLimits: [
       "A gravity anomaly is an observation. Density, geology, and drill targets are not established by this pack.",
-      "Simple Bouguer, near-zone, and zoned planar terrain-corrected Bouguer are different products. None is a Complete Bouguer Anomaly.",
+      "Simple Bouguer, near-zone, and zoned planar terrain-corrected Bouguer are different products. None includes spherical far-zone treatment, Hayford–Bowie geometry, global coverage, or atmospheric correction.",
     ],
     expectedArtifacts: ["gravity_interpretation.json"],
   }),

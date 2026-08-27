@@ -13,7 +13,7 @@ const STEP_TO_CAPABILITY: Record<string, UserCapabilityId> = {
   gis: "mag.gis",
 };
 
-const GRAVITY_DEFAULT: UserCapabilityId[] = [
+export const GRAVITY_DEFAULT: UserCapabilityId[] = [
   "grav.ingest",
   "grav.freeair",
   "grav.bouguer",
@@ -216,20 +216,22 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
   const completeAsk =
     /\bcomplete\s+bouguer\b/.test(m) &&
     !/\b(skip|omit|without|no)\b.{0,40}\b(terrain|complete bouguer)\b/.test(m);
+  const zonedAsk = /\bzoned planar terrain-corrected bouguer(?: anomaly)?\b/.test(m);
   const intermediateAsk =
     /\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km/.test(m) &&
     !/\b(skip|omit|without|no)\b.{0,40}\b(intermediate|hayford|bowie)\b/.test(m);
   const farAsk =
     /\bfar[\s-]?zone\s+terrain/.test(m) &&
     !/\b(skip|omit|without|no)\b.{0,40}\bfar[\s-]?zone\b/.test(m);
-  if (terrainAsk || completeAsk || intermediateAsk || farAsk) {
+  // Complete Bouguer never auto-grants terrain. The named zoned planar alternative must be approved.
+  if (zonedAsk || ((terrainAsk || intermediateAsk || farAsk) && !completeAsk)) {
     for (const id of GRAVITY_DEFAULT) next.add(id);
     next.add("grav.terrain_near_zone");
   }
-  if (completeAsk || intermediateAsk || farAsk) {
+  if (zonedAsk || ((intermediateAsk || farAsk) && !completeAsk)) {
     next.add("grav.terrain_intermediate_zone");
   }
-  if (completeAsk || farAsk) {
+  if (zonedAsk || (farAsk && !completeAsk)) {
     next.add("grav.terrain_far_zone");
   }
 

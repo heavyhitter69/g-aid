@@ -5,5 +5,5 @@
   "formula": "\u0394g_B = \u0394g_FA \u2212 2\u03c0G\u03c1h",
   "terrain": "not applied \u2014 simple Bouguer only. Near-zone terrain correction requires grav.terrain_near_zone with a documented DEM.",
   "assumed_density": false,
-  "convention": "simple Bouguer (infinite slab). This is not a terrain-corrected Bouguer anomaly and not a Complete Bouguer Anomaly."
+  "convention": "simple Bouguer (infinite slab). Terrain correction is not applied."
 }

@@ -1,5 +1,5 @@
 {
-  "product_name": "zoned terrain-corrected Bouguer anomaly (planar Nagy; not Complete Bouguer)",
+  "product_name": "zoned planar terrain-corrected Bouguer anomaly",
   "not_complete_bouguer": true,
   "complete_bouguer_justified": false,
   "kernel": "Nagy 1966 rectangular prisms, planar near/intermediate/far annuli on a bound DEM",

@@ -6,7 +6,10 @@
   "passed": true,
   "support_bar_for_this_pack": "met_with_documented_limits",
   "source": "live-react-page",
-  "components": ["GridMapView", "SectionView"],
+  "components": [
+    "GridMapView",
+    "SectionView"
+  ],
   "url": "http://127.0.0.1:3000/workspace/verify-phase5b",
   "viewport": "1280x800",
   "recorded_at": "2026-08-26T22:46:00Z",
@@ -20,13 +23,13 @@
   "tabs": {
     "gravity": {
       "passed": true,
-      "title": "Near-zone terrain-corrected Bouguer (not complete Bouguer)",
+      "title": "Near-zone terrain-corrected Bouguer",
       "crs": "EPSG:32630",
       "units": "mGal",
       "map_visible": true,
-      "colorbar_range": "-92.11 – -86.32 mGal",
-      "grid": "8 x 8 · 100.00 m",
-      "warnings": "Product: near-zone terrain-corrected Bouguer anomaly. Terrain correction is limited to the configured DEM extent or radius. Cells outside that window are ignored. Far-zone and intermediate-zone terrain effects are not included. Hayford–Bowie compartments are not implemented. This anomaly is not equivalent to a fully regional or commercial Complete Bouguer product. Bullard B / spherical-cap curvature: off unless requested. Reduction density: 2.67 g/cm³ (user-confirmed). Near-zone radius: 150 m. DEM cell size: 25 m. DEM coverage inside the near-zone window: 100.0%. Vertical datum: orthometric. Overlay blocked: documented CRS EPSG:32630 does not match EPSG:4326. G-AID will not reproject silently.",
+      "colorbar_range": "-92.11 \u2013 -86.32 mGal",
+      "grid": "8 x 8 \u00b7 100.00 m",
+      "warnings": "Product: near-zone terrain-corrected Bouguer anomaly. Terrain correction is limited to the configured DEM extent or radius. Cells outside that window are ignored. Far-zone and intermediate-zone terrain effects are not included. Hayford\u2013Bowie compartments are not implemented. Spherical far-zone treatment, global terrain coverage, and atmospheric correction are excluded. Bullard B / spherical-cap curvature: off unless requested. Reduction density: 2.67 g/cm\u00b3 (user-confirmed). Near-zone radius: 150 m. DEM cell size: 25 m. DEM coverage inside the near-zone window: 100.0%. Vertical datum: orthometric. Overlay blocked: documented CRS EPSG:32630 does not match EPSG:4326. G-AID will not reproject silently.",
       "screenshot": "docs/validation/results/screenshots/gravity-map.webp"
     },
     "pseudo": {
@@ -34,7 +37,7 @@
       "heading": "ERT pseudosection",
       "section_visible": true,
       "units": "ohm.m",
-      "z_reference": "pseudo-depth n*a/2 — plotting convention not inversion depth",
+      "z_reference": "pseudo-depth n*a/2 \u2014 plotting convention not inversion depth",
       "model_status": "not a depth model",
       "warnings": "A pseudosection is not a depth model and is not true resistivity.",
       "screenshot": "docs/validation/results/screenshots/ert-pseudosection.webp"
@@ -60,7 +63,7 @@
       "far_zone": false,
       "intermediate_zone": false,
       "crs_warning": "Overlay blocked: documented CRS EPSG:32630 does not match EPSG:4326. G-AID will not reproject silently.",
-      "not_established_includes": "A Complete Bouguer Anomaly is not established without far-zone and intermediate-zone terrain.",
+      "not_established_includes": "Spherical far-zone treatment, Hayford\u2013Bowie or equivalent geometry, global/adequate terrain coverage, and atmospheric correction are excluded.",
       "screenshot": "docs/validation/results/screenshots/provenance-crs.webp"
     }
   }

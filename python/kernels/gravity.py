@@ -196,7 +196,7 @@ def gravity_bouguer(payload: dict) -> dict:
         "formula": formula,
         "terrain": "not applied — simple Bouguer only. Near-zone terrain correction requires grav.terrain_near_zone with a documented DEM.",
         "assumed_density": False,
-        "convention": "simple Bouguer (infinite slab). This is not a terrain-corrected Bouguer anomaly and not a Complete Bouguer Anomaly.",
+        "convention": "simple Bouguer (infinite slab). Terrain correction is not applied.",
     }
     qc_path = write_json(os.path.join(out, "gravity_bouguer_qc.json"), qc)
     write_lineage(out, node_id, formula, {"density": density, "applyBullardB": apply_bb}, [src], [path, qc_path])
@@ -205,7 +205,7 @@ def gravity_bouguer(payload: dict) -> dict:
             make_artifact("artifact-grav-bouguer", "processed_dataset", "csv", path, node_id, [src], qc),
             make_artifact("artifact-grav-bouguer-qc", "qc_report", "json", qc_path, node_id, [src]),
         ],
-        "events": [{"type": "NODE_PROGRESS", "message": f"Simple Bouguer at {density} g/cm³. Terrain not applied — this is not a Complete Bouguer Anomaly."}],
+        "events": [{"type": "NODE_PROGRESS", "message": f"Simple Bouguer at {density} g/cm³. Terrain not applied."}],
     }
 
 
@@ -226,7 +226,8 @@ def gravity_terrain(payload: dict) -> dict:
 
     Near-zone always uses native cells. Intermediate- and far-zone rings are
     optional, skipped when the bound DEM does not cover them, and never
-    downloaded. This is not a Complete Bouguer Anomaly.
+    downloaded. Spherical far-zone treatment, Hayford–Bowie geometry,
+    global terrain coverage, and atmospheric correction are excluded.
     """
     from formats.dem import parse_dem_ascii
     from science.gravity import HAYFORD_BOWIE_OUTER_M, zoned_terrain_correction
@@ -335,16 +336,14 @@ def gravity_terrain(payload: dict) -> dict:
         apply_bb = apply_bb or bool(np.nanmax(np.abs(work["bullard_b_mgal"].to_numpy(dtype=float))) > 0)
     int_applied = bool(zoned["intermediate"].get("applied"))
     far_applied = bool(zoned["far"].get("applied"))
-    if far_applied:
-        product_name = "zoned terrain-corrected Bouguer anomaly (planar Nagy; not Complete Bouguer)"
-    elif int_applied:
-        product_name = "near- and intermediate-zone terrain-corrected Bouguer anomaly"
+    if apply_intermediate or apply_far:
+        product_name = "zoned planar terrain-corrected Bouguer anomaly"
     else:
         product_name = "near-zone terrain-corrected Bouguer anomaly"
     formula = (
         "Δg = Δg_FA − 2πGρh [+ Bullard B if requested] + TC_near[+TC_int][+TC_far] (Nagy 1966 planar prisms). "
         "Atmospheric correction is not applied. Hayford–Bowie compartments are not implemented. "
-        "Not a Complete Bouguer Anomaly."
+        "Spherical far-zone treatment and global terrain coverage are excluded."
     )
     qc = {
         "product_name": product_name,
@@ -425,8 +424,8 @@ def gravity_terrain(payload: dict) -> dict:
             "Atmospheric correction is not implemented.",
             "No isostatic correction.",
             "No Earth curvature on the prism kernel itself (Bullard B is a separate optional term on the slab).",
-            "Not equivalent to Oasis montaj or any commercial Complete Bouguer product.",
-            "The term Complete Bouguer Anomaly is not scientifically justified in G-AID product copy for this convention.",
+            "Not equivalent to Oasis montaj or any commercial full-convention Bouguer product.",
+            "Spherical far-zone treatment, Hayford–Bowie geometry, global coverage, and atmospheric correction are excluded.",
         ],
     }
     qc_path = write_json(os.path.join(out, "near_zone_terrain_corrected_bouguer_qc.json"), qc)
@@ -472,7 +471,7 @@ def gravity_terrain(payload: dict) -> dict:
                 "message": (
                     f"{qc['product_name']} at {density} g/cm³, near window={qc['near_zone_window']}, "
                     f"intermediate={qc['intermediate_zone']}, far={qc['far_zone']}. "
-                    f"Bullard B {qc['bullard_b_status']}. Not Complete Bouguer."
+                    f"Bullard B {qc['bullard_b_status']}. Spherical far-zone, Hayford–Bowie geometry, global coverage, and atmosphere excluded."
                 ),
             }
         ],
@@ -678,21 +677,21 @@ def grav_interpret(payload: dict) -> dict:
             "Simple Bouguer omits terrain. Incomplete terrain correction can exceed many geological signals.",
             "Terrain correction is limited to the bound DEM. Intermediate/far rings are skipped when coverage is incomplete.",
             "Atmospheric correction is not applied. Hayford–Bowie compartments are not implemented.",
-            "This product is not equivalent to a fully regional or commercial Complete Bouguer Anomaly.",
+            "Spherical far-zone treatment and global/adequate terrain coverage are excluded.",
             "Polynomial residual order is a modelling choice.",
             "Gridding interpolates between stations.",
         ],
         "recommendations": [
             "Confirm density with rock samples or a well-justified local value before modelling.",
             "Do not treat residual highs/lows as drill targets.",
-            "Do not present this run as a Complete Bouguer Anomaly.",
+            "Do not present this run as a full-convention Bouguer product.",
         ],
         "not_established": [
             "Lithology is not established.",
             "Mineralisation is not established.",
             "Density bodies are not established.",
             "Drill targets are not established.",
-            "A Complete Bouguer Anomaly is not established. Atmospheric correction, spherical far-zone theory, Hayford–Bowie compartments, and global DEM coverage are excluded.",
+            "Spherical far-zone treatment, Hayford–Bowie or equivalent geometry, global/adequate terrain coverage, and atmospheric correction are excluded.",
         ],
         "qc": qcs,
         "interpretation_limit": "A gravity anomaly is an observation. Overlay and colour scale do not prove geological causation.",

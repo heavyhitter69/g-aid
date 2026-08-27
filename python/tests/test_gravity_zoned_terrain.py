@@ -271,7 +271,7 @@ def write_results(cases: list[dict]) -> str:
     os.makedirs(RESULTS_DIR, exist_ok=True)
     path = os.path.abspath(os.path.join(RESULTS_DIR, "gravity_zoned_terrain_benchmarks.json"))
     payload = {
-        "product_name": "zoned terrain-corrected Bouguer anomaly (planar Nagy; not Complete Bouguer)",
+        "product_name": "zoned planar terrain-corrected Bouguer anomaly",
         "not_complete_bouguer": True,
         "complete_bouguer_justified": False,
         "kernel": "Nagy 1966 rectangular prisms, planar near/intermediate/far annuli on a bound DEM",

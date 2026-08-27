@@ -58,8 +58,8 @@ Live React pass recorded 2026-08-26 at viewport 1280×800
 
 | Check | Result |
 |---|---|
-| Gravity legend **Near-zone terrain-corrected Bouguer (not complete Bouguer)** | pass |
-| Warning bar: DEM radius/extent, far-zone/intermediate omitted, Bullard B off, DEM 25 m / 100% coverage / orthometric, density 2.67 g/cm³ user-confirmed, not commercial Complete Bouguer | pass |
+| Gravity legend **Near-zone terrain-corrected Bouguer** | pass |
+| Warning bar: DEM radius/extent, far-zone/intermediate omitted, Bullard B off, DEM 25 m / 100% coverage / orthometric, density 2.67 g/cm³ user-confirmed; spherical far-zone / Hayford–Bowie / atmosphere excluded | pass |
 | Colorbar units mGal; CRS EPSG:32630 | pass |
 | ERT pseudosection labelled not a depth model | pass |
 | ERT invert labelled experimental, not production, not Res2DInv | live label; screenshot captured before this wording |

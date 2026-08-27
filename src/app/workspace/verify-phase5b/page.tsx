@@ -72,7 +72,7 @@ export default function Phase5bVerifyPage() {
   if (!grid || !pseudo || !model) {
     return (
       <p className="p-6 text-sm text-red-300">
-        Fixtures loaded but the gravity grid or ERT section failed to parse. This is not a Complete Bouguer or Res2DInv product.
+        Fixtures loaded but the gravity grid or ERT section failed to parse. This is not a full-convention Bouguer or Res2DInv product.
       </p>
     );
   }
@@ -83,8 +83,8 @@ export default function Phase5bVerifyPage() {
         <p className="text-[10px] uppercase tracking-wide text-[#858585]">Desktop verification</p>
         <h1 className="text-sm font-medium">Near-zone terrain-corrected Bouguer and ERT sections</h1>
         <p className="text-[11px] text-[#9d9d9d] mt-1">
-          This page renders the same map and section components as the workspace. It does not claim Complete Bouguer,
-          Res2DInv, groundwater, or drill targets.
+          This page renders the same map and section components as the workspace. It does not claim a full-convention
+          Bouguer product, Res2DInv, groundwater, or drill targets.
         </p>
       </header>
       <nav className="flex gap-1 px-3 py-2 border-b border-[#2b2b2b] text-[12px]">

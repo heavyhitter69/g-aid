@@ -108,7 +108,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
       ? "I can plan MagArrow + GSM-19 magnetics if you ask for that work. Mixed files do not start a magnetic workflow by themselves."
       : "I will not start a magnetic workflow unless you ask for magnetics and both MagArrow and GSM-19 supported records are present.",
     gravity
-      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented. Near-zone terrain-corrected Bouguer also needs a documented dem-ascii record. Intermediate- and far-zone rings need covering DEM extent; G-AID does not download terrain. That product is not a Complete Bouguer Anomaly."
+      ? "I can plan gravity reductions if you ask, after density, CRS, units, and elevation datum are documented. Near-zone terrain-corrected Bouguer also needs a documented dem-ascii record. Intermediate- and far-zone rings need covering DEM extent; G-AID does not download terrain. Spherical far-zone treatment, Hayford–Bowie geometry, global coverage, and atmospheric correction are excluded."
       : "Gravity processing needs a documented XYZ/CSV contract, not the first .xyz file.",
     dem
       ? "A documented DEM ASCII record is available as a near-zone terrain source. I will not download a DEM or apply far-zone terrain."

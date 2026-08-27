@@ -195,7 +195,8 @@ def terrain_correction_prisms(
 
     Each DEM cell is a rectangular prism of the mass difference between the DEM
     surface and the station slab plane. TC = |gz| so both hills and valleys
-    add a positive correction. Planar geometry. Not a Complete Bouguer Anomaly.
+    add a positive correction. Planar geometry. Spherical far-zone treatment
+    and Hayford–Bowie compartments are not implemented.
 
     min_radius_m < r ≤ max_radius_m selects the ring. Near-zone is min=0.
     """
@@ -255,7 +256,7 @@ def terrain_correction_prisms(
         "radius_m": radius,
         "min_radius_m": r_min,
         "density_gcc": float(density_gcc),
-        "method": "Nagy 1966 rectangular prisms, planar annulus — not Complete Bouguer",
+        "method": "Nagy 1966 rectangular prisms, planar annulus",
         "cellsize_m": float(dem.dx),
     }
 
@@ -333,7 +334,7 @@ def zoned_terrain_correction(
                 intermediate["applied"] = True
                 intermediate["reason"] = (
                     f"Planar Nagy annulus {float(near_radius_m)}–{r_int_eff} m on aggregated DEM "
-                    f"(cell {outer_dem.dx:.1f} m). Not Hayford–Bowie compartments. Not Complete Bouguer."
+                    f"(cell {outer_dem.dx:.1f} m). Hayford–Bowie compartments are not implemented."
                 )
             intermediate["coverage_mean"] = cov
 
@@ -378,7 +379,7 @@ def zoned_terrain_correction(
                 far["applied"] = True
                 far["reason"] = (
                     f"Planar Nagy annulus {r_far_inner}–{r_far_req} m on aggregated DEM. "
-                    "Not spherical Earth, not atmospheric, not Complete Bouguer."
+                    "Spherical-Earth far-zone theory and atmospheric correction are excluded."
                 )
             far["coverage_mean"] = cov
 
@@ -403,7 +404,8 @@ def zoned_terrain_correction(
             "Near-zone terrain-corrected Bouguer uses Nagy 1966 planar prisms on a bound DEM "
             "(native cells 0–R_near). Intermediate and far rings are optional, aggregated, "
             "and skipped when the DEM does not cover them. Far-zone beyond 166.7 km is never "
-            "downloaded. Not a Complete Bouguer Anomaly."
+            "downloaded. Spherical far-zone treatment, Hayford–Bowie geometry, global coverage, "
+            "and atmospheric correction are excluded."
         ),
     }
 

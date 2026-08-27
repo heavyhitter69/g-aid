@@ -1,4 +1,4 @@
-/** Honest gravity product names. Never label zoned planar TC as Complete Bouguer. */
+/** Honest gravity product names. The partial zoned planar product never uses the phrase Complete Bouguer. */
 
 export const NEAR_ZONE_TERRAIN_CAPABILITY = "grav.terrain_near_zone" as const;
 export const INTERMEDIATE_ZONE_TERRAIN_CAPABILITY = "grav.terrain_intermediate_zone" as const;
@@ -9,23 +9,63 @@ export const FAR_ZONE_TERRAIN_STEP = "farZoneTerrain" as const;
 export const HAYFORD_BOWIE_OUTER_M = 166700;
 
 export const NEAR_ZONE_PRODUCT_NAME = "near-zone terrain-corrected Bouguer anomaly";
+export const ZONED_PLANAR_PRODUCT_NAME = "zoned planar terrain-corrected Bouguer anomaly";
 export const NEAR_ZONE_CSV = "near_zone_terrain_corrected_bouguer.csv";
 export const NEAR_ZONE_GRID_STEM = "near_zone_terrain_corrected_bouguer_grid";
 export const NEAR_ZONE_QC = "near_zone_terrain_corrected_bouguer_qc.json";
 export const NEAR_ZONE_COLUMN = "near_zone_terrain_corrected_bouguer_mgal";
-export const NEAR_ZONE_MAP_LABEL = "Near-zone terrain-corrected Bouguer (not complete Bouguer)";
+export const NEAR_ZONE_MAP_LABEL = "Near-zone terrain-corrected Bouguer";
+export const ZONED_PLANAR_MAP_LABEL = "Zoned planar terrain-corrected Bouguer";
+
+export const TERRAIN_EXCLUSIONS = [
+  "spherical far-zone treatment",
+  "Hayford–Bowie or equivalent compartment geometry",
+  "global or otherwise adequate terrain coverage (no ETOPO/SRTM download)",
+  "atmospheric correction (not implemented)",
+  "isostatic compensation",
+  "DEM uncertainty and near-station survey detail finer than the bound DEM",
+] as const;
+
+export const COMPLETE_BOUGUER_REFUSAL =
+  "Complete Bouguer Anomaly is not supported. G-AID does not implement the required full convention and coverage: spherical far-zone treatment, Hayford–Bowie or equivalent geometry, global/adequate terrain coverage, and atmospheric correction are missing, along with isostatic compensation and DEM-uncertainty treatment. I will not grant or execute near/intermediate/far planar terrain capabilities under a Complete Bouguer request. Alternative implementation plan: zoned planar terrain-corrected Bouguer anomaly. Review that named plan and explicitly approve it before any terrain-correction capability is enabled.";
+
+export const ZONED_PLANAR_OFFER =
+  "Offered alternative implementation plan: zoned planar terrain-corrected Bouguer anomaly. Terrain-correction capabilities stay off until you explicitly approve that named plan.";
 
 export const NEAR_ZONE_STATEMENTS = [
   "Terrain correction is limited to the configured DEM extent or radius. Cells outside that window are ignored.",
   "Far-zone and intermediate-zone terrain effects are not included. Hayford–Bowie compartments are not implemented.",
-  "This anomaly is not equivalent to a fully regional or commercial Complete Bouguer product.",
+  "Spherical far-zone treatment, global terrain coverage, and atmospheric correction are excluded.",
 ] as const;
 
 export const ZONED_TERRAIN_STATEMENTS = [
   "Intermediate-zone terrain is planar Nagy on the bound DEM, clipped to DEM coverage. Hayford–Bowie compartments are not implemented.",
   "Far-zone terrain is applied only when a bound DEM covers the requested radius beyond 166.7 km. G-AID does not download ETOPO/SRTM.",
-  "Atmospheric correction, spherical-Earth far-zone theory, and global terrain coverage are excluded. This is not a Complete Bouguer Anomaly.",
+  "Spherical far-zone treatment, atmospheric correction, and global terrain coverage are excluded.",
 ] as const;
+
+export function isCompleteBouguerRequest(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    /\bcomplete\s+bouguer\b/.test(m) &&
+    !/\b(skip|omit|without|no)\b.{0,40}\b(terrain|complete bouguer)\b/.test(m)
+  );
+}
+
+export function isZonedPlanarApproval(message: string, offered = false): boolean {
+  const m = message.toLowerCase();
+  if (/\b(skip|omit|without|no|don't|dont|do not|reject|refuse)\b.{0,40}\bzoned planar\b/.test(m)) {
+    return false;
+  }
+  if (/\bzoned planar terrain-corrected bouguer(?: anomaly)?\b/.test(m)) return true;
+  if (/\b(approve|accept|confirm|run|use|enable)\b.{0,80}\bzoned planar\b/.test(m)) return true;
+  if (offered && /\b(approve|accept|confirm|run)\b.{0,40}\b(the )?alternative\b/.test(m)) return true;
+  return false;
+}
+
+export function terrainProductName(zoned: boolean): string {
+  return zoned ? ZONED_PLANAR_PRODUCT_NAME : NEAR_ZONE_PRODUCT_NAME;
+}
 
 export function isNearZoneTerrainPath(path: string): boolean {
   const n = path.replace(/\\/g, "/").toLowerCase();
@@ -51,7 +91,6 @@ export function gravityProductWarnings(options: {
   farZone?: boolean;
   intermediateReason?: string;
   farReason?: string;
-  completeBouguer?: boolean;
 }): string[] {
   const n = options.path.replace(/\\/g, "/").toLowerCase();
   if (!isNearZoneTerrainPath(n) && !/gravity_terrain|complete_bouguer/.test(n)) return [];
@@ -91,18 +130,6 @@ export function gravityProductWarnings(options: {
         ZONED_TERRAIN_STATEMENTS[2],
       ]
     : [...NEAR_ZONE_STATEMENTS];
-  const product = zoned
-    ? "Product: zoned terrain-corrected Bouguer anomaly (planar Nagy; not Complete Bouguer)."
-    : `Product: ${NEAR_ZONE_PRODUCT_NAME}.`;
-  return [
-    product,
-    ...zoneLines,
-    bullard,
-    density,
-    radius,
-    dem,
-    coverage,
-    datum,
-    "Complete Bouguer Anomaly is not scientifically justified in G-AID product copy for this convention.",
-  ];
+  const product = zoned ? `Product: ${ZONED_PLANAR_PRODUCT_NAME}.` : `Product: ${NEAR_ZONE_PRODUCT_NAME}.`;
+  return [product, ...zoneLines, bullard, density, radius, dem, coverage, datum];
 }

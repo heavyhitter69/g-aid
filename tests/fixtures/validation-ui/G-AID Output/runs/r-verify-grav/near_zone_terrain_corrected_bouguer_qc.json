@@ -26,13 +26,13 @@
     "ymin": 1199800.0,
     "ymax": 1200600.0
   },
-  "method": "Nagy 1966 rectangular prisms, near-zone only \u2014 not Complete Bouguer",
+  "method": "Nagy 1966 rectangular prisms, near-zone only",
   "numerical_approximation": "Vectorized Nagy 1966 eight-term prism kernel per DEM cell inside the near-zone window.",
   "near_zone": true,
   "far_zone": false,
   "intermediate_zone": false,
   "hayford_bowie": false,
-  "convention": "G-AID near-zone terrain-corrected Bouguer anomaly. Not a Complete Bouguer Anomaly. Not equivalent to a fully regional or commercial complete Bouguer product.",
+  "convention": "G-AID near-zone terrain-corrected Bouguer anomaly. Spherical far-zone treatment, Hayford\u2013Bowie geometry, global coverage, and atmospheric correction are excluded.",
   "formula": "\u0394g_NZTC = \u0394g_FA \u2212 2\u03c0G\u03c1h [+ Bullard B if requested] + TC_Nagy(R or DEM extent). TC is |gz| of DEM\u2212slab prisms (Nagy 1966) inside the near-zone window. Far-zone and intermediate-zone / Hayford\u2013Bowie are not applied.",
   "limitations": [
     "Terrain correction is limited to the configured DEM extent or radius.",
@@ -40,6 +40,7 @@
     "DEM cells outside the near-zone window are ignored.",
     "No isostatic correction.",
     "No Earth curvature on the prism kernel itself (Bullard B is a separate optional term on the slab).",
-    "Not equivalent to Oasis montaj or any commercial Complete Bouguer product."
+    "Not equivalent to Oasis montaj or any commercial full-convention Bouguer product.",
+    "Spherical far-zone treatment, Hayford\u2013Bowie geometry, global coverage, and atmospheric correction are excluded."
   ]
 }

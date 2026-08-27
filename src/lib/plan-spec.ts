@@ -10,16 +10,18 @@ import {
   compileCapabilityDag,
   capabilitiesFromSteps,
   getCapability,
+  GRAVITY_DEFAULT,
   isRegisteredCapability,
   proposeCapabilitiesFromMessage,
   stepsFromCapabilities,
   unregisteredProposal,
+  USER_CAPABILITY_IDS,
   validateCapabilityContracts,
   type CompiledDag,
   type ReviewDecision,
   type UserCapabilityId,
 } from "./capabilities/index.ts";
-import { NEAR_ZONE_STATEMENTS, ZONED_TERRAIN_STATEMENTS } from "./gravity-product.ts";
+import { NEAR_ZONE_STATEMENTS, ZONED_PLANAR_OFFER, ZONED_PLANAR_PRODUCT_NAME, ZONED_TERRAIN_STATEMENTS, COMPLETE_BOUGUER_REFUSAL, isCompleteBouguerRequest, isZonedPlanarApproval } from "./gravity-product.ts";
 import { RADIO_STATEMENTS } from "./radio-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
@@ -146,6 +148,10 @@ export interface AgentPlan {
     intermediateRadiusM?: number;
     farRadiusM?: number;
     outerCellSizeM?: number;
+    zonedPlanarOffered?: boolean;
+    zonedPlanarApproved?: boolean;
+    requestIntent?: string;
+    productName?: string;
     gravityMapping?: {
       x: string;
       y: string;
@@ -341,7 +347,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "gravity", re: /\bbouguer\b|\bfree[ -]?air\b|\blatitude\b/i },
   { key: "farZoneTerrain", re: /\bfar[\s-]?zone\s+terrain/i },
   { key: "intermediateZoneTerrain", re: /\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km/i },
-  { key: "nearZoneTerrain", re: /\bnear[\s-]?zone\s+terrain|\bterrain[\s-]?correct(?:ed|ion)?\s+bouguer|\bterrain\s+correct|\bcomplete\s+bouguer\b/i },
+  { key: "nearZoneTerrain", re: /\bnear[\s-]?zone\s+terrain|\bterrain[\s-]?correct(?:ed|ion)?\s+bouguer|\bterrain\s+correct|\bzoned planar terrain-corrected bouguer\b/i },
   { key: "residual", re: /\bregional\b.*\bresidual\b|\bresidual gravity\b/i },
   { key: "ertInvert", re: /\binvert(?:ing|ed)? the ert\b|\bert inversion\b|\b2d invert/i },
   { key: "ert", re: /\bpseudosection\b|\bert\b|\bresistivity\b/i },
@@ -400,11 +406,11 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
     case "gravity":
       return "Apply latitude, free-air, and simple Bouguer corrections";
     case "nearZoneTerrain":
-      return "Apply near-zone Nagy terrain correction (near-zone terrain-corrected Bouguer; not Complete Bouguer)";
+      return "Apply near-zone Nagy terrain correction on the bound DEM";
     case "intermediateZoneTerrain":
-      return "Apply intermediate-zone planar Nagy terrain on the bound DEM (clipped; not Hayford–Bowie compartments; not Complete Bouguer)";
+      return "Apply intermediate-zone planar Nagy terrain on the bound DEM (clipped; not Hayford–Bowie compartments)";
     case "farZoneTerrain":
-      return "Apply far-zone planar Nagy terrain only if the bound DEM covers the requested radius beyond 166.7 km (not Complete Bouguer)";
+      return "Apply far-zone planar Nagy terrain only if the bound DEM covers the requested radius beyond 166.7 km";
     case "residual":
       return "Separate regional and residual gravity";
     case "ert":
@@ -450,6 +456,8 @@ export function renderImplementationPlan(opts: {
   applyFarZone?: boolean;
   intermediateRadiusM?: number;
   farRadiusM?: number;
+  requestIntent?: string;
+  productName?: string;
 }): string {
   const target = opts.targetFolder || "(opened folder)";
   const capabilityIds = opts.capabilities?.length
@@ -500,20 +508,21 @@ export function renderImplementationPlan(opts: {
     typeof opts.surveyLatitude === "number" ? `Survey latitude: ${opts.surveyLatitude}° (Somigliana; easting/northing is not latitude)` : "",
     opts.elevationDatum ? `Elevation datum: ${opts.elevationDatum}` : "",
     opts.applyBullardB ? "Bullard B: enabled" : gravityStepsEnabled(opts.steps) ? "Bullard B: off unless requested" : "",
+    opts.requestIntent ? `Frozen request intent: ${opts.requestIntent}` : "",
     opts.steps.farZoneTerrain
       ? typeof opts.farRadiusM === "number"
-        ? `Product: zoned terrain-corrected Bouguer (planar Nagy). Far radius: ${opts.farRadiusM} m, applied only if the bound DEM covers it. Atmospheric correction off. Not a Complete Bouguer Anomaly.`
-        : "Far-zone radius: required to attempt far-zone TC. G-AID will not download a global DEM. Not a Complete Bouguer Anomaly."
+        ? `Product: ${ZONED_PLANAR_PRODUCT_NAME}. Far radius: ${opts.farRadiusM} m, applied only if the bound DEM covers it. Atmospheric correction off.`
+        : "Far-zone radius: required to attempt far-zone TC. G-AID will not download a global DEM."
       : opts.steps.intermediateZoneTerrain
-        ? `Product: near- and intermediate-zone terrain-corrected Bouguer (planar Nagy on the bound DEM, default outer 166.7 km clipped to DEM). Hayford–Bowie compartments are not implemented. Not a Complete Bouguer Anomaly.`
+        ? `Product: ${ZONED_PLANAR_PRODUCT_NAME} (planar Nagy on the bound DEM, default outer 166.7 km clipped to DEM). Hayford–Bowie compartments are not implemented.`
         : opts.steps.nearZoneTerrain
       ? typeof opts.terrainRadiusM === "number"
-        ? `Product: near-zone terrain-corrected Bouguer anomaly. Terrain radius: ${opts.terrainRadiusM} m (Nagy prisms). Far-zone and intermediate-zone terrain are not applied. Not a Complete Bouguer Anomaly.`
+        ? `Product: near-zone terrain-corrected Bouguer anomaly. Terrain radius: ${opts.terrainRadiusM} m (Nagy prisms). Far-zone and intermediate-zone terrain are not applied.`
         : opts.useDemExtent
-          ? "Product: near-zone terrain-corrected Bouguer anomaly. Terrain window: bound DEM extent (still near-zone only). Far-zone/intermediate-zone not applied. Not a Complete Bouguer Anomaly."
+          ? "Product: near-zone terrain-corrected Bouguer anomaly. Terrain window: bound DEM extent (still near-zone only). Far-zone/intermediate-zone not applied."
           : "Near-zone terrain radius: required before Proceed (or say use DEM extent). Far-zone is skipped without a covering DEM."
       : gravityStepsEnabled(opts.steps)
-        ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless grav.terrain_near_zone is approved. Neither product is a Complete Bouguer Anomaly."
+        ? "Anomaly: simple Bouguer (infinite slab). Terrain correction is off unless a named terrain plan is approved."
         : "",
   ].filter(Boolean);
   const thisRunFallback = radiometricsStepsEnabled(opts.steps)
@@ -571,12 +580,16 @@ function sectionBody(markdown: string, heading: string): string | null {
 function parseStepKey(line: string): StepKey | undefined {
   const tagged = line.match(/<!--\s*step:([a-zA-Z]+)\s*-->/);
   if (tagged) {
-    const raw = tagged[1] === "completeBouguer" ? "nearZoneTerrain" : tagged[1];
+    const raw = tagged[1];
     if (STEP_KEYS.includes(raw as StepKey)) return raw as StepKey;
   }
   const stripped = line.replace(/<!--.*?-->/g, "").replace(/^[-*]\s+(\[[ xX~!s]?\]\s*)?/, "").trim();
   if (!stripped || stripped.startsWith("Ask for a specific")) return undefined;
+  const completeAsk = /\bcomplete\s+bouguer\b/i.test(stripped) && !/\bzoned planar terrain-corrected bouguer/i.test(stripped);
   for (const row of STEP_FALLBACK) {
+    if (completeAsk && (row.key === "nearZoneTerrain" || row.key === "intermediateZoneTerrain" || row.key === "farZoneTerrain")) {
+      continue;
+    }
     if (row.re.test(stripped)) return row.key;
   }
   return undefined;
@@ -695,7 +708,7 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   const previous = plan.capabilities?.length
     ? plan.capabilities
     : capabilitiesFromSteps(plan.steps as unknown as Record<string, boolean>);
-  const proposed = proposeCapabilitiesFromMessage(raw, previous);
+  let proposed = proposeCapabilitiesFromMessage(raw, previous);
   const decisions: ReviewDecision[] = [...(plan.reviewDecisions || [])];
   const now = new Date().toISOString();
   const parameters = { ...plan.parameters };
@@ -743,6 +756,38 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
   if (inc) parameters.inclination = parseFloat(inc[1]);
   if (dec) parameters.declination = parseFloat(dec[1]);
 
+  const zonedOk = isZonedPlanarApproval(raw, Boolean(parameters.zonedPlanarOffered));
+  if (zonedOk) {
+    const granted = new Set(proposed);
+    for (const id of GRAVITY_DEFAULT) granted.add(id);
+    granted.add("grav.terrain_near_zone");
+    granted.add("grav.terrain_intermediate_zone");
+    granted.add("grav.terrain_far_zone");
+    proposed = USER_CAPABILITY_IDS.filter((id) => granted.has(id));
+    parameters.zonedPlanarApproved = true;
+    parameters.applyIntermediateZone = true;
+    parameters.applyFarZone = true;
+    parameters.requestIntent = ZONED_PLANAR_PRODUCT_NAME;
+    parameters.productName = ZONED_PLANAR_PRODUCT_NAME;
+  } else if (isCompleteBouguerRequest(raw)) {
+    const priorTerrain = new Set(previous.filter((id) => id.startsWith("grav.terrain_")));
+    proposed = proposed.filter((id) => !id.startsWith("grav.terrain_") || priorTerrain.has(id));
+    parameters.zonedPlanarOffered = true;
+    if (!parameters.zonedPlanarApproved) parameters.zonedPlanarApproved = false;
+    if (!priorTerrain.size) {
+      parameters.requestIntent = "simple Bouguer";
+      parameters.productName = "simple Bouguer";
+    }
+    decisions.push({
+      at: now,
+      message: raw,
+      status: "refused",
+      capabilityId: "complete-bouguer",
+      reason: COMPLETE_BOUGUER_REFUSAL,
+    });
+    notes.push(ZONED_PLANAR_OFFER);
+  }
+
   const previousSet = new Set(previous);
   const nextSet = new Set(proposed);
 
@@ -777,9 +822,6 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
         id === "grav.terrain_near_zone" &&
         !parameters.useDemExtent &&
         !(typeof parameters.terrainRadiusM === "number" && Number.isFinite(parameters.terrainRadiusM));
-      const completeAsk = /\bcomplete\s+bouguer\b/.test(m) && id.startsWith("grav.terrain_");
-      const notCba =
-        "G-AID does not produce a Complete Bouguer Anomaly: Hayford–Bowie compartments, spherical far-zone theory, atmospheric correction, and global DEM download are excluded.";
       decisions.push({
         at: now,
         message: raw,
@@ -790,13 +832,13 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
           : needsDensity
             ? "Bouguer correction was requested. Supply a density in g/cm³. I will not assume 2.67."
             : needsTerrain
-              ? "Near-zone terrain-corrected Bouguer needs a documented DEM and a terrain radius (or use DEM extent). Far-zone is skipped without a covering DEM. This is not a Complete Bouguer Anomaly."
-              : completeAsk
-                ? `Accepted ${id} as planar Nagy terrain on the bound DEM. ${notCba}`
+              ? "Near-zone terrain-corrected Bouguer needs a documented DEM and a terrain radius (or use DEM extent). Far-zone is skipped without a covering DEM."
+                : id === "grav.terrain_near_zone" && parameters.zonedPlanarApproved
+                  ? `Accepted alternative implementation plan: ${ZONED_PLANAR_PRODUCT_NAME}. Frozen request intent is zoned planar terrain.`
                 : id === "grav.terrain_intermediate_zone"
-                  ? `Accepted intermediate-zone planar Nagy on the bound DEM (default outer 166.7 km, clipped). ${notCba}`
+                  ? `Accepted intermediate-zone planar Nagy on the bound DEM (default outer 166.7 km, clipped) as part of ${ZONED_PLANAR_PRODUCT_NAME}.`
                 : id === "grav.terrain_far_zone"
-                  ? `Accepted far-zone planar Nagy only if the bound DEM covers farRadiusM beyond 166.7 km. Missing global DEM is not a silent pass. ${notCba}`
+                  ? `Accepted far-zone planar Nagy only if the bound DEM covers farRadiusM beyond 166.7 km. Missing global DEM is not a silent pass.`
                 : id === "ert.invert2d"
                   ? "Accepted experimental ert.invert2d. This is not a production inversion pack. Independent two-layer true resistivities are not recovered. Not Res2DInv. Default ERT work is ingest and pseudosection only."
                 : id === "rad.ingest"

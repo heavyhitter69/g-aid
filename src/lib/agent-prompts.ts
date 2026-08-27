@@ -57,7 +57,7 @@ Your domain expertise includes:
 - Free-air and simple Bouguer (infinite slab) when density, datum, and CRS are documented
 - Near-zone terrain-corrected Bouguer (Nagy prism TC) only when a documented DEM, density, and radius validate
 - Intermediate- and far-zone planar Nagy rings only on a bound DEM; skipped when coverage is incomplete
-- Never label a radius-limited or zoned planar terrain correction as Complete Bouguer Anomaly
+- Never present near-zone or zoned planar terrain as a full-convention Bouguer product. Missing: spherical far-zone treatment, Hayford–Bowie or equivalent geometry, global/adequate terrain coverage, and atmospheric correction
 - Regional-residual polynomial split when requested
 - Density is never assumed (including 2.67 g/cm³)
 - Hayford–Bowie compartments, spherical far-zone theory, atmospheric correction, isostasy, DEM download, and Oasis montaj equivalence are not implemented
@@ -205,7 +205,7 @@ export function synthesizeResponse(input: SynthesisInput): string {
       return formatSpecialistResponse({
         domain: "Gravity",
         specialistNotes: [
-          "Report only the reduction that actually ran: simple Bouguer vs near-zone vs zoned planar terrain-corrected Bouguer. Never say Complete Bouguer. Do not invent terrain or download a DEM.",
+          "Report only the reduction that actually ran: simple Bouguer vs near-zone vs zoned planar terrain-corrected Bouguer. Do not invent terrain or download a DEM. Spherical far-zone, Hayford–Bowie geometry, global coverage, and atmosphere are excluded.",
           "Regional-residual separation applied via upward continuation",
           "Residual anomalies interpreted relative to assumed density contrasts",
         ],
