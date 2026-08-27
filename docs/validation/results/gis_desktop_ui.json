@@ -1,0 +1,120 @@
+{
+  "product_name": "G-AID documented GeoJSON vector layer",
+  "supported_format": "GeoJSON Feature/FeatureCollection with documented EPSG",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.spatial_overlap",
+    "gis.export_vector",
+    "gis.interpret"
+  ],
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["GridMapView", "DatasetExplorer-equivalent catalog table"],
+  "url": "http://127.0.0.1:3000/workspace/verify-gis",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-27T17:03:00Z",
+  "electron_packaged_app": false,
+  "shapefile_parsed": false,
+  "geopackage_parsed": false,
+  "silent_reprojection": false,
+  "filename_inferred_geology": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same GridMapView).",
+    "A packaged Electron executable was not launched.",
+    "GeoJSON is the only supported vector ingest. Shapefile sidecar completeness is checked; shape records and DBF attributes are not parsed. GeoPackage containers are recognised, not loaded.",
+    "Catalog role assignment on the verify page is a reviewed label and is not persisted into the fixture folder. Dataset Explorer POST /api/workspace/catalog/vector-role is the live persist path.",
+    "geology.geojson stayed generic-vector until a user assigned geology. The polygons run fixture remains unassigned because the filename is not a role.",
+    "Spatial overlap is a geometric table (contains / bbox-overlap). It is not a prospectivity map."
+  ],
+  "tabs": {
+    "catalog": {
+      "passed": true,
+      "geology_filename_auto_role": false,
+      "geology_geojson_support": "supported",
+      "geology_geojson_crs": "EPSG:32734",
+      "user_assigned_role": "geology (reviewed)",
+      "no_crs_support": "recognised-unsupported",
+      "shapefile_incomplete_sidecars": { "shx": false, "dbf": false, "prj": false },
+      "shapefile_sidecars_parsed": false,
+      "geopackage_parsed": false,
+      "screenshot": "docs/validation/results/screenshots/gis-catalog.webp"
+    },
+    "points": {
+      "passed": true,
+      "title": "Sample points (EPSG:32734)",
+      "crs": "EPSG:32734",
+      "geometry": "Point",
+      "role": "sample-location (user-assigned)",
+      "attributes": ["GRADE", "ROCK", "SAMPLE_ID"],
+      "unknown_semantics": true,
+      "points_toggle": "Points checkbox hid then restored the markers",
+      "screenshot": "docs/validation/results/screenshots/gis-points.webp"
+    },
+    "lines": {
+      "passed": true,
+      "title": "Structure lines (filename is not a role)",
+      "crs": "EPSG:32734",
+      "geometry": "LineString",
+      "role": "structure (user-assigned)",
+      "lines_toggle": "Lines checkbox hid then restored the line",
+      "screenshot": "docs/validation/results/screenshots/gis-lines.webp"
+    },
+    "polygons": {
+      "passed": true,
+      "title": "Geology polygons (filename is not a role)",
+      "crs": "EPSG:32734",
+      "geometry": "Polygon",
+      "role": "unassigned generic vector",
+      "filename_inferred_geology": false,
+      "polygons_toggle": "Polygons checkbox hid then restored the fill",
+      "screenshot": "docs/validation/results/screenshots/gis-polygons.webp"
+    },
+    "unknown_crs": {
+      "passed": true,
+      "skipped": true,
+      "reason": "gis_crs_required",
+      "rfc7946_assumed": false,
+      "silent_reprojection": false,
+      "map_overlay": false,
+      "screenshot": "docs/validation/results/screenshots/gis-unknown-crs.webp"
+    },
+    "conflict_crs": {
+      "passed": true,
+      "blocked": true,
+      "crs_pair": "EPSG:32734 vs EPSG:4326",
+      "reprojection_registered": false,
+      "silent_reprojection": false,
+      "screenshot": "docs/validation/results/screenshots/gis-conflict-crs.webp"
+    },
+    "overlap": {
+      "passed": true,
+      "title": "Tenure + samples (same CRS)",
+      "crs": "EPSG:32734",
+      "layers": ["overlap/tenure.geojson", "overlap/samples.geojson"],
+      "relations": ["contains", "bbox-overlap"],
+      "prospectivity_map": false,
+      "geological_relationship_claimed": false,
+      "screenshot": "docs/validation/results/screenshots/gis-overlap.webp"
+    },
+    "interpretation": {
+      "passed": true,
+      "run": "r-verify-gis-interpret",
+      "planHash": "fixture-r-verify-gis-interpret",
+      "product_name": "G-AID documented GeoJSON vector layer",
+      "geological_certainty_improved": false,
+      "sections": ["Observations", "Assumptions", "Uncertainty", "Recommendations", "Not established"],
+      "not_established": [
+        "Geological interpretation is not established.",
+        "Mineral targeting is not established.",
+        "Prospectivity is not established.",
+        "Resource or reserve estimates are not established.",
+        "Drill recommendations are not established.",
+        "Causal relationships from overlay are not established.",
+        "Shapefile or GeoPackage ingest is not established."
+      ],
+      "screenshot": "docs/validation/results/screenshots/gis-interpretation.webp"
+    }
+  }
+}

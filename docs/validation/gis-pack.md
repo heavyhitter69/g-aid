@@ -94,7 +94,8 @@ polygons, unknown CRS, conflicting CRS, overlap, interpretation) is recorded in
 
 ## Next recommended pack
 
-Further **field-instrument contracts** on the shared platform (additional
-documented survey formats that already have a real parser, CRS, and fixtures)
-— not production `ert.invert2d`, not Complete Bouguer, and not QGIS-class
-geoprocessing.
+A **documented seismic (SEG-Y) contract** on the shared catalog/DAG **only if**
+a real trace reader, CRS/geometry contract, and fixtures already exist. SEG-Y
+is currently recognised-unsupported (textual header sniff; traces not loaded).
+Do not follow this pack with shapefile/GeoPackage geoprocessing, production
+`ert.invert2d`, Complete Bouguer auto-grant, or QGIS/ArcGIS equivalence.

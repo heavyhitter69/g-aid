@@ -349,6 +349,17 @@ test("desktop verification fixtures cover catalog, points, lines, polygons, unkn
   const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-gis-interpret", "vector_interpretation.json"), "utf8"));
   assert.equal(interp.geological_certainty_improved, false);
   assert.ok((interp.not_established as string[]).some((line) => /Prospectivity/i.test(line)));
+  const ui = JSON.parse(fs.readFileSync(path.join(process.cwd(), "docs/validation/results/gis_desktop_ui.json"), "utf8"));
+  assert.equal(ui.passed, true);
+  assert.equal(ui.shapefile_parsed, false);
+  assert.equal(ui.geopackage_parsed, false);
+  assert.equal(ui.silent_reprojection, false);
+  assert.equal(ui.filename_inferred_geology, false);
+  assert.equal(ui.tabs.catalog.geology_filename_auto_role, false);
+  assert.equal(ui.tabs.unknown_crs.reason, "gis_crs_required");
+  assert.equal(ui.tabs.conflict_crs.reprojection_registered, false);
+  assert.equal(ui.tabs.overlap.prospectivity_map, false);
+  assert.equal(ui.tabs.interpretation.geological_certainty_improved, false);
 });
 
 if (failed) process.exit(1);
