@@ -6,6 +6,7 @@
  */
 
 import type { CrsAxisOrder } from "../map/crs.ts";
+import { assemblePolygonParts } from "../geometry/polygon-topology.ts";
 import { UNASSIGNED_VECTOR_ROLE, type VectorRoleAssignment } from "./geojson-contract.ts";
 
 export const SHAPEFILE_ADAPTER_ID = "shapefile";
@@ -47,8 +48,17 @@ export interface ShapefileSidecars {
 
 export interface ShapefileVectorFeature {
   id: string;
-  geometry_type: "Point" | "LineString" | "Polygon";
+  geometry_type: "Point" | "LineString" | "Polygon" | "MultiPolygon";
   coordinates: { x: number; y: number }[];
+  rings?: { x: number; y: number }[][];
+  parts?: { x: number; y: number }[][][];
+  topology?: {
+    engine: string;
+    valid: boolean;
+    hole_count?: number;
+    part_count?: number;
+    classification?: string;
+  };
   properties: Record<string, unknown>;
 }
 
@@ -353,14 +363,33 @@ function parseShapeContent(
       return out;
     }
     const ring = rings[0] || [];
-    if (rings.length > 1) {
-      warnings.push(`Polygon ${fid} has ${rings.length - 1} interior ring(s). Overlap uses the exterior ring only.`);
-    }
-    if (!closed(ring)) {
+    if (!closed(ring) && rings.length === 1) {
       errors.push(`Polygon ${fid} exterior ring must be closed with at least four finite positions.`);
       return [];
     }
-    return [{ id: fid, geometry_type: "Polygon", coordinates: ring, properties: props }];
+    const assembled = assemblePolygonParts(rings);
+    if (!assembled.ok) {
+      errors.push(...(assembled.errors.length ? assembled.errors : [`Polygon ${fid} topology is invalid.`]));
+      return [];
+    }
+    const first = assembled.parts[0] || [];
+    return [
+      {
+        id: fid,
+        geometry_type: assembled.geometryType,
+        coordinates: assembled.parts.flat(2),
+        rings: first,
+        parts: assembled.parts,
+        topology: {
+          engine: assembled.engine,
+          valid: true,
+          hole_count: assembled.holeCount,
+          part_count: assembled.partCount,
+          classification: assembled.classification,
+        },
+        properties: props,
+      },
+    ];
   }
   errors.push(`Shapefile geometry type ${shapeType} is not a supported processing geometry.`);
   return [];

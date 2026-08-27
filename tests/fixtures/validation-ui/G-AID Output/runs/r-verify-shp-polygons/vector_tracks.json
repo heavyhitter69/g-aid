@@ -57,6 +57,65 @@
               "y": 6240100.0
             }
           ],
+          "rings": [
+            [
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              }
+            ]
+          ],
+          "parts": [
+            [
+              [
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                }
+              ]
+            ]
+          ],
+          "topology": {
+            "engine": "g-aid-evenodd-segment",
+            "engine_version": "1.0",
+            "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+            "valid": true,
+            "part_count": 1,
+            "hole_count": 0,
+            "classification": "nesting-containment"
+          },
           "properties": {
             "ID": "G1",
             "UNIT": "Qal"
@@ -88,6 +147,65 @@
               "y": 6240050.0
             }
           ],
+          "rings": [
+            [
+              {
+                "x": 260050.0,
+                "y": 6240050.0
+              },
+              {
+                "x": 260090.0,
+                "y": 6240050.0
+              },
+              {
+                "x": 260090.0,
+                "y": 6240090.0
+              },
+              {
+                "x": 260050.0,
+                "y": 6240090.0
+              },
+              {
+                "x": 260050.0,
+                "y": 6240050.0
+              }
+            ]
+          ],
+          "parts": [
+            [
+              [
+                {
+                  "x": 260050.0,
+                  "y": 6240050.0
+                },
+                {
+                  "x": 260090.0,
+                  "y": 6240050.0
+                },
+                {
+                  "x": 260090.0,
+                  "y": 6240090.0
+                },
+                {
+                  "x": 260050.0,
+                  "y": 6240090.0
+                },
+                {
+                  "x": 260050.0,
+                  "y": 6240050.0
+                }
+              ]
+            ]
+          ],
+          "topology": {
+            "engine": "g-aid-evenodd-segment",
+            "engine_version": "1.0",
+            "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+            "valid": true,
+            "part_count": 1,
+            "hole_count": 0,
+            "classification": "nesting-containment"
+          },
           "properties": {
             "ID": "G2",
             "UNIT": "granite"
@@ -95,6 +213,7 @@
           "semantics": "unknown"
         }
       ],
+      "topology_engine": "g-aid-evenodd-segment",
       "origin": "source"
     }
   ],

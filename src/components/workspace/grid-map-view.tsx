@@ -4,8 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map as MapIcon } from "lucide-react";
 import { parseEsriAscii, type RasterGrid } from "@/lib/map/ascii";
 
-export type AsciiGrid = RasterGrid;
-export { parseEsriAscii };
+export type OverlayPolygon =
+  | { x: number; y: number }[]
+  | { exterior: { x: number; y: number }[]; holes?: { x: number; y: number }[][] };
+
+function normalizeOverlayPolygon(poly: OverlayPolygon): {
+  exterior: { x: number; y: number }[];
+  holes: { x: number; y: number }[][];
+} {
+  if (Array.isArray(poly)) return { exterior: poly, holes: [] };
+  return { exterior: poly.exterior, holes: poly.holes || [] };
+}
 
 function colorFor(t: number, ramp: "jet" | "gray" | "viridis" = "jet"): [number, number, number] {
   const x = Math.max(0, Math.min(1, t));
@@ -243,7 +252,7 @@ export function GridMapView({
   note?: string;
   overlay?: { x: number; y: number }[];
   overlayLines?: { x: number; y: number }[][];
-  overlayPolygons?: { x: number; y: number }[][];
+  overlayPolygons?: OverlayPolygon[];
   units?: string;
   warnings?: string[];
   opacity?: number;
@@ -388,20 +397,39 @@ export function GridMapView({
       ctx.fillStyle = "rgba(78, 201, 176, 0.28)";
       ctx.strokeStyle = "rgba(78, 201, 176, 0.95)";
       ctx.lineWidth = 1.5;
-      for (const ring of sampledPolygons) {
-        if (ring.length < 3) continue;
-        ctx.beginPath();
+      const toScreen = (p: { x: number; y: number }) => {
+        const col = (p.x - grid.xllcorner) / grid.cellsize;
+        const row = grid.nrows - (p.y - grid.yllcorner) / grid.cellsize;
+        return { sx: panX + col * scale, sy: panY + row * scale };
+      };
+      const drawRing = (ring: { x: number; y: number }[]) => {
         ring.forEach((p, i) => {
-          const col = (p.x - grid.xllcorner) / grid.cellsize;
-          const row = grid.nrows - (p.y - grid.yllcorner) / grid.cellsize;
-          const sx = panX + col * scale;
-          const sy = panY + row * scale;
+          const { sx, sy } = toScreen(p);
           if (i === 0) ctx.moveTo(sx, sy);
           else ctx.lineTo(sx, sy);
         });
         ctx.closePath();
-        ctx.fill();
+      };
+      for (const poly of sampledPolygons) {
+        const { exterior, holes } = normalizeOverlayPolygon(poly);
+        if (exterior.length < 3) continue;
+        ctx.beginPath();
+        drawRing(exterior);
+        for (const hole of holes) {
+          if (hole.length >= 3) drawRing(hole);
+        }
+        ctx.fill("evenodd");
+        ctx.beginPath();
+        drawRing(exterior);
         ctx.stroke();
+        for (const hole of holes) {
+          if (hole.length < 3) continue;
+          ctx.beginPath();
+          drawRing(hole);
+          ctx.strokeStyle = "rgba(220, 160, 80, 0.95)";
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(78, 201, 176, 0.95)";
+        }
       }
     }
     if (showLineaments && sampledLines.length) {

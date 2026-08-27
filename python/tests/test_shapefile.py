@@ -134,6 +134,66 @@ def test_kernels_ingest_shapefile_overlap_export_without_separate_pipeline(tmp_p
     assert not any("Shapefile or GeoPackage ingest is not established" in line for line in interp["not_established"])
 
 
+def test_hole_points_are_not_contained_and_boundaries_are_labelled(tmp_path):
+    from kernels.vector import vector_ingest, vector_overlap, vector_export
+
+    out = tmp_path / "G-AID Output" / "runs" / "r-holes"
+    out.mkdir(parents=True)
+    payload = {
+        "parameters": {
+            "baseDir": str(FIXTURE),
+            "outDir": str(tmp_path / "G-AID Output" / "runs"),
+            "taskFolder": "r-holes",
+            "catalogInputs": [
+                {
+                    "catalogId": "poly",
+                    "path": "topology/hole-polygon.shp",
+                    "adapterId": "shapefile",
+                    "formatId": "shapefile",
+                    "checksum": "h",
+                },
+                {
+                    "catalogId": "pts",
+                    "path": "topology/hole-points.shp",
+                    "adapterId": "shapefile",
+                    "formatId": "shapefile",
+                    "checksum": "p",
+                },
+            ],
+        }
+    }
+    vector_ingest(payload)
+    vector_overlap(payload)
+    vector_export(payload)
+    canonical = json.loads((out / "vector_canonical.json").read_text())
+    poly = canonical["layers"][0]["features"][0]
+    assert poly["topology"]["hole_count"] == 1
+    assert poly["parts"][0][1]
+    overlap = json.loads((out / "vector_overlap.json").read_text())
+    assert overlap["engine"] == "g-aid-evenodd-segment"
+    assert overlap["exterior_ring_only"] is False
+    by_id = {row["right_id"]: row for row in overlap["rows"]}
+    assert by_id["shell"]["relation"] == "contains"
+    assert by_id["hole"]["relation"] == "disjoint"
+    assert "not contained" in by_id["hole"]["reason"]
+    assert by_id["ebound"]["relation"] == "on-boundary"
+    assert by_id["hbound"]["relation"] == "on-boundary"
+    exported = json.loads((out / "vector_export_1.geojson").read_text())
+    rings = exported["features"][0]["geometry"]["coordinates"]
+    assert len(rings) == 2
+    assert exported["features"][0]["geometry"]["type"] == "Polygon"
+
+
+def test_multipolygon_preserved_and_malformed_topology_refused():
+    parsed = parse_shapefile(str(FIXTURE / "topology" / "multipolygon.shp"))
+    assert parsed["geometry_types"] == ["MultiPolygon"]
+    assert parsed["features"][0]["topology"]["part_count"] == 2
+    with pytest.raises(ValueError, match="self-intersecting"):
+        parse_shapefile(str(FIXTURE / "topology" / "self-intersect.shp"))
+    with pytest.raises(ValueError, match="cross"):
+        parse_shapefile(str(FIXTURE / "topology" / "crossing-hole.shp"))
+
+
 def test_kernels_refuse_empty_catalog_inputs(tmp_path):
     from kernels.vector import vector_ingest
 

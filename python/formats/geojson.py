@@ -12,6 +12,8 @@ import os
 import re
 from typing import Any
 
+from science.polygon_topology import assemble_polygon_parts, canonical_polygon
+
 EPSG_RE = re.compile(r"EPSG[:\s]*([0-9]{4,6})", re.I)
 AUTHORITY_RE = re.compile(r'AUTHORITY\["EPSG","(\d+)"\]', re.I)
 COMMENT_RE = re.compile(r"/\s*EPSG\s*=\s*(\d{4,6})", re.I)
@@ -68,38 +70,40 @@ def _epsg_from_prj(path: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _walk_geom(geom: dict, errors: list[str]) -> tuple[str, list[tuple[float, float]]]:
+def _walk_geom(geom: dict, errors: list[str]) -> tuple[str, list[tuple[float, float]], list[list[list[tuple[float, float]]]]]:
     if not isinstance(geom, dict) or not geom.get("type"):
         errors.append("Feature is missing a geometry object.")
-        return "", []
+        return "", [], []
     gtype = str(geom.get("type"))
     coords = geom.get("coordinates")
     if gtype == "GeometryCollection":
         pts: list[tuple[float, float]] = []
         last = ""
+        parts: list[list[list[tuple[float, float]]]] = []
         for child in geom.get("geometries") or []:
-            ctype, cpts = _walk_geom(child if isinstance(child, dict) else {}, errors)
+            ctype, cpts, cparts = _walk_geom(child if isinstance(child, dict) else {}, errors)
             if cpts:
                 last = ctype or last
                 pts.extend(cpts)
-        return last or "GeometryCollection", pts
+            parts.extend(cparts)
+        return last or "GeometryCollection", pts, parts
     if gtype == "Point":
         pair = _finite_pair(coords)
         if not pair:
             errors.append("Point coordinates are missing or not finite.")
-            return gtype, []
-        return gtype, [pair]
+            return gtype, [], []
+        return gtype, [pair], []
     if gtype == "MultiPoint" and isinstance(coords, list):
         pts = [p for p in (_finite_pair(item) for item in coords) if p]
         if not pts:
             errors.append("MultiPoint has no finite coordinates.")
-        return gtype, pts
+        return gtype, pts, []
     if gtype == "LineString":
         pts = _line(coords)
         if len(pts) < 2:
             errors.append("LineString needs at least two finite positions.")
-            return gtype, []
-        return gtype, pts
+            return gtype, [], []
+        return gtype, pts, []
     if gtype == "MultiLineString" and isinstance(coords, list):
         pts: list[tuple[float, float]] = []
         for line in coords:
@@ -108,26 +112,31 @@ def _walk_geom(geom: dict, errors: list[str]) -> tuple[str, list[tuple[float, fl
                 pts.extend(line_pts)
         if not pts:
             errors.append("MultiLineString has no valid line.")
-        return gtype, pts
+        return gtype, pts, []
     if gtype == "Polygon" and isinstance(coords, list):
-        ring = _line(coords[0] if coords else [])
-        if not _closed(ring):
-            errors.append("Polygon exterior ring must be closed with at least four finite positions.")
-            return gtype, []
-        return gtype, ring
+        rings = [_line(ring) for ring in coords if isinstance(ring, list)]
+        assembled = assemble_polygon_parts(rings)
+        if not assembled["ok"]:
+            errors.extend(assembled["errors"] or ["Polygon topology is invalid."])
+            return gtype, [], []
+        pts = [xy for part in assembled["parts"] for ring in part for xy in ring]
+        return assembled["geometry_type"], pts, assembled["parts"]
     if gtype == "MultiPolygon" and isinstance(coords, list):
-        pts: list[tuple[float, float]] = []
+        rings: list[list[tuple[float, float]]] = []
         for poly in coords:
-            if not isinstance(poly, list) or not poly:
+            if not isinstance(poly, list):
                 continue
-            ring = _line(poly[0])
-            if _closed(ring):
-                pts.extend(ring)
-        if not pts:
-            errors.append("MultiPolygon has no valid closed exterior ring.")
-        return gtype, pts
+            for ring in poly:
+                if isinstance(ring, list):
+                    rings.append(_line(ring))
+        assembled = assemble_polygon_parts(rings)
+        if not assembled["ok"]:
+            errors.extend(assembled["errors"] or ["MultiPolygon topology is invalid."])
+            return gtype, [], []
+        pts = [xy for part in assembled["parts"] for ring in part for xy in ring]
+        return assembled["geometry_type"], pts, assembled["parts"]
     errors.append(f"Geometry type {gtype} is not a supported processing geometry.")
-    return gtype, []
+    return gtype, [], []
 
 
 def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = False) -> dict:
@@ -160,7 +169,7 @@ def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = Fals
     ys: list[float] = []
     for index, feature in enumerate(features_in):
         geom = feature.get("geometry") if isinstance(feature.get("geometry"), dict) else feature
-        gtype, pts = _walk_geom(geom if isinstance(geom, dict) else {}, errors)
+        gtype, pts, parts = _walk_geom(geom if isinstance(geom, dict) else {}, errors)
         if gtype:
             types.add(gtype)
         if not pts:
@@ -170,15 +179,19 @@ def parse_geojson(path: str, role: str | None = None, role_reviewed: bool = Fals
             attrs.add(str(key))
         xs.extend(p[0] for p in pts)
         ys.extend(p[1] for p in pts)
-        features.append(
-            {
-                "id": feature.get("id") if feature.get("id") is not None else index,
-                "geometry_type": gtype,
-                "coordinates": [{"x": x, "y": y} for x, y in pts],
-                "properties": props,
-                "semantics": "unknown",
-            }
-        )
+        fid = feature.get("id") if feature.get("id") is not None else index
+        if parts:
+            features.append(canonical_polygon(parts, fid, props))
+        else:
+            features.append(
+                {
+                    "id": fid,
+                    "geometry_type": gtype,
+                    "coordinates": [{"x": x, "y": y} for x, y in pts],
+                    "properties": props,
+                    "semantics": "unknown",
+                }
+            )
 
     if not features:
         raise ValueError("No valid geometries after coordinate and ring checks. " + "; ".join(dict.fromkeys(errors)))

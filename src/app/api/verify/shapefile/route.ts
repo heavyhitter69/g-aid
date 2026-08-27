@@ -27,11 +27,23 @@ function optionalJson(run: string, file: string): unknown | null {
 function featureGeometry(feature: {
   geometry_type?: string;
   coordinates?: Array<{ x: number; y: number }>;
+  rings?: Array<Array<{ x: number; y: number }>>;
+  parts?: Array<Array<Array<{ x: number; y: number }>>>;
 }) {
   const coords = feature.coordinates || [];
   const gtype = feature.geometry_type || "Point";
   if (gtype === "Point" && coords[0]) return { type: "Point", coordinates: [coords[0].x, coords[0].y] };
   if (gtype.includes("Line")) return { type: "LineString", coordinates: coords.map((p) => [p.x, p.y]) };
+  const ringCoords = (ring: Array<{ x: number; y: number }>) => ring.map((p) => [p.x, p.y]);
+  if (feature.parts?.length) {
+    if (feature.parts.length === 1) {
+      return { type: "Polygon", coordinates: feature.parts[0].map(ringCoords) };
+    }
+    return { type: "MultiPolygon", coordinates: feature.parts.map((part) => part.map(ringCoords)) };
+  }
+  if (feature.rings?.length) {
+    return { type: "Polygon", coordinates: feature.rings.map(ringCoords) };
+  }
   return { type: "Polygon", coordinates: [coords.map((p) => [p.x, p.y])] };
 }
 
@@ -50,6 +62,8 @@ type TrackLayer = {
     properties?: Record<string, unknown>;
     geometry_type?: string;
     coordinates?: Array<{ x: number; y: number }>;
+    rings?: Array<Array<{ x: number; y: number }>>;
+    parts?: Array<Array<Array<{ x: number; y: number }>>>;
   }>;
 };
 
@@ -156,6 +170,7 @@ export async function GET(): Promise<Response> {
     blocked: pack("r-verify-shp-blocked"),
     conflict: pack("r-verify-shp-conflict"),
     overlap: { ...overlapPack, bboxHits },
+    holes: pack("r-verify-shp-holes"),
     interpretation: pack("r-verify-shp-interpret"),
   });
 }

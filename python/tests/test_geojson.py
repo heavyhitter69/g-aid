@@ -266,3 +266,92 @@ def test_crs84_epsg4326_overlap_records_compatibility_decision(tmp_path):
     crs84_export = next(item for item in exports if item["features"][0]["properties"].get("_g_aid_crs") == "OGC:CRS84")
     assert "crs" not in crs84_export
     assert crs84_export["features"][0]["properties"]["_g_aid_geojson_contract"] == "rfc7946"
+
+
+def test_geojson_polygon_keeps_holes_and_overlap_excludes_hole_points(tmp_path):
+    from kernels.vector import vector_ingest, vector_overlap
+
+    src = tmp_path / "gis"
+    src.mkdir()
+    (src / "poly.geojson").write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:32734"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "H1",
+                        "properties": {"UNIT": "licence"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [
+                                [
+                                    [260100.0, 6240100.0],
+                                    [260500.0, 6240100.0],
+                                    [260500.0, 6240400.0],
+                                    [260100.0, 6240400.0],
+                                    [260100.0, 6240100.0],
+                                ],
+                                [
+                                    [260220.0, 6240200.0],
+                                    [260320.0, 6240200.0],
+                                    [260320.0, 6240300.0],
+                                    [260220.0, 6240300.0],
+                                    [260220.0, 6240200.0],
+                                ],
+                            ],
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (src / "pts.geojson").write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:32734"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "shell",
+                        "properties": {},
+                        "geometry": {"type": "Point", "coordinates": [260150.0, 6240150.0]},
+                    },
+                    {
+                        "type": "Feature",
+                        "id": "hole",
+                        "properties": {},
+                        "geometry": {"type": "Point", "coordinates": [260270.0, 6240250.0]},
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "G-AID Output" / "runs" / "r-gj-holes"
+    out.mkdir(parents=True)
+    payload = {
+        "parameters": {
+            "baseDir": str(src),
+            "outDir": str(tmp_path / "G-AID Output" / "runs"),
+            "taskFolder": "r-gj-holes",
+            "catalogInputs": [
+                {"catalogId": "poly", "path": "poly.geojson", "adapterId": "geojson", "formatId": "geojson", "checksum": "a"},
+                {"catalogId": "pts", "path": "pts.geojson", "adapterId": "geojson", "formatId": "geojson", "checksum": "b"},
+            ],
+        }
+    }
+    vector_ingest(payload)
+    vector_overlap(payload)
+    canonical = json.loads((out / "vector_canonical.json").read_text())
+    assert canonical["layers"][0]["features"][0]["topology"]["hole_count"] == 1
+    overlap = json.loads((out / "vector_overlap.json").read_text())
+    by_id = {row["right_id"]: row["relation"] for row in overlap["rows"]}
+    assert by_id["shell"] == "contains"
+    assert by_id["hole"] == "disjoint"
+    assert overlap["engine"] == "g-aid-evenodd-segment"
+    assert overlap["exterior_ring_only"] is False
+

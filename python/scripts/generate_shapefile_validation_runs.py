@@ -105,6 +105,15 @@ def main() -> None:
         overlap=True,
     )
     run_ok(
+        "r-verify-shp-holes",
+        [
+            item("topology/hole-polygon.shp", "hole-polygon", "tenure", True),
+            item("topology/hole-points.shp", "hole-points", "sample-location", True),
+        ],
+        overlap=True,
+        export=True,
+    )
+    run_ok(
         "r-verify-shp-interpret",
         [
             item("overlap/tenure.shp", "tenure", "tenure", True),
@@ -139,6 +148,14 @@ def main() -> None:
                     {
                         "source_path": "invalid-geometry/open-ring.shp",
                         "reason": "Polygon geometry is malformed.",
+                    },
+                    {
+                        "source_path": "topology/self-intersect.shp",
+                        "reason": "Ring 1 is self-intersecting. Overlap will not use an exterior-ring approximation.",
+                    },
+                    {
+                        "source_path": "topology/crossing-hole.shp",
+                        "reason": "Rings 1 and 2 cross. Hole/exterior relationships are invalid.",
                     },
                 ],
             },

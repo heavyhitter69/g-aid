@@ -76,16 +76,24 @@ def write_lines(stem: Path, rows: list[tuple[str, str, list[tuple[float, float]]
     write_prj(stem, prj)
 
 
-def write_polygons(stem: Path, rows: list[tuple[str, str, list[tuple[float, float]]]], prj: str = WGS84_UTM34S) -> None:
+def write_polygon_rings(
+    stem: Path,
+    rows: list[tuple[str, str, list[list[tuple[float, float]]]]],
+    prj: str = WGS84_UTM34S,
+) -> None:
     stem.parent.mkdir(parents=True, exist_ok=True)
     writer = shapefile.Writer(str(stem), shapeType=shapefile.POLYGON)
     writer.field("ID", "C", 16)
     writer.field("UNIT", "C", 24)
-    for fid, unit, pts in rows:
-        writer.poly([close_ring(list(pts))])
+    for fid, unit, rings in rows:
+        writer.poly([close_ring(list(ring)) for ring in rings])
         writer.record(fid, unit)
     writer.close()
     write_prj(stem, prj)
+
+
+def write_polygons(stem: Path, rows: list[tuple[str, str, list[tuple[float, float]]]], prj: str = WGS84_UTM34S) -> None:
+    write_polygon_rings(stem, [(fid, unit, [pts]) for fid, unit, pts in rows], prj)
 
 
 def copy_dataset(src: Path, dest: Path) -> None:
@@ -251,6 +259,69 @@ def main() -> None:
     writer.record("1", "S-001")
     writer.close()
     write_prj(nulls, WGS84_UTM34S)
+
+    exterior = [
+        (260100.0, 6240100.0),
+        (260500.0, 6240100.0),
+        (260500.0, 6240400.0),
+        (260100.0, 6240400.0),
+    ]
+    hole = [
+        (260220.0, 6240200.0),
+        (260320.0, 6240200.0),
+        (260320.0, 6240300.0),
+        (260220.0, 6240300.0),
+    ]
+    island = [
+        (260600.0, 6240100.0),
+        (260700.0, 6240100.0),
+        (260700.0, 6240200.0),
+        (260600.0, 6240200.0),
+    ]
+    write_polygon_rings(
+        DEST / "topology" / "hole-polygon",
+        [("H1", "licence-with-hole", [exterior, hole])],
+    )
+    write_points(
+        DEST / "topology" / "hole-points",
+        [
+            ("shell", "IN-SHELL", 260150.0, 6240150.0),
+            ("hole", "IN-HOLE", 260270.0, 6240250.0),
+            ("ebound", "ON-EXTERIOR", 260100.0, 6240250.0),
+            ("hbound", "ON-HOLE", 260220.0, 6240250.0),
+        ],
+    )
+    write_lines(
+        DEST / "topology" / "hole-line",
+        [
+            ("LF", "in-filled", [(260140.0, 6240140.0), (260160.0, 6240160.0)]),
+            ("LH", "in-hole", [(260240.0, 6240220.0), (260300.0, 6240280.0)]),
+        ],
+    )
+    write_polygon_rings(
+        DEST / "topology" / "multipolygon",
+        [("M1", "two-parts", [exterior, island])],
+    )
+
+    bowtie = DEST / "topology" / "self-intersect"
+    bowtie.parent.mkdir(parents=True, exist_ok=True)
+    writer = shapefile.Writer(str(bowtie), shapeType=shapefile.POLYGON)
+    writer.field("ID", "C", 8)
+    writer.poly([[(260100.0, 6240100.0), (260200.0, 6240200.0), (260100.0, 6240200.0), (260200.0, 6240100.0), (260100.0, 6240100.0)]])
+    writer.record("X")
+    writer.close()
+    write_prj(bowtie, WGS84_UTM34S)
+
+    crossing = [
+        (260000.0, 6240200.0),
+        (260200.0, 6240200.0),
+        (260200.0, 6240300.0),
+        (260000.0, 6240300.0),
+    ]
+    write_polygon_rings(
+        DEST / "topology" / "crossing-hole",
+        [("C1", "bad-hole", [exterior, crossing])],
+    )
 
     print(f"Wrote shapefile fixtures under {DEST}")
 

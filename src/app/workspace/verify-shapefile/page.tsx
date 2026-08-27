@@ -45,6 +45,11 @@ type Pack = {
     rows?: Array<Record<string, string>>;
     blocked?: Array<{ reason?: string }>;
     crs_decisions?: Array<Record<string, string>>;
+    engine?: string;
+    method?: string;
+    exterior_ring_only?: boolean;
+    skipped_features?: Array<Record<string, string>>;
+    precision?: { model?: string; epsilon?: number; approximation?: string };
   } | null;
   overlapQc: { skipped?: boolean; reason?: string; message?: string } | null;
   interpretation: {
@@ -65,10 +70,11 @@ type Payload = {
   blocked: Pack;
   conflict: Pack;
   overlap: Pack;
+  holes: Pack;
   interpretation: Pack;
 };
 
-type Tab = "catalog" | "points" | "lines" | "polygons" | "blocked" | "conflict" | "overlap" | "interpretation";
+type Tab = "catalog" | "points" | "lines" | "polygons" | "holes" | "blocked" | "conflict" | "overlap" | "interpretation";
 
 function MapPack({ pack, title }: { pack: Pack; title: string }) {
   const vector = useMemo(() => (pack.geojson ? parseGeojson(pack.geojson) : null), [pack.geojson]);
@@ -110,7 +116,7 @@ function MapPack({ pack, title }: { pack: Pack; title: string }) {
             "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
             "Attribute names have unknown semantics. UNIT/LITHOLOGY/geology.shp do not establish geology.",
             `CRS source is ${layer?.crs_source || "unknown"} with confidence ${layer?.crs_confidence || "n/a"}. Coordinates were not reprojected.`,
-            "Spatial overlap is geometric coincidence, not a joint interpretation.",
+            "Spatial overlap uses even-odd filled topology (exterior minus holes). Exterior-ring-only overlap is not supported.",
           ]}
         />
       </div>
@@ -142,7 +148,7 @@ export default function VerifyShapefilePage() {
   if (error) return <p className="p-6 text-red-300">{error}</p>;
   if (!payload) return <p className="p-6 text-[#cccccc]">Loading shapefile verification…</p>;
 
-  const tabs: Tab[] = ["catalog", "points", "lines", "polygons", "blocked", "conflict", "overlap", "interpretation"];
+  const tabs: Tab[] = ["catalog", "points", "lines", "polygons", "holes", "blocked", "conflict", "overlap", "interpretation"];
   const geology = payload.catalog.records.find((row) => row.relativePath.includes("polygons/geology.shp"));
 
   return (
@@ -152,7 +158,7 @@ export default function VerifyShapefilePage() {
           Documented shapefile ingest (GIS vector extension)
         </h1>
         <p className="text-[12px] text-[#858585]" data-testid="shp-parser">
-          Parser {payload.catalog.parser}. Shared gis.vector_* capabilities. GeoPackage remains recognised-unsupported.
+          Parser {payload.catalog.parser}. Topology {payload.holes.overlap?.engine || "g-aid-evenodd-segment"}. Shared gis.vector_* capabilities. Exterior-ring-only overlap is not supported. GeoPackage remains recognised-unsupported.
         </p>
       </header>
       <nav className="flex flex-wrap gap-1 px-3 py-2 border-b border-[#2b2b2b]">
@@ -203,6 +209,25 @@ export default function VerifyShapefilePage() {
         {tab === "points" ? <MapPack pack={payload.points} title="Shapefile points" /> : null}
         {tab === "lines" ? <MapPack pack={payload.lines} title="Shapefile polylines" /> : null}
         {tab === "polygons" ? <MapPack pack={payload.polygons} title="Geology-style shapefile polygons" /> : null}
+        {tab === "holes" ? (
+          <div className="h-full flex flex-col">
+            <div className="flex-1 min-h-0">
+              <MapPack pack={payload.holes} title="Polygon with hole (even-odd fill; point in hole is not contained)" />
+            </div>
+            <pre className="max-h-44 overflow-auto border-t border-[#2b2b2b] p-3 text-[12px]" data-testid="hole-overlap-rows">
+              {JSON.stringify(
+                {
+                  engine: payload.holes.overlap?.engine,
+                  method: payload.holes.overlap?.method,
+                  exterior_ring_only: payload.holes.overlap?.exterior_ring_only,
+                  rows: payload.holes.overlap?.rows || [],
+                },
+                null,
+                2
+              )}
+            </pre>
+          </div>
+        ) : null}
         {tab === "blocked" ? (
           <div className="p-4 text-[13px]" data-testid="blocked-panel">
             <p>Invalid shapefile datasets stay recognised-unsupported. Sidecar names alone are not ingest.</p>

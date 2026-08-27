@@ -16,8 +16,27 @@
       "right_coordinate_order": "east-north"
     }
   ],
+  "skipped_features": [],
   "reprojected": false,
   "axis_swap": false,
+  "exterior_ring_only": false,
   "geological_certainty_improved": false,
-  "interpretation_limit": "Overlap is a geometric table, not a prospectivity map."
+  "interpretation_limit": "Overlap is a geometric table, not a prospectivity map.",
+  "engine": "g-aid-evenodd-segment",
+  "engine_version": "1.0",
+  "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+  "precision": {
+    "model": "ieee754-float64",
+    "epsilon": 1e-09,
+    "on_boundary": "collinear-and-within-segment",
+    "approximation": "none"
+  },
+  "supported_relations": [
+    "contains",
+    "within",
+    "intersects",
+    "on-boundary",
+    "disjoint",
+    "not-evaluated"
+  ]
 }

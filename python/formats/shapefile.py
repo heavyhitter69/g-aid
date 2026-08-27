@@ -20,6 +20,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from science.polygon_topology import assemble_polygon_parts, canonical_polygon
+
 VENDOR = Path(__file__).resolve().parents[1] / "vendor"
 if str(VENDOR) not in sys.path:
     sys.path.insert(0, str(VENDOR))
@@ -251,28 +253,15 @@ def _geom_features(shape: Any, fid: str, props: dict[str, Any], errors: list[str
             )
         return features
 
-    # Polygon: first ring is the exterior used by the GIS kernel. Interior rings
-    # are not a geological interpretation; they are recorded as a warning.
-    if len(rings) > 1:
-        warnings.append(
-            f"Polygon {fid} has {len(rings) - 1} interior ring(s). Overlap uses the exterior ring only."
-        )
-    ring = rings[0] if rings else []
-    if any(not _finite(x, y) for x, y in ring):
+    if any(not _finite(x, y) for ring in rings for x, y in ring):
         errors.append(f"Polygon {fid} has non-finite coordinates.")
         return []
-    if not _closed(ring):
-        errors.append(f"Polygon {fid} exterior ring must be closed with at least four finite positions.")
+    assembled = assemble_polygon_parts(rings)
+    if not assembled["ok"]:
+        errors.extend(assembled["errors"] or [f"Polygon {fid} topology is invalid."])
         return []
-    features.append(
-        {
-            "id": fid,
-            "geometry_type": "Polygon",
-            "coordinates": [{"x": x, "y": y} for x, y in ring],
-            "properties": props,
-            "semantics": "unknown",
-        }
-    )
+    feature = canonical_polygon(assembled["parts"], fid, props)
+    features.append(feature)
     return features
 
 

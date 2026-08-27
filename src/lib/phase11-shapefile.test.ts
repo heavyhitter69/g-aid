@@ -166,6 +166,33 @@ test("plan binds supported shapefiles through gis.* capabilities; incomplete sid
   assert.ok(conflict.blockers.some((item) => item.code === "gis_crs_conflict"));
 });
 
+test("catalog retains polygon holes and rejects self-intersecting / crossing rings", () => {
+  const root = tmpCopy();
+  const catalog = buildProjectCatalog(root);
+  const holed = byPath(catalog.records, "topology/hole-polygon.shp");
+  assert.equal(holed.supportStatus, "supported");
+  const inspected = inspectShapefilePath(path.join(root, "topology", "hole-polygon.shp"));
+  assert.equal(inspected.features?.[0]?.topology?.hole_count, 1);
+  assert.equal((inspected.features?.[0]?.parts?.[0] || []).length, 2);
+  assert.equal(byPath(catalog.records, "topology/multipolygon.shp").supportStatus, "supported");
+  assert.equal(byPath(catalog.records, "topology/self-intersect.shp").supportStatus, "recognised-unsupported");
+  assert.equal(byPath(catalog.records, "topology/crossing-hole.shp").supportStatus, "recognised-unsupported");
+});
+
+test("map decode keeps hole rings for even-odd fill", () => {
+  const root = tmpCopy();
+  const decoded = decodeVectorLayer({
+    formatId: "shapefile",
+    shp: fs.readFileSync(path.join(root, "topology", "hole-polygon.shp")),
+    shx: fs.readFileSync(path.join(root, "topology", "hole-polygon.shx")),
+    dbf: fs.readFileSync(path.join(root, "topology", "hole-polygon.dbf")),
+    prjText: fs.readFileSync(path.join(root, "topology", "hole-polygon.prj"), "utf8"),
+  });
+  assert.ok(decoded);
+  assert.equal(decoded.data.features[0].type, "Polygon");
+  assert.equal((decoded.data.features[0].rings || []).length, 2);
+});
+
 test("map decode uses parsed shapefile sidecars; incomplete shp is not viewable", () => {
   assert.equal(isFalselyDecodable("shapefile"), false);
   const root = tmpCopy();
@@ -256,6 +283,8 @@ test("python kernels ingest shapefile through gis.vector_* and export GeoJSON wi
   const run = path.join(outRoot, "r-shp");
   const overlap = JSON.parse(fs.readFileSync(path.join(run, "vector_overlap.json"), "utf8"));
   assert.ok(overlap.rows.length);
+  assert.equal(overlap.engine, "g-aid-evenodd-segment");
+  assert.equal(overlap.exterior_ring_only, false);
   const exported = JSON.parse(fs.readFileSync(path.join(run, "vector_export_1.geojson"), "utf8"));
   assert.equal(exported.features[0].properties._g_aid_source_format, "shapefile");
   const meta = JSON.parse(fs.readFileSync(path.join(run, "vector_export.meta.json"), "utf8"));
@@ -273,6 +302,7 @@ test("desktop verification fixtures cover shapefile catalog, blocked datasets, C
     "r-verify-shp-blocked",
     "r-verify-shp-conflict",
     "r-verify-shp-overlap",
+    "r-verify-shp-holes",
     "r-verify-shp-interpret",
   ];
   for (const run of required) {
@@ -288,6 +318,14 @@ test("desktop verification fixtures cover shapefile catalog, blocked datasets, C
   const overlap = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-shp-overlap", "vector_overlap.json"), "utf8"));
   assert.ok(overlap.rows.length);
   assert.ok(overlap.rows[0].reason.includes("does not establish geological"));
+  const holes = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-shp-holes", "vector_overlap.json"), "utf8"));
+  assert.equal(holes.engine, "g-aid-evenodd-segment");
+  assert.equal(holes.exterior_ring_only, false);
+  const byId = Object.fromEntries((holes.rows as Array<{ right_id: string; relation: string }>).map((row) => [row.right_id, row.relation]));
+  assert.equal(byId.shell, "contains");
+  assert.equal(byId.hole, "disjoint");
+  assert.equal(byId.ebound, "on-boundary");
+  assert.equal(byId.hbound, "on-boundary");
   const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-shp-interpret", "vector_interpretation.json"), "utf8"));
   assert.equal(interp.geological_certainty_improved, false);
   const uiPath = path.join(process.cwd(), "docs/validation/results/shapefile_desktop_ui.json");

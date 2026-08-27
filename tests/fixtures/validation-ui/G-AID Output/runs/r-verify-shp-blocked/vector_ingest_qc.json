@@ -18,6 +18,14 @@
     {
       "source_path": "invalid-geometry/open-ring.shp",
       "reason": "Polygon geometry is malformed."
+    },
+    {
+      "source_path": "topology/self-intersect.shp",
+      "reason": "Ring 1 is self-intersecting. Overlap will not use an exterior-ring approximation."
+    },
+    {
+      "source_path": "topology/crossing-hole.shp",
+      "reason": "Rings 1 and 2 cross. Hole/exterior relationships are invalid."
     }
   ]
 }

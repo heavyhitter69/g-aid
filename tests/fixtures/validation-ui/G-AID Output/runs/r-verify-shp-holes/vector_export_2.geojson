@@ -1,0 +1,107 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "shell",
+      "properties": {
+        "ID": "shell",
+        "SAMPLE_ID": "IN-SHELL",
+        "_g_aid_source": "topology/hole-points.shp",
+        "_g_aid_source_format": "shapefile",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": null,
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "sample-location",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260150.0,
+          6240150.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hole",
+      "properties": {
+        "ID": "hole",
+        "SAMPLE_ID": "IN-HOLE",
+        "_g_aid_source": "topology/hole-points.shp",
+        "_g_aid_source_format": "shapefile",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": null,
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "sample-location",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260270.0,
+          6240250.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ebound",
+      "properties": {
+        "ID": "ebound",
+        "SAMPLE_ID": "ON-EXTERIOR",
+        "_g_aid_source": "topology/hole-points.shp",
+        "_g_aid_source_format": "shapefile",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": null,
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "sample-location",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260100.0,
+          6240250.0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hbound",
+      "properties": {
+        "ID": "hbound",
+        "SAMPLE_ID": "ON-HOLE",
+        "_g_aid_source": "topology/hole-points.shp",
+        "_g_aid_source_format": "shapefile",
+        "_g_aid_semantics": "unknown",
+        "_g_aid_crs": "EPSG:32734",
+        "_g_aid_geojson_contract": null,
+        "_g_aid_axis_order": "east-north",
+        "_g_aid_coordinate_order": "east-north",
+        "_g_aid_role": "sample-location",
+        "_g_aid_role_reviewed": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          260220.0,
+          6240250.0
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:32734"
+    }
+  }
+}

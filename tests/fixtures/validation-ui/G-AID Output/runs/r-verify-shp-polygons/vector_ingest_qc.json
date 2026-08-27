@@ -33,6 +33,7 @@
       },
       "role": "generic-vector",
       "role_reviewed": false,
+      "topology_engine": "g-aid-evenodd-segment",
       "warnings": [
         "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
         "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",

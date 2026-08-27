@@ -61,6 +61,8 @@ export function decodeVectorLayer(input: {
         features: decoded.features.map((feature) => ({
           type: feature.geometry_type,
           coordinates: feature.coordinates,
+          rings: feature.rings,
+          parts: feature.parts,
           id: feature.id,
           properties: feature.properties,
         })),

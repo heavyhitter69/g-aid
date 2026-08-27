@@ -8,7 +8,7 @@ import { folderOf } from "@/lib/job-results";
 import { companionAsciiPath } from "@/lib/survey-file-kinds";
 import { compareRunLayers, provenanceLabel } from "@/lib/map/compare";
 import { overlayDecision, crsFromPrj, type CrsInfo } from "@/lib/map/crs";
-import { parseGeojson, pointsFromVector, linesFromVector, polygonsFromVector } from "@/lib/map/geojson";
+import { parseGeojson, pointsFromVector, linesFromVector, polygonsFromVector, type OverlayPolygon } from "@/lib/map/geojson";
 import { sampleProfile, type ProfileResult } from "@/lib/map/inspect";
 import {
   buildMapLayers,
@@ -352,7 +352,7 @@ export function VisualizationStudio() {
   const [overlayParsedCrs, setOverlayParsedCrs] = useState<CrsInfo | undefined>(undefined);
   const [overlayPts, setOverlayPts] = useState<{ x: number; y: number }[]>([]);
   const [overlayLines, setOverlayLines] = useState<{ x: number; y: number }[][]>([]);
-  const [overlayPolygons, setOverlayPolygons] = useState<{ x: number; y: number }[][]>([]);
+  const [overlayPolygons, setOverlayPolygons] = useState<OverlayPolygon[]>([]);
   const [overlayBlock, setOverlayBlock] = useState<string>("");
   useEffect(() => {
     const desktop = window.gaidDesktop;
@@ -379,7 +379,7 @@ export function VisualizationStudio() {
         if (cancelled) return;
         const pts: { x: number; y: number }[] = [];
         const lines: { x: number; y: number }[][] = [];
-        const polygons: { x: number; y: number }[][] = [];
+        const polygons: OverlayPolygon[] = [];
         const blocked: string[] = [];
         let firstCrs: CrsInfo | undefined;
         let firstPrj = "";

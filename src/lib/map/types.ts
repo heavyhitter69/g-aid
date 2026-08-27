@@ -59,8 +59,10 @@ export interface RasterGrid {
 }
 
 export interface VectorFeature {
-  type: "Point" | "LineString" | "Polygon";
+  type: "Point" | "LineString" | "Polygon" | "MultiPolygon";
   coordinates: { x: number; y: number }[];
+  rings?: { x: number; y: number }[][];
+  parts?: { x: number; y: number }[][][];
   id?: string | number;
   properties?: Record<string, unknown>;
 }

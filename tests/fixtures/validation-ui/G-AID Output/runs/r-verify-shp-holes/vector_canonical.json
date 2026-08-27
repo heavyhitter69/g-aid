@@ -1,0 +1,337 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "ID",
+        "UNIT"
+      ],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": "H1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240200.0
+            },
+            {
+              "x": 260320.0,
+              "y": 6240200.0
+            },
+            {
+              "x": 260320.0,
+              "y": 6240300.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240300.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240200.0
+            }
+          ],
+          "rings": [
+            [
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              }
+            ],
+            [
+              {
+                "x": 260220.0,
+                "y": 6240200.0
+              },
+              {
+                "x": 260320.0,
+                "y": 6240200.0
+              },
+              {
+                "x": 260320.0,
+                "y": 6240300.0
+              },
+              {
+                "x": 260220.0,
+                "y": 6240300.0
+              },
+              {
+                "x": 260220.0,
+                "y": 6240200.0
+              }
+            ]
+          ],
+          "parts": [
+            [
+              [
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                }
+              ],
+              [
+                {
+                  "x": 260220.0,
+                  "y": 6240200.0
+                },
+                {
+                  "x": 260320.0,
+                  "y": 6240200.0
+                },
+                {
+                  "x": 260320.0,
+                  "y": 6240300.0
+                },
+                {
+                  "x": 260220.0,
+                  "y": 6240300.0
+                },
+                {
+                  "x": 260220.0,
+                  "y": 6240200.0
+                }
+              ]
+            ]
+          ],
+          "topology": {
+            "engine": "g-aid-evenodd-segment",
+            "engine_version": "1.0",
+            "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+            "valid": true,
+            "part_count": 1,
+            "hole_count": 1,
+            "classification": "nesting-containment"
+          },
+          "properties": {
+            "ID": "H1",
+            "UNIT": "licence-with-hole"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240100.0,
+        "maxX": 260500.0,
+        "maxY": 6240400.0
+      },
+      "role": "tenure",
+      "role_reviewed": true,
+      "source_path": "topology/hole-polygon.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "797d3490f031deaf36417bf9c745080978650de70f4cd90fea5dee30428c8d9f",
+        "shx": "a48306cb22479a56925e908dfb055a3830377ff6c3af21402f60c23b0dd0bfd9",
+        "dbf": "c50b58ee3f4eace7b931b4bb37335ad4246162f700c49a6d621f02c146a43986",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "hole-polygon",
+      "checksum": "hole-polygon"
+    },
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "ID",
+        "SAMPLE_ID"
+      ],
+      "feature_count": 4,
+      "features": [
+        {
+          "id": "shell",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260150.0,
+              "y": 6240150.0
+            }
+          ],
+          "properties": {
+            "ID": "shell",
+            "SAMPLE_ID": "IN-SHELL"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "hole",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260270.0,
+              "y": 6240250.0
+            }
+          ],
+          "properties": {
+            "ID": "hole",
+            "SAMPLE_ID": "IN-HOLE"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "ebound",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240250.0
+            }
+          ],
+          "properties": {
+            "ID": "ebound",
+            "SAMPLE_ID": "ON-EXTERIOR"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "hbound",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260220.0,
+              "y": 6240250.0
+            }
+          ],
+          "properties": {
+            "ID": "hbound",
+            "SAMPLE_ID": "ON-HOLE"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260100.0,
+        "minY": 6240150.0,
+        "maxX": 260270.0,
+        "maxY": 6240250.0
+      },
+      "role": "sample-location",
+      "role_reviewed": true,
+      "source_path": "topology/hole-points.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "76402d89342f725b7b15d1af173fda7d2bf3825ca181b628275cbf8d867600ce",
+        "shx": "ecb7c996795f8793f523efda7570340fe2ee49c06a9e1ce0c69fd88c19dbfb8f",
+        "dbf": "fef35e2b05848105d2cf43e28a53147f6d9d679cfdbdfd3da2a2d9539db4b823",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "hole-points",
+      "checksum": "hole-points"
+    }
+  ]
+}

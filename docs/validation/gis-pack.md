@@ -28,7 +28,9 @@ identity, CRS source, axis order, coordinate storage order, feature IDs,
 source path, checksum, user-assigned layer role, provenance.
 
 G-AID will **not** silently reproject or swap axes. Overlay and analysis
-rules stay explicit.
+rules stay explicit. Spatial overlap uses even-odd filled topology
+(exterior minus holes) via `g-aid-evenodd-segment`. Exterior-ring-only
+overlap is not supported.
 
 Layer purpose (`geology`, `structure`, `tenure`, `alteration`,
 `mine-feature`, `sample-location`, `generic-vector`) is a **reviewed,

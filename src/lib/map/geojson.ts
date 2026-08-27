@@ -51,17 +51,35 @@ function featuresFromGeometry(
       .map((pts) => ({ type: "LineString" as const, coordinates: pts, ...meta }));
   }
   if (type === "Polygon" && Array.isArray(coordinates)) {
-    const ring = lineCoords(coordinates[0]);
-    return ring.length >= 3 ? [{ type: "Polygon", coordinates: ring, ...meta }] : [];
+    const rings = coordinates.map((ring) => lineCoords(ring)).filter((ring) => ring.length >= 3);
+    if (!rings.length) return [];
+    return [
+      {
+        type: rings.length && coordinates.length > 1 ? "Polygon" : "Polygon",
+        coordinates: rings[0],
+        rings,
+        parts: [rings],
+        ...meta,
+      },
+    ];
   }
   if (type === "MultiPolygon" && Array.isArray(coordinates)) {
-    const out: VectorFeature[] = [];
+    const parts: { x: number; y: number }[][][] = [];
     for (const poly of coordinates) {
       if (!Array.isArray(poly)) continue;
-      const ring = lineCoords(poly[0]);
-      if (ring.length >= 3) out.push({ type: "Polygon", coordinates: ring, ...meta });
+      const rings = poly.map((ring: unknown) => lineCoords(ring)).filter((ring) => ring.length >= 3);
+      if (rings.length) parts.push(rings);
     }
-    return out;
+    if (!parts.length) return [];
+    return [
+      {
+        type: "MultiPolygon",
+        coordinates: parts.flat(2),
+        rings: parts[0],
+        parts,
+        ...meta,
+      },
+    ];
   }
   return [];
 }
@@ -142,6 +160,33 @@ export function linesFromVector(data: VectorLayerData): { x: number; y: number }
   return data.features.filter((feature) => feature.type === "LineString").map((feature) => feature.coordinates);
 }
 
-export function polygonsFromVector(data: VectorLayerData): { x: number; y: number }[][] {
-  return data.features.filter((feature) => feature.type === "Polygon").map((feature) => feature.coordinates);
+export type OverlayPolygon =
+  | { x: number; y: number }[]
+  | { exterior: { x: number; y: number }[]; holes?: { x: number; y: number }[][] };
+
+export function normalizeOverlayPolygon(poly: OverlayPolygon): {
+  exterior: { x: number; y: number }[];
+  holes: { x: number; y: number }[][];
+} {
+  if (Array.isArray(poly)) return { exterior: poly, holes: [] };
+  return { exterior: poly.exterior, holes: poly.holes || [] };
+}
+
+export function polygonsFromVector(data: VectorLayerData): OverlayPolygon[] {
+  const out: OverlayPolygon[] = [];
+  for (const feature of data.features) {
+    if (feature.type !== "Polygon" && feature.type !== "MultiPolygon") continue;
+    const parts = feature.parts?.length
+      ? feature.parts
+      : feature.rings?.length
+        ? [feature.rings]
+        : feature.coordinates.length
+          ? [[feature.coordinates]]
+          : [];
+    for (const part of parts) {
+      if (!part.length) continue;
+      out.push({ exterior: part[0], holes: part.slice(1) });
+    }
+  }
+  return out;
 }

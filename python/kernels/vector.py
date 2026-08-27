@@ -11,6 +11,7 @@ import json
 import os
 
 from science.artifacts import make_artifact, skipped, task_dir, write_json, write_lineage
+from science.polygon_topology import engine_meta, geojson_geometry, relate_features
 
 
 def _params(payload: dict) -> dict:
@@ -123,6 +124,7 @@ def vector_ingest(payload: dict) -> dict:
                 "bbox": layer["bbox"],
                 "role": layer["role"],
                 "role_reviewed": layer["role_reviewed"],
+                "topology_engine": "g-aid-evenodd-segment",
                 "warnings": layer["warnings"],
             }
             for layer in layers
@@ -181,6 +183,7 @@ def vector_view(payload: dict) -> dict:
                 "feature_count": layer.get("feature_count"),
                 "bbox": layer.get("bbox"),
                 "features": layer.get("features"),
+                "topology_engine": "g-aid-evenodd-segment",
                 "origin": "source",
             }
         )
@@ -206,43 +209,6 @@ def vector_view(payload: dict) -> dict:
 
 def _bbox_overlap(a: dict, b: dict) -> bool:
     return a["minX"] <= b["maxX"] and a["maxX"] >= b["minX"] and a["minY"] <= b["maxY"] and a["maxY"] >= b["minY"]
-
-
-def _point_in_ring(x: float, y: float, ring: list[dict]) -> bool:
-    inside = False
-    n = len(ring)
-    j = n - 1
-    for i in range(n):
-        xi, yi = float(ring[i]["x"]), float(ring[i]["y"])
-        xj, yj = float(ring[j]["x"]), float(ring[j]["y"])
-        intersect = ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-12) + xi)
-        if intersect:
-            inside = not inside
-        j = i
-    return inside
-
-
-def _feature_pts(feature: dict) -> list[dict]:
-    return [p for p in (feature.get("coordinates") or []) if isinstance(p, dict)]
-
-
-def _relation(left: dict, right: dict) -> str:
-    lt = str(left.get("geometry_type") or "")
-    rt = str(right.get("geometry_type") or "")
-    lp, rp = _feature_pts(left), _feature_pts(right)
-    if "Polygon" in lt and rp:
-        if all(_point_in_ring(p["x"], p["y"], lp) for p in rp if "x" in p):
-            return "contains"
-    if "Polygon" in rt and lp:
-        if all(_point_in_ring(p["x"], p["y"], rp) for p in lp if "x" in p):
-            return "within"
-    if "Polygon" in lt and lp and rp:
-        if any(_point_in_ring(p["x"], p["y"], lp) for p in rp if "x" in p):
-            return "intersects"
-    if "Polygon" in rt and lp and rp:
-        if any(_point_in_ring(p["x"], p["y"], rp) for p in lp if "x" in p):
-            return "intersects"
-    return "bbox-overlap"
 
 
 def _lonlat_storage(layer: dict) -> bool:
@@ -329,6 +295,8 @@ def vector_overlap(payload: dict) -> dict:
     rows = []
     blocked = []
     decisions = []
+    skipped_features = []
+    topo = engine_meta()
     for i, left in enumerate(layers):
         for right in layers[i + 1 :]:
             pair = _crs_pair(left, right)
@@ -358,8 +326,26 @@ def vector_overlap(payload: dict) -> dict:
             if not _bbox_overlap(left.get("bbox") or {}, right.get("bbox") or {}):
                 continue
             for lf in left.get("features") or []:
+                if "Polygon" in str(lf.get("geometry_type") or "") and not lf.get("parts") and not lf.get("rings"):
+                    skipped_features.append(
+                        {
+                            "id": lf.get("id"),
+                            "path": left.get("source_path"),
+                            "reason": "Polygon has no retained rings. Overlap was not approximated from an exterior ring.",
+                        }
+                    )
+                    continue
                 for rf in right.get("features") or []:
-                    relation = _relation(lf, rf)
+                    if "Polygon" in str(rf.get("geometry_type") or "") and not rf.get("parts") and not rf.get("rings"):
+                        skipped_features.append(
+                            {
+                                "id": rf.get("id"),
+                                "path": right.get("source_path"),
+                                "reason": "Polygon has no retained rings. Overlap was not approximated from an exterior ring.",
+                            }
+                        )
+                        continue
+                    hit = relate_features(lf, rf)
                     rows.append(
                         {
                             "left_path": left.get("source_path"),
@@ -370,9 +356,13 @@ def vector_overlap(payload: dict) -> dict:
                             "right_role": right.get("role"),
                             "crs": pair.get("crs") or left.get("crs"),
                             "compatibility_decision": pair.get("decision") or "",
-                            "relation": relation,
+                            "relation": hit["relation"],
+                            "location": hit.get("location") or "",
+                            "engine": hit.get("engine") or topo["engine"],
+                            "method": hit.get("method") or topo["method"],
+                            "precision": "ieee754-float64 epsilon=1e-9 approximation=none",
                             "reason": (
-                                f"Geometric {relation}. {pair['reason']} "
+                                f"Geometric {hit['relation']}. {hit.get('reason') or ''} {pair['reason']} "
                                 "Spatial overlap does not establish geological, mineral, or causal relationships."
                             ),
                         }
@@ -389,6 +379,10 @@ def vector_overlap(payload: dict) -> dict:
         "crs",
         "compatibility_decision",
         "relation",
+        "location",
+        "engine",
+        "method",
+        "precision",
         "reason",
     ]
     with open(table_path, "w", encoding="utf-8", newline="") as handle:
@@ -398,17 +392,30 @@ def vector_overlap(payload: dict) -> dict:
             writer.writerow(row)
     json_path = write_json(
         os.path.join(out, "vector_overlap.json"),
-        {"kind": "gis-overlap", "rows": rows, "blocked": blocked, "crs_decisions": decisions, "reprojected": False, "axis_swap": False},
+        {
+            "kind": "gis-overlap",
+            "rows": rows,
+            "blocked": blocked,
+            "crs_decisions": decisions,
+            "skipped_features": skipped_features,
+            "reprojected": False,
+            "axis_swap": False,
+            "exterior_ring_only": False,
+            **topo,
+        },
     )
     qc = {
         "skipped": False,
         "n_rows": len(rows),
         "blocked": blocked,
         "crs_decisions": decisions,
+        "skipped_features": skipped_features,
         "reprojected": False,
         "axis_swap": False,
+        "exterior_ring_only": False,
         "geological_certainty_improved": False,
         "interpretation_limit": "Overlap is a geometric table, not a prospectivity map.",
+        **topo,
     }
     qc_path = write_json(os.path.join(out, "vector_overlap_qc.json"), qc)
     write_lineage(out, node_id, "Same-CRS geometric overlap", {"n": len(rows)}, [src], [table_path, json_path, qc_path])
@@ -444,14 +451,9 @@ def vector_export(payload: dict) -> dict:
         elif epsg:
             fc["crs"] = {"type": "name", "properties": {"name": f"EPSG:{epsg}"}}
         for feature in layer.get("features") or []:
-            coords = feature.get("coordinates") or []
-            gtype = feature.get("geometry_type") or "Point"
-            if gtype == "Point" and coords:
-                geometry = {"type": "Point", "coordinates": [coords[0]["x"], coords[0]["y"]]}
-            elif "Line" in gtype:
-                geometry = {"type": "LineString", "coordinates": [[p["x"], p["y"]] for p in coords]}
-            else:
-                geometry = {"type": "Polygon", "coordinates": [[[p["x"], p["y"]] for p in coords]]}
+            geometry = geojson_geometry(feature)
+            if not geometry:
+                continue
             props = dict(feature.get("properties") or {})
             props["_g_aid_source"] = layer.get("source_path")
             props["_g_aid_source_format"] = layer.get("source_format") or "geojson"
@@ -535,6 +537,7 @@ def vector_interpret(payload: dict) -> dict:
         ],
         "uncertainty": [
             "Spatial overlap is geometric coincidence.",
+            "Overlap uses even-odd filled topology (exterior minus holes). A point in a hole is not contained.",
             "A fault line, geology polygon, tenure boundary, occurrence, alteration label, or sample point remains source information.",
         ],
         "recommendations": [
@@ -550,6 +553,7 @@ def vector_interpret(payload: dict) -> dict:
             "Drill recommendations are not established.",
             "Causal relationships from overlay are not established.",
             "GeoPackage ingest is not established.",
+            "Exterior-ring-only overlap is not established.",
         ],
         "geological_certainty_improved": False,
         "qc": {

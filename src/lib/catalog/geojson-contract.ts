@@ -7,6 +7,7 @@
 
 import { resolveGeojsonCrs, type CrsAxisOrder } from "../map/crs.ts";
 import type { GeojsonContractKind } from "../map/types.ts";
+import { assemblePolygonParts } from "../geometry/polygon-topology.ts";
 
 export const GEOJSON_ADAPTER_ID = "geojson";
 export const GEOJSON_FORMAT = "geojson";
@@ -170,26 +171,26 @@ function validateGeometry(
     return { ok, pts };
   }
   if (type === "Polygon" && Array.isArray(coordinates)) {
-    const ring = linePts(coordinates[0]);
-    if (ring.length < 4 || !ringClosed(ring)) {
-      errors.push("Polygon exterior ring must be closed with at least four finite positions.");
+    const rings = coordinates.map((ring) => linePts(ring)).filter((ring) => ring.length);
+    const assembled = assemblePolygonParts(rings);
+    if (!assembled.ok) {
+      errors.push(...(assembled.errors.length ? assembled.errors : ["Polygon topology is invalid."]));
       return { ok: false, pts: [] };
     }
-    return { ok: true, pts: ring };
+    return { ok: true, pts: assembled.parts.flat(2) };
   }
   if (type === "MultiPolygon" && Array.isArray(coordinates)) {
-    const pts: { x: number; y: number }[] = [];
-    let ok = false;
+    const rings: { x: number; y: number }[][] = [];
     for (const poly of coordinates) {
       if (!Array.isArray(poly)) continue;
-      const ring = linePts(poly[0]);
-      if (ring.length >= 4 && ringClosed(ring)) {
-        ok = true;
-        pts.push(...ring);
-      }
+      for (const ring of poly) rings.push(linePts(ring));
     }
-    if (!ok) errors.push("MultiPolygon has no valid closed exterior ring.");
-    return { ok, pts };
+    const assembled = assemblePolygonParts(rings.filter((ring) => ring.length));
+    if (!assembled.ok) {
+      errors.push(...(assembled.errors.length ? assembled.errors : ["MultiPolygon topology is invalid."]));
+      return { ok: false, pts: [] };
+    }
+    return { ok: true, pts: assembled.parts.flat(2) };
   }
   errors.push(`Geometry type ${type} is not a supported GeoJSON processing geometry.`);
   return { ok: false, pts: [] };

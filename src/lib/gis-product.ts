@@ -12,7 +12,7 @@ export const GIS_STATEMENTS = [
   "Shapefile sidecar names alone are not support. Geometry records, DBF attributes, encoding, and CRS must parse.",
   "Layer purpose (geology, structure, tenure, alteration, mine feature, sample location) is user-assigned. Filenames and field names do not establish geology or mineral meaning.",
   "Overlay and spatial-overlap queries require documented CRS compatibility. G-AID will not silently reproject or swap axes.",
-  "Spatial overlap is a geometric relationship table. It does not establish geological, mineral, or causal relationships.",
+  "Spatial overlap is a geometric relationship table using even-odd filled topology (exterior minus holes). A point in a hole is not contained. It does not establish geological, mineral, or causal relationships.",
   "Buffer, clip, dissolve, reprojection, geoprocessing, and attribute editing are not registered capabilities.",
   "Mineral targets, prospectivity maps, resource/reserve claims, and drill recommendations are not established from overlays.",
 ];
@@ -61,7 +61,7 @@ export function gisProductWarnings(opts: {
     warnings.push("EPSG:4326 OGC axis order is lat-lon. GeoJSON coordinates remain [lon, lat]. G-AID will not silently swap axes.");
   }
   if (opts.overlapComputed) {
-    warnings.push("Spatial overlap is geometric coincidence, not a joint geological or mineral interpretation.");
+    warnings.push("Spatial overlap is geometric coincidence using filled topology (exterior minus holes), not a joint geological or mineral interpretation.");
   }
   return warnings;
 }

@@ -57,6 +57,65 @@
               "y": 6240100.0
             }
           ],
+          "rings": [
+            [
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240100.0
+              },
+              {
+                "x": 260500.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240400.0
+              },
+              {
+                "x": 260100.0,
+                "y": 6240100.0
+              }
+            ]
+          ],
+          "parts": [
+            [
+              [
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240100.0
+                },
+                {
+                  "x": 260500.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240400.0
+                },
+                {
+                  "x": 260100.0,
+                  "y": 6240100.0
+                }
+              ]
+            ]
+          ],
+          "topology": {
+            "engine": "g-aid-evenodd-segment",
+            "engine_version": "1.0",
+            "method": "even-odd point-in-ring with hole exclusion; segment-segment intersection; ring nesting by containment (not orientation)",
+            "valid": true,
+            "part_count": 1,
+            "hole_count": 0,
+            "classification": "nesting-containment"
+          },
           "properties": {
             "ID": "T1",
             "UNIT": "licence"
@@ -64,6 +123,7 @@
           "semantics": "unknown"
         }
       ],
+      "topology_engine": "g-aid-evenodd-segment",
       "origin": "source"
     },
     {
@@ -127,6 +187,7 @@
           "semantics": "unknown"
         }
       ],
+      "topology_engine": "g-aid-evenodd-segment",
       "origin": "source"
     }
   ],
