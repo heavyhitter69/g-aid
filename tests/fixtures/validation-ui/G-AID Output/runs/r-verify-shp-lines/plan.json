@@ -1,0 +1,12 @@
+{
+  "runId": "r-verify-shp-lines",
+  "planHash": "fixture-r-verify-shp-lines",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view"
+  ],
+  "product": "G-AID documented GIS vector layer",
+  "parameters": {}
+}

@@ -93,48 +93,6 @@ function sniffEsriAscii(ctx: SniffContext): AdapterSniff | null {
   };
 }
 
-function sniffShapefile(ctx: SniffContext): AdapterSniff | null {
-  if (ctx.peek.length < 4) return null;
-  const code = ctx.peek.readUInt32BE(0);
-  if (code !== 9994) return null;
-  return {
-    confidence: 0.88,
-    formatId: "shapefile",
-    mediaClass: "vector",
-    domainHint: "gis",
-    notes: ["ESRI shapefile file-code 9994. Shape records and DBF attributes were not loaded."],
-  };
-}
-
-function inspectShapefile(ctx: SniffContext): CatalogInspection {
-  const stem = ctx.filename.replace(/\.shp$/i, "");
-  const names = new Set((ctx.siblingNames || []).map((name) => name.toLowerCase()));
-  const sidecars = {
-    shp: true,
-    shx: names.has(`${stem.toLowerCase()}.shx`),
-    dbf: names.has(`${stem.toLowerCase()}.dbf`),
-    prj: names.has(`${stem.toLowerCase()}.prj`),
-  };
-  const missing: string[] = [];
-  if (!sidecars.shx) missing.push(".shx");
-  if (!sidecars.dbf) missing.push(".dbf");
-  if (!sidecars.prj) missing.push(".prj");
-  const errors = [
-    "Shapefile is recognised-unsupported. G-AID does not parse shape records, DBF attributes, or shapefile geometry in this pack.",
-  ];
-  if (missing.length) {
-    errors.push(`Shapefile sidecar set is incomplete (missing ${missing.join(", ")}). A valid dataset needs .shp, .shx, .dbf, and .prj together.`);
-  } else if (!ctx.companionPrjText || !/EPSG/i.test(ctx.companionPrjText)) {
-    errors.push("Shapefile .prj is present but has no EPSG authority. CRS is undocumented.");
-  }
-  return {
-    parseErrors: errors,
-    shapefileSidecars: sidecars,
-    locationQuality: sidecars.prj && ctx.companionPrjText && /EPSG/i.test(ctx.companionPrjText) ? "documented" : "missing",
-    headerSummary: `Shapefile file-code 9994; sidecars shx=${sidecars.shx} dbf=${sidecars.dbf} prj=${sidecars.prj}`,
-  };
-}
-
 function sniffGeopackage(ctx: SniffContext): AdapterSniff | null {
   const sqlite = ctx.peek.length >= 16 && ctx.peek.subarray(0, 16).toString("utf8") === "SQLite format 3\0";
   const named = ctx.extension === "gpkg";
@@ -283,7 +241,6 @@ export const recognisedAdapters: CatalogAdapter[] = [
     parseErrors: undefined,
   })),
   makeAdapter("geotiff", "geotiff", sniffGeotiff),
-  makeAdapter("shapefile", "shapefile", sniffShapefile, inspectShapefile),
   makeAdapter("geopackage", "geopackage", sniffGeopackage, () => ({
     parseErrors: [
       "GeoPackage is recognised-unsupported. G-AID does not parse GPKG tables, geometries, or CRS in this pack.",

@@ -1,0 +1,73 @@
+{
+  "kind": "gis-vector",
+  "product_name": "G-AID documented GIS vector layer",
+  "layers": [
+    {
+      "source_path": "points/samples.shp",
+      "catalog_id": "points",
+      "crs": "EPSG:32734",
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "source_format": "shapefile",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "ID",
+        "SAMPLE_ID"
+      ],
+      "feature_count": 2,
+      "bbox": {
+        "minX": 260150.0,
+        "minY": 6240150.0,
+        "maxX": 260180.0,
+        "maxY": 6240180.0
+      },
+      "features": [
+        {
+          "id": "1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260150.0,
+              "y": 6240150.0
+            }
+          ],
+          "properties": {
+            "ID": "1",
+            "SAMPLE_ID": "S-001"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "2",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260180.0,
+              "y": 6240180.0
+            }
+          ],
+          "properties": {
+            "ID": "2",
+            "SAMPLE_ID": "S-002"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
+    "Attribute names have unknown semantics unless the user supplied meaning."
+  ]
+}

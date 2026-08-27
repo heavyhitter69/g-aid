@@ -1,0 +1,13 @@
+{
+  "runId": "r-verify-shp-conflict",
+  "planHash": "fixture-r-verify-shp-conflict",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.spatial_overlap"
+  ],
+  "product": "G-AID documented GIS vector layer",
+  "parameters": {}
+}

@@ -308,7 +308,7 @@ export function VisualizationStudio() {
   const text = active ? fileContents[active.path] : undefined;
   const raster: RasterGrid | null = useMemo(() => {
     if (!active || !text) return null;
-    if (active.formatId === "geojson") return null;
+    if (active.formatId === "geojson" || active.formatId === "shapefile") return null;
     return parseEsriAscii(text);
   }, [active, text]);
   const vector = useMemo(() => {

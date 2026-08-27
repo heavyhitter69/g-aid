@@ -1,0 +1,14 @@
+{
+  "runId": "r-verify-shp-interpret",
+  "planHash": "fixture-r-verify-shp-interpret",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view",
+    "gis.spatial_overlap",
+    "gis.interpret"
+  ],
+  "product": "G-AID documented GIS vector layer",
+  "parameters": {}
+}

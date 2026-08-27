@@ -37,7 +37,7 @@ export function mapValueUnits(path: string, formatId?: string, recorded?: string
   const n = posix(path).toLowerCase();
   if (isRadiometricMapPath(path, formatId)) return recorded?.trim() || "unknown";
   if (formatId === "dem-ascii" || /\bdem\b/.test(n)) return "m";
-  if (formatId === "geojson" || n.endsWith(".geojson")) {
+  if (formatId === "geojson" || formatId === "shapefile" || n.endsWith(".geojson") || n.endsWith(".shp")) {
     if (/gravity|bouguer|free_air|free-air/.test(n)) return "mGal";
     if (/geochem_points/.test(n)) return recorded?.trim() || "assay-units";
     return "coordinate";
@@ -66,12 +66,17 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
   const adapter = displayAdapterFor(record.formatId);
   const dem = isDemAscii(record);
   const formatId = dem ? "dem-ascii" : record.formatId;
-  const viewable = Boolean(adapter?.viewable);
-  const decoded = Boolean(adapter?.decoded);
+  let viewable = Boolean(adapter?.viewable);
+  let decoded = Boolean(adapter?.decoded);
+  if (record.formatId === "shapefile" && record.supportStatus !== "supported") {
+    viewable = false;
+    decoded = false;
+  }
   let displayStatus: MapLayerSpec["displayStatus"] = "not-viewable";
   if (viewable && decoded) displayStatus = "viewable";
   else if (viewable) displayStatus = "recognised-not-decoded";
   else if (adapter && !adapter.decoded) displayStatus = "recognised-not-decoded";
+  else if (record.formatId === "shapefile") displayStatus = "recognised-not-decoded";
   const crs = record.crs
     ? crsFromCatalog(record.crs, {
         source: "catalog",
@@ -96,20 +101,22 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
         })
       : undefined;
   const vectorWarnings =
-    record.formatId === "geojson"
+    record.formatId === "geojson" || record.formatId === "shapefile"
       ? gisProductWarnings({
           path: record.relativePath,
           role: record.vectorRole?.role,
           roleReviewed: record.vectorRole?.reviewed,
           crs: record.crs,
           geojsonContract: record.geojsonContract,
+          crsSource: record.crsSource,
+          crsConfidence: record.crsConfidence,
           axisOrder: record.axisOrder,
         })
       : undefined;
   const label =
     record.adapterId === "geochem-csv" || record.adapterId === "geochem-xyz"
       ? `${geochemLayerHeading(record.geochemMapping?.elements?.[0]?.symbol, record.units)} — ${record.filename}`
-      : record.formatId === "geojson"
+      : record.formatId === "geojson" || record.formatId === "shapefile"
       ? `${gisLayerHeading(record.vectorRole?.role, record.vectorRole?.reviewed)} — ${record.filename}`
       : dem
         ? `DEM ${record.filename}`

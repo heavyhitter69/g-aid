@@ -77,7 +77,7 @@ function RecordRow({ record }: { record: CatalogRecord }) {
       <td className="px-3 py-2 text-xs text-[#858585]">{record.sniffConfidence.toFixed(2)}</td>
       <td className="px-3 py-2 text-xs text-[#858585] whitespace-nowrap">{record.crs || "—"}</td>
       <td className="px-3 py-2 text-xs text-[#858585]">
-        {record.adapterId === "geojson" ? (
+        {record.adapterId === "geojson" || record.adapterId === "shapefile" ? (
           <select
             data-testid={`vector-role-${record.id}`}
             className="bg-[#2a2d2e] border border-[#3c3c3c] rounded px-1 py-0.5 text-[11px] text-[#cccccc] max-w-[9rem]"

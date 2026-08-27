@@ -1,0 +1,12 @@
+{
+  "runId": "r-verify-shp-points",
+  "planHash": "fixture-r-verify-shp-points",
+  "intent": "gis",
+  "status": "complete",
+  "capabilities": [
+    "gis.vector_ingest",
+    "gis.vector_view"
+  ],
+  "product": "G-AID documented GIS vector layer",
+  "parameters": {}
+}

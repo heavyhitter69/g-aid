@@ -81,8 +81,14 @@ export interface CatalogInspection {
     shx: boolean;
     dbf: boolean;
     prj: boolean;
+    cpg?: boolean;
   };
   geojsonContract?: CatalogRecord["geojsonContract"];
+  shapefileContract?: CatalogRecord["shapefileContract"];
+  vectorFormat?: CatalogRecord["vectorFormat"];
+  encoding?: CatalogRecord["encoding"];
+  encodingSource?: CatalogRecord["encodingSource"];
+  crsConfidence?: CatalogRecord["crsConfidence"];
   crsSource?: CatalogRecord["crsSource"];
   axisOrder?: CatalogRecord["axisOrder"];
   coordinateOrder?: CatalogRecord["coordinateOrder"];

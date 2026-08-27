@@ -1,14 +1,15 @@
 import { crsFromCatalog, overlayDecision, type CrsInfo } from "./map/crs.ts";
 
-export const GIS_PRODUCT_NAME = "G-AID documented GeoJSON vector layer";
+export const GIS_PRODUCT_NAME = "G-AID documented GIS vector layer";
 export const GIS_SUPPORTED_FORMAT =
-  "RFC 7946 GeoJSON (OGC:CRS84), legacy-GeoJSON with a validated CRS mapping, or G-AID custom import (.prj / EPSG=)";
+  "RFC 7946 GeoJSON (OGC:CRS84), legacy-GeoJSON with a validated CRS mapping, a G-AID custom import (.prj / EPSG=), or a documented ESRI shapefile (.shp/.shx/.dbf with .prj EPSG)";
 
 export const GIS_STATEMENTS = [
-  "Product: G-AID documented GeoJSON vector layer. Geometry and attributes are source information, not an AI-confirmed interpretation.",
+  "Product: G-AID documented GIS vector layer. Geometry and attributes are source information, not an AI-confirmed interpretation.",
   "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (WGS 84 longitude-latitude degrees). It is not EPSG:4326.",
   "A legacy GeoJSON crs member is not RFC 7946. Projected files with .prj or / EPSG= are a G-AID custom import contract.",
-  "GeoJSON is the only supported vector ingest. Shapefile and GeoPackage stay recognised-unsupported (no geometry/attribute parser in this pack).",
+  "Supported vector ingest is documented GeoJSON and parsed ESRI shapefile (.shp/.shx/.dbf with .prj EPSG). GeoPackage stays recognised-unsupported.",
+  "Shapefile sidecar names alone are not support. Geometry records, DBF attributes, encoding, and CRS must parse.",
   "Layer purpose (geology, structure, tenure, alteration, mine feature, sample location) is user-assigned. Filenames and field names do not establish geology or mineral meaning.",
   "Overlay and spatial-overlap queries require documented CRS compatibility. G-AID will not silently reproject or swap axes.",
   "Spatial overlap is a geometric relationship table. It does not establish geological, mineral, or causal relationships.",
@@ -29,6 +30,8 @@ export function gisProductWarnings(opts: {
   roleReviewed?: boolean;
   crs?: string;
   geojsonContract?: string;
+  crsSource?: string;
+  crsConfidence?: string;
   axisOrder?: string;
   overlapComputed?: boolean;
 }): string[] {
@@ -49,6 +52,10 @@ export function gisProductWarnings(opts: {
     warnings.push("This is legacy-GeoJSON. The crs member is not the RFC 7946 CRS mechanism.");
   } else if (opts.geojsonContract === "g-aid-custom-import") {
     warnings.push("This is a G-AID custom import contract, not standard RFC 7946 GeoJSON.");
+  } else if (opts.crsSource === "shapefile-prj") {
+    warnings.push(
+      `CRS is from shapefile .prj (${opts.crs}${opts.crsConfidence ? `, confidence ${opts.crsConfidence}` : ""}). Coordinates were not reprojected.`
+    );
   }
   if (opts.crs === "EPSG:4326") {
     warnings.push("EPSG:4326 OGC axis order is lat-lon. GeoJSON coordinates remain [lon, lat]. G-AID will not silently swap axes.");

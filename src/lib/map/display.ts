@@ -1,6 +1,6 @@
 /**
  * Display adapters. Viewing is not processing support.
- * Shapefile, FileGDB, LAS/LAZ, and SEG-Y are recognised but not decoded.
+ * Incomplete shapefiles, FileGDB, LAS/LAZ, and SEG-Y are recognised but not decoded.
  */
 
 export type DisplayAdapterId =
@@ -60,10 +60,10 @@ const ADAPTERS: DisplayAdapter[] = [
   {
     id: "shapefile",
     formatIds: ["shapefile"],
-    viewable: false,
-    decoded: false,
-    kind: "none",
-    reason: "Shapefile is recognised but not decoded in this release.",
+    viewable: true,
+    decoded: true,
+    kind: "vector",
+    reason: "Documented ESRI shapefile (.shp/.shx/.dbf with .prj EPSG) is parsed. Incomplete or unparseable sidecars are not decoded.",
   },
   {
     id: "geopackage",

@@ -26,8 +26,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (!catalog) return Response.json({ error: "catalog not found" }, { status: 404 });
   const record = catalog.records.find((item) => item.id === catalogId);
   if (!record) return Response.json({ error: "catalog record not found" }, { status: 404 });
-  if (record.adapterId !== "geojson") {
-    return Response.json({ error: "Vector roles apply only to GeoJSON catalog records." }, { status: 400 });
+  if (record.adapterId !== "geojson" && record.adapterId !== "shapefile") {
+    return Response.json({ error: "Vector roles apply only to GeoJSON or shapefile catalog records." }, { status: 400 });
   }
   try {
     const updated = applyReviewedVectorRole(record, role as VectorRoleId);

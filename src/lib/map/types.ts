@@ -24,7 +24,7 @@ export interface CrsInfo {
   epsg?: number;
   units?: string;
   datum?: string;
-  source: "prj" | "geotiff" | "geojson" | "catalog" | "rfc7946" | "legacy-crs" | "custom-import" | "unknown";
+  source: "prj" | "geotiff" | "geojson" | "catalog" | "rfc7946" | "legacy-crs" | "custom-import" | "shapefile-prj" | "unknown";
   assumed: boolean;
   authority?: "OGC" | "EPSG";
   axisOrder?: CrsAxisOrder;

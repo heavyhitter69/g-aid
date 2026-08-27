@@ -1,0 +1,23 @@
+{
+  "product_name": "G-AID documented GIS vector layer",
+  "n_layers": 0,
+  "reprojected": false,
+  "rejected": [
+    {
+      "source_path": "missing-dbf/samples.shp",
+      "reason": "Shapefile sidecar set is incomplete (missing .dbf)."
+    },
+    {
+      "source_path": "unknown-crs/geology.shp",
+      "reason": "Shapefile .prj has no EPSG authority."
+    },
+    {
+      "source_path": "corrupt-dbf/samples.shp",
+      "reason": "DBF is unparseable."
+    },
+    {
+      "source_path": "invalid-geometry/open-ring.shp",
+      "reason": "Polygon geometry is malformed."
+    }
+  ]
+}

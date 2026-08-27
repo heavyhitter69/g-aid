@@ -1334,16 +1334,16 @@ const CAPABILITIES: ScientificCapability[] = [
     version: "1.0.0",
     title: "GIS vector ingest",
     description:
-      "Parse RFC 7946 GeoJSON (OGC:CRS84), legacy-GeoJSON with a validated CRS mapping, or a G-AID custom import into a canonical vector catalog. Shapefile and GeoPackage remain recognised-unsupported.",
+      "Parse RFC 7946 GeoJSON, legacy-GeoJSON with a validated CRS mapping, a G-AID custom import, or a documented ESRI shapefile (.shp/.shx/.dbf with .prj EPSG) into a canonical vector catalog. GeoPackage remains recognised-unsupported.",
     domain: "gis",
     kernelNodeIds: ["vector_ingest"],
     dependsOn: [],
     inputRoles: [
       {
         role: "gis-vector",
-        adapterIds: ["geojson"],
+        adapterIds: ["geojson", "shapefile"],
         required: true,
-        description: "Supported GeoJSON catalog records (RFC 7946 OGC:CRS84, legacy-GeoJSON, or G-AID custom import)",
+        description: "Supported GeoJSON or shapefile catalog records",
       },
     ],
     outputs: [
@@ -1353,7 +1353,8 @@ const CAPABILITIES: ScientificCapability[] = [
     parameters: {},
     metadataRequirements: ["documented CRS (OGC:CRS84 or EPSG)", "valid Point/Line/Polygon geometries"],
     scientificConstraints: [
-      "Shapefile sidecars and GeoPackage are flagged, not parsed.",
+      "Shapefile ingest requires parsed .shp/.shx/.dbf records and a .prj EPSG. Sidecar names alone are not support.",
+      "GeoPackage is flagged, not parsed.",
       "Filename geology/tenure/fault labels are not assigned as layer roles.",
       "RFC 7946 GeoJSON with no crs member is OGC:CRS84. It is not EPSG:4326.",
       "Legacy crs members and companion .prj / EPSG= comments are not RFC 7946.",
@@ -1377,7 +1378,7 @@ const CAPABILITIES: ScientificCapability[] = [
     inputRoles: [
       {
         role: "gis-vector",
-        adapterIds: ["geojson"],
+        adapterIds: ["geojson", "shapefile"],
         required: true,
         description: "Canonical vectors from gis.vector_ingest",
       },
@@ -1407,9 +1408,9 @@ const CAPABILITIES: ScientificCapability[] = [
     inputRoles: [
       {
         role: "gis-vector",
-        adapterIds: ["geojson"],
+        adapterIds: ["geojson", "shapefile"],
         required: true,
-        description: "At least two same-CRS supported GeoJSON layers",
+        description: "Canonical vectors from gis.vector_ingest",
       },
     ],
     outputs: [{ id: "vector_overlap", type: "table", description: "Geometric overlap rows", viewer: "table" }],
@@ -1436,7 +1437,7 @@ const CAPABILITIES: ScientificCapability[] = [
     inputRoles: [
       {
         role: "gis-vector",
-        adapterIds: ["geojson"],
+        adapterIds: ["geojson", "shapefile"],
         required: true,
         description: "Canonical vectors from gis.vector_ingest",
       },
@@ -1463,7 +1464,7 @@ const CAPABILITIES: ScientificCapability[] = [
     inputRoles: [
       {
         role: "gis-vector",
-        adapterIds: ["geojson"],
+        adapterIds: ["geojson", "shapefile"],
         required: true,
         description: "Vector products already in the run folder",
       },

@@ -61,6 +61,7 @@ const SUPPORTED_ADAPTER_IDS = new Set([
   "gpr-csv",
   "las-well",
   "geojson",
+  "shapefile",
   "geochem-csv",
   "geochem-xyz",
 ]);

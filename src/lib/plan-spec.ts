@@ -180,7 +180,7 @@ export interface PlanInput {
     source: "user-assigned" | "unassigned";
   };
   geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
-  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj";
   axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
 }
@@ -674,7 +674,7 @@ export function renderImplementationPlan(opts: {
   );
   const gprInputs = (opts.inputs || []).some((item) => item.adapterId === "gpr-csv");
   const lasInputs = (opts.inputs || []).some((item) => item.adapterId === "las-well");
-  const gisInputs = (opts.inputs || []).some((item) => item.adapterId === "geojson");
+  const gisInputs = (opts.inputs || []).some((item) => item.adapterId === "geojson" || item.adapterId === "shapefile");
   const geochemInputs = (opts.inputs || []).some((item) => item.adapterId === "geochem-csv" || item.adapterId === "geochem-xyz");
   const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs, gisInputs, geochemInputs].filter(Boolean).length;
   const mixed = mixedCount > 1;
@@ -1517,20 +1517,26 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
   }
 
   if (gisVectorStepsEnabled(plan.steps)) {
-    const geoFiles = inputs.filter((item) => item.adapterId === "geojson" || item.kind === "geojson");
+    const geoFiles = inputs.filter(
+      (item) =>
+        item.adapterId === "geojson" ||
+        item.adapterId === "shapefile" ||
+        item.kind === "geojson" ||
+        item.kind === "shapefile"
+    );
     if (inputs.length === 0) {
       blockers.push({
         level: "blocker",
         code: "no_geojson_files",
         message:
-          "GIS vector processing needs a supported GeoJSON catalog record (RFC 7946 OGC:CRS84, legacy-GeoJSON with a validated CRS mapping, or a G-AID custom import). I will not take the first .geojson, shapefile, or GeoPackage.",
+          "GIS vector processing needs a supported GeoJSON or shapefile catalog record. I will not take the first .geojson, incomplete shapefile sidecar set, or GeoPackage.",
       });
     } else if (geoFiles.length === 0) {
       blockers.push({
         level: "blocker",
         code: "no_geojson_files",
         message:
-          "GIS vector processing needs a supported geojson catalog record. A shapefile sidecar set or GeoPackage is not a processing input.",
+          "GIS vector processing needs a supported geojson or shapefile catalog record. An incomplete shapefile sidecar set or GeoPackage is not a processing input.",
       });
     }
   }

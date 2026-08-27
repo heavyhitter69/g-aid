@@ -1,0 +1,153 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "ID",
+        "SAMPLE_ID"
+      ],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": "1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 260150.0,
+              "y": 6240150.0
+            }
+          ],
+          "properties": {
+            "ID": "1",
+            "SAMPLE_ID": "S-001"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260150.0,
+        "minY": 6240150.0,
+        "maxX": 260150.0,
+        "maxY": 6240150.0
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "conflict-crs/utm_samples.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "dd8f2b93becfc06bb08d79aba5c11da264d7a2d5d6f303e9d1ed1c3b7cc319bd",
+        "shx": "9e129b183645460ad3ab4397201101c6f3455517be597eac3c56fb43a1b546b2",
+        "dbf": "29d565c535aae435b9f12a1f2805f0f4927791fd8fcff3d85f7c3091aac127b9",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "utm",
+      "checksum": "utm"
+    },
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:4326",
+      "crs_epsg": 4326,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "lat-lon",
+      "coordinate_order": "lon-lat",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Point"
+      ],
+      "attribute_names": [
+        "ID",
+        "SAMPLE_ID"
+      ],
+      "feature_count": 1,
+      "features": [
+        {
+          "id": "1",
+          "geometry_type": "Point",
+          "coordinates": [
+            {
+              "x": 18.41,
+              "y": -33.91
+            }
+          ],
+          "properties": {
+            "ID": "1",
+            "SAMPLE_ID": "S-001"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 18.41,
+        "minY": -33.91,
+        "maxX": 18.41,
+        "maxY": -33.91
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "conflict-crs/wgs_samples.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "f6f718bc405772cc2634993bdf3b33a84a8024790c71953ea8b601316419d3f0",
+        "shx": "59318e3ce2a82518d4206477d3d697ae5c284641b539bb1e97c94fe4da0670a4",
+        "dbf": "29d565c535aae435b9f12a1f2805f0f4927791fd8fcff3d85f7c3091aac127b9",
+        "prj": "a189e356ca541d44193274a31e6e9e80e065ef1f55f0038589e8e5b25cf44709",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:4326, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "wgs",
+      "checksum": "wgs"
+    }
+  ]
+}

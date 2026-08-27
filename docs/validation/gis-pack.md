@@ -39,7 +39,7 @@ establish geology or mineral meaning.
 
 | Input | Why |
 |---|---|
-| Shapefile (`.shp` + sidecars) | Magic `9994` is recognised. `.shx`/`.dbf`/`.prj` are validated together as a sidecar set. Shape records and DBF attributes are **not parsed**. |
+| Shapefile (`.shp` + sidecars) | Originally recognised-only in this pack. Documented shapefile ingest is the later adapter in `docs/validation/shapefile-pack.md` (pyshp 2.3.1; sidecar names alone are not support). |
 | GeoPackage (`.gpkg` / SQLite `GPKG`) | Container is recognised. Tables and geometries are **not loaded**. |
 | Projected GeoJSON without `.prj` / `/ EPSG=` / validated legacy `crs` | Not RFC 7946 CRS84. Recognised-unsupported. |
 | Legacy `crs` without a validated EPSG | Needs a user-confirmed CRS mapping. |

@@ -176,9 +176,15 @@ export interface CatalogRecord {
     shx: boolean;
     dbf: boolean;
     prj: boolean;
+    cpg?: boolean;
   };
   geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
-  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed";
+  shapefileContract?: "esri-shp-shx-dbf-prj";
+  vectorFormat?: "geojson" | "shapefile";
+  encoding?: string;
+  encodingSource?: "cpg" | "undeclared-cp1252";
+  crsConfidence?: "high" | "medium" | "none";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj";
   axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   provenance: CatalogProvenance;

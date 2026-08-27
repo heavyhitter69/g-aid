@@ -1,0 +1,46 @@
+{
+  "kind": "gis-overlap",
+  "rows": [
+    {
+      "left_path": "overlap/tenure.shp",
+      "right_path": "overlap/samples.shp",
+      "left_id": "T1",
+      "right_id": "1",
+      "left_role": "tenure",
+      "right_role": "sample-location",
+      "crs": "EPSG:32734",
+      "compatibility_decision": "",
+      "relation": "contains",
+      "reason": "Geometric contains. Both layers use EPSG:32734. Spatial overlap does not establish geological, mineral, or causal relationships."
+    },
+    {
+      "left_path": "overlap/tenure.shp",
+      "right_path": "overlap/samples.shp",
+      "left_id": "T1",
+      "right_id": "2",
+      "left_role": "tenure",
+      "right_role": "sample-location",
+      "crs": "EPSG:32734",
+      "compatibility_decision": "",
+      "relation": "contains",
+      "reason": "Geometric contains. Both layers use EPSG:32734. Spatial overlap does not establish geological, mineral, or causal relationships."
+    }
+  ],
+  "blocked": [],
+  "crs_decisions": [
+    {
+      "left": "overlap/tenure.shp",
+      "right": "overlap/samples.shp",
+      "code": "same-crs",
+      "compatibility_decision": null,
+      "left_crs": "EPSG:32734",
+      "right_crs": "EPSG:32734",
+      "left_axis_order": "east-north",
+      "right_axis_order": "east-north",
+      "left_coordinate_order": "east-north",
+      "right_coordinate_order": "east-north"
+    }
+  ],
+  "reprojected": false,
+  "axis_swap": false
+}

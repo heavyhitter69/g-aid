@@ -44,6 +44,8 @@ export {
   geojsonReadyForSupport,
   GEOJSON_ADAPTER_ID,
 } from "./geojson-contract.ts";
+export { inspectShapefilePath } from "./adapters/shapefile.ts";
+export { shapefileReadyForSupport, SHAPEFILE_ADAPTER_ID } from "./shapefile-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";
 export {

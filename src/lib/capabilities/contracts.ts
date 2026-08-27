@@ -470,27 +470,31 @@ export function validateCapabilityContracts(options: {
   }
 
   const geojsonInputs = boundSupported(options.inputs, "geojson");
+  const shapefileInputs = boundSupported(options.inputs, "shapefile");
+  const gisInputs = [...geojsonInputs, ...shapefileInputs];
   const needsGis = expanded.some((id) => id.startsWith("gis."));
-  if (needsGis && options.inputs.length && geojsonInputs.length === 0) {
+  if (needsGis && options.inputs.length && gisInputs.length === 0) {
     issues.push({
       level: "blocker",
       code: "no_geojson_files",
       message:
-        "GIS vector processing needs a supported GeoJSON catalog record (RFC 7946 OGC:CRS84, legacy-GeoJSON with a validated CRS mapping, or a G-AID custom import). I will not take a shapefile or GeoPackage.",
+        "GIS vector processing needs a supported GeoJSON or shapefile catalog record. Incomplete shapefile sidecars and GeoPackage are not processing inputs.",
     });
   }
-  const shapefileBound = options.inputs.filter(
-    (item) => item.adapterId === "shapefile" || item.formatId === "shapefile" || item.kind === "shapefile"
+  const shapefileBoundUnsupported = options.inputs.filter(
+    (item) =>
+      (item.adapterId === "shapefile" || item.formatId === "shapefile" || item.kind === "shapefile") &&
+      item.supportStatus !== "supported"
   );
   const gpkgBound = options.inputs.filter(
     (item) => item.adapterId === "geopackage" || item.formatId === "geopackage" || item.kind === "geopackage"
   );
-  if (shapefileBound.length) {
+  if (shapefileBoundUnsupported.length) {
     issues.push({
       level: "blocker",
       code: "shapefile_not_parsed",
       message:
-        "Shapefile is recognised-unsupported. G-AID does not parse .shp/.shx/.dbf geometry or attributes in this pack. Convert to documented GeoJSON.",
+        "Bound shapefile is recognised-unsupported (missing/corrupt sidecar, unparseable geometry or DBF, or undocumented CRS). Convert to a valid .shp/.shx/.dbf/.prj dataset or documented GeoJSON.",
     });
   }
   if (gpkgBound.length) {
@@ -501,34 +505,34 @@ export function validateCapabilityContracts(options: {
     });
   }
   if (expanded.includes("gis.spatial_overlap")) {
-    const records = catalogRecordsForInputs(geojsonInputs, options.catalog || null);
+    const records = catalogRecordsForInputs(gisInputs, options.catalog || null);
     const crsKeys = [
       ...new Set(
         [
           ...records.map((record) => record.crs).filter(Boolean),
-          ...geojsonInputs.map((item) => item.crs).filter(Boolean),
+          ...gisInputs.map((item) => item.crs).filter(Boolean),
         ] as string[]
       ),
     ];
-    if (geojsonInputs.length && geojsonInputs.length < 2) {
+    if (gisInputs.length && gisInputs.length < 2) {
       issues.push({
         level: "blocker",
         code: "gis_overlap_needs_two_layers",
         message:
-          "Spatial overlap needs at least two documented GeoJSON layers with compatible CRS. I will not invent a second layer or silently reproject.",
+          "Spatial overlap needs at least two documented vector layers with compatible CRS. I will not invent a second layer or silently reproject.",
       });
-    } else if (geojsonInputs.length >= 2 && crsKeys.length === 0) {
+    } else if (gisInputs.length >= 2 && crsKeys.length === 0) {
       issues.push({
         level: "blocker",
         code: "gis_crs_required",
-        message: "Spatial overlap needs a documented CRS on every layer (OGC:CRS84, a validated legacy mapping, or a G-AID custom import EPSG).",
+        message: "Spatial overlap needs a documented CRS on every layer (OGC:CRS84, a validated legacy mapping, a G-AID custom import EPSG, or a shapefile .prj EPSG).",
       });
-    } else if (geojsonInputs.length >= 2 && crsKeys.length > 1) {
+    } else if (gisInputs.length >= 2 && crsKeys.length > 1) {
       const set = new Set(crsKeys);
       const crs84Vs4326 = set.size === 2 && set.has("OGC:CRS84") && set.has("EPSG:4326");
       const orders = [
         ...records.map((record) => record.coordinateOrder),
-        ...geojsonInputs.map((item) => item.coordinateOrder),
+        ...gisInputs.map((item) => item.coordinateOrder),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value));
       const lonLatStorage = orders.length >= 2 && orders.every((value) => value === "lon-lat");
       if (crs84Vs4326 && lonLatStorage) {

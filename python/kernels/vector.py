@@ -29,7 +29,7 @@ def _find(directory: str, *names: str) -> str:
     raise FileNotFoundError(f"None of {names} found in {directory}")
 
 
-def _bound_geojson(params: dict) -> list[dict]:
+def _bound_vectors(params: dict) -> list[dict]:
     items = params.get("catalogInputs") or params.get("catalog_inputs") or []
     if not isinstance(items, list) or not items:
         raise ValueError("vector_ingest requires parameters.catalogInputs from the frozen plan.")
@@ -39,10 +39,12 @@ def _bound_geojson(params: dict) -> list[dict]:
             continue
         adapter = str(item.get("adapterId") or item.get("kind") or "").lower()
         fmt = str(item.get("formatId") or "").lower()
-        if adapter == "geojson" or fmt == "geojson":
+        if adapter in {"geojson", "shapefile"} or fmt in {"geojson", "shapefile"}:
             out.append(item)
     if not out:
-        raise ValueError("No bound geojson catalog records. I will not search by extension or decode shapefile/GPKG.")
+        raise ValueError(
+            "No bound geojson or shapefile catalog records. I will not search by extension or decode GeoPackage."
+        )
     return out
 
 
@@ -63,6 +65,7 @@ def _role(item: dict) -> tuple[str, bool]:
 
 def vector_ingest(payload: dict) -> dict:
     from formats.geojson import parse_geojson
+    from formats.shapefile import parse_shapefile
 
     node_id = "vector_ingest"
     out = _out(payload)
@@ -70,10 +73,16 @@ def vector_ingest(payload: dict) -> dict:
     layers = []
     sources = []
     events = []
-    for item in _bound_geojson(params):
+    for item in _bound_vectors(params):
         filepath = _abs(params, item)
         role, reviewed = _role(item)
-        parsed = parse_geojson(filepath, role=role, role_reviewed=reviewed)
+        adapter = str(item.get("adapterId") or item.get("kind") or item.get("formatId") or "").lower()
+        if adapter == "shapefile":
+            parsed = parse_shapefile(filepath, role=role, role_reviewed=reviewed)
+            label = "shapefile"
+        else:
+            parsed = parse_geojson(filepath, role=role, role_reviewed=reviewed)
+            label = "GeoJSON"
         parsed["catalog_id"] = item.get("catalogId") or item.get("catalog_id")
         parsed["checksum"] = item.get("checksum")
         parsed["source_path"] = item.get("path") or filepath
@@ -83,24 +92,29 @@ def vector_ingest(payload: dict) -> dict:
             {
                 "type": "NODE_PROGRESS",
                 "message": (
-                    f"Ingested GeoJSON '{os.path.basename(filepath)}' "
+                    f"Ingested {label} '{os.path.basename(filepath)}' "
                     f"features={parsed['feature_count']} CRS={parsed['crs']} role={parsed['role']} "
                     f"(reviewed={reviewed}). Role is not geology proof."
                 ),
             }
         )
     qc = {
-        "product_name": "G-AID documented GeoJSON vector layer",
-        "format": "geojson",
+        "product_name": "G-AID documented GIS vector layer",
+        "format": "gis-vector",
         "layers": [
             {
                 "source_path": layer["source_path"],
+                "source_format": layer.get("source_format") or "geojson",
                 "catalog_id": layer.get("catalog_id"),
                 "checksum": layer.get("checksum"),
                 "crs": layer["crs"],
                 "crs_epsg": layer["crs_epsg"],
                 "crs_source": layer["crs_source"],
+                "crs_confidence": layer.get("crs_confidence"),
                 "geojson_contract": layer.get("geojson_contract"),
+                "shapefile_contract": layer.get("shapefile_contract"),
+                "encoding": layer.get("encoding"),
+                "encoding_source": layer.get("encoding_source"),
                 "axis_order": layer.get("axis_order"),
                 "coordinate_order": layer.get("coordinate_order"),
                 "geometry_types": layer["geometry_types"],
@@ -120,7 +134,7 @@ def vector_ingest(payload: dict) -> dict:
     canonical = os.path.join(out, "vector_canonical.json")
     write_json(canonical, {"kind": "gis-vector", "layers": layers})
     qc_path = write_json(os.path.join(out, "vector_ingest_qc.json"), qc)
-    write_lineage(out, node_id, "Documented GeoJSON ingest", {"n": len(layers)}, sources, [canonical, qc_path])
+    write_lineage(out, node_id, "Documented GIS vector ingest", {"n": len(layers)}, sources, [canonical, qc_path])
     return {
         "artifacts": [
             make_artifact("artifact-vector-canonical", "processed_dataset", "json", canonical, node_id),
@@ -138,7 +152,7 @@ def vector_view(payload: dict) -> dict:
         canonical = json.load(handle)
     tracks = {
         "kind": "gis-vector",
-        "product_name": "G-AID documented GeoJSON vector layer",
+        "product_name": "G-AID documented GIS vector layer",
         "layers": [],
         "warnings": [
             "This layer is source geometry and attributes. It is not an AI-confirmed geological interpretation.",
@@ -152,7 +166,12 @@ def vector_view(payload: dict) -> dict:
                 "catalog_id": layer.get("catalog_id"),
                 "crs": layer.get("crs"),
                 "crs_source": layer.get("crs_source"),
+                "crs_confidence": layer.get("crs_confidence"),
                 "geojson_contract": layer.get("geojson_contract"),
+                "shapefile_contract": layer.get("shapefile_contract"),
+                "source_format": layer.get("source_format") or "geojson",
+                "encoding": layer.get("encoding"),
+                "encoding_source": layer.get("encoding_source"),
                 "axis_order": layer.get("axis_order"),
                 "coordinate_order": layer.get("coordinate_order"),
                 "role": layer.get("role"),
@@ -434,6 +453,8 @@ def vector_export(payload: dict) -> dict:
             else:
                 geometry = {"type": "Polygon", "coordinates": [[[p["x"], p["y"]] for p in coords]]}
             props = dict(feature.get("properties") or {})
+            props["_g_aid_source"] = layer.get("source_path")
+            props["_g_aid_source_format"] = layer.get("source_format") or "geojson"
             props["_g_aid_semantics"] = "unknown"
             props["_g_aid_crs"] = crs_key
             props["_g_aid_geojson_contract"] = layer.get("geojson_contract")
@@ -453,6 +474,8 @@ def vector_export(payload: dict) -> dict:
             "format": "geojson",
             "rfc7946_crs84": True,
             "shapefile": False,
+            "shapefile_writer": False,
+            "parser": "pyshp-2.3.1" if any(layer.get("source_format") == "shapefile" for layer in (canonical.get("layers") or [])) else "geojson",
             "geopackage": False,
             "reprojected": False,
             "attribute_editing": False,
@@ -481,19 +504,23 @@ def vector_interpret(payload: dict) -> dict:
             overlap_qc = json.load(handle)
     layers = canonical.get("layers") or []
     observations = [
-        f"{len(layers)} documented GeoJSON layer(s) were ingested as source geometry.",
+        f"{len(layers)} documented GIS vector layer(s) were ingested as source geometry.",
         "Observed geometry types: "
         + ", ".join(sorted({g for layer in layers for g in (layer.get("geometry_types") or [])}))
+        + ".",
+        "Source formats: "
+        + ", ".join(sorted({str(layer.get("source_format") or "geojson") for layer in layers}))
         + ".",
     ]
     for layer in layers:
         observations.append(
-            f"{layer.get('source_path')}: {layer.get('feature_count')} feature(s), CRS {layer.get('crs')}, "
-            f"contract={layer.get('geojson_contract')}, axis_order={layer.get('axis_order')}, "
+            f"{layer.get('source_path')}: {layer.get('feature_count')} feature(s), CRS {layer.get('crs')} "
+            f"(source={layer.get('crs_source')}, confidence={layer.get('crs_confidence') or 'n/a'}), "
+            f"format={layer.get('source_format') or 'geojson'}, "
             f"role={layer.get('role')} (reviewed={layer.get('role_reviewed')})."
         )
     report = {
-        "product_name": "G-AID documented GeoJSON vector layer",
+        "product_name": "G-AID documented GIS vector layer",
         "observations": observations,
         "user_supplied_curve_meaning": [
             "No attribute meanings were supplied. Field names remain unknown semantics.",
@@ -502,6 +529,7 @@ def vector_interpret(payload: dict) -> dict:
             "RFC 7946 GeoJSON with no crs member is documented OGC:CRS84 (lon, lat degrees). It is not EPSG:4326.",
             "A legacy GeoJSON crs member is not the RFC 7946 CRS mechanism.",
             "Companion .prj or / EPSG= annotations are a G-AID custom import contract, not standard RFC 7946.",
+            "Shapefile CRS is the companion .prj EPSG. Coordinates stay in that CRS. G-AID will not silently reproject.",
             "OGC:CRS84 vs EPSG:4326 overlay, when allowed, uses stored GeoJSON [lon, lat] without an axis swap.",
             "User-assigned roles are catalog labels, not geological confirmation.",
         ],
@@ -511,8 +539,8 @@ def vector_interpret(payload: dict) -> dict:
         ],
         "recommendations": [
             "Do not generate mineral targets, prospectivity maps, resource/reserve claims, or drill recommendations from overlays.",
-            "Assign layer roles explicitly. Do not infer geology from filenames.",
-            "Keep shapefile and GeoPackage out of processing until a tested parser exists.",
+            "Assign layer roles explicitly. Do not infer geology from filenames or DBF field names.",
+            "Keep GeoPackage out of processing until a tested parser exists.",
         ],
         "not_established": [
             "Geological interpretation is not established.",
@@ -521,7 +549,7 @@ def vector_interpret(payload: dict) -> dict:
             "Resource or reserve estimates are not established.",
             "Drill recommendations are not established.",
             "Causal relationships from overlay are not established.",
-            "Shapefile or GeoPackage ingest is not established.",
+            "GeoPackage ingest is not established.",
         ],
         "geological_certainty_improved": False,
         "qc": {

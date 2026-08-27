@@ -1,0 +1,126 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "Polygon"
+      ],
+      "attribute_names": [
+        "ID",
+        "UNIT"
+      ],
+      "feature_count": 2,
+      "features": [
+        {
+          "id": "G1",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240100.0
+            },
+            {
+              "x": 260500.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240400.0
+            },
+            {
+              "x": 260100.0,
+              "y": 6240100.0
+            }
+          ],
+          "properties": {
+            "ID": "G1",
+            "UNIT": "Qal"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "G2",
+          "geometry_type": "Polygon",
+          "coordinates": [
+            {
+              "x": 260050.0,
+              "y": 6240050.0
+            },
+            {
+              "x": 260090.0,
+              "y": 6240050.0
+            },
+            {
+              "x": 260090.0,
+              "y": 6240090.0
+            },
+            {
+              "x": 260050.0,
+              "y": 6240090.0
+            },
+            {
+              "x": 260050.0,
+              "y": 6240050.0
+            }
+          ],
+          "properties": {
+            "ID": "G2",
+            "UNIT": "granite"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260050.0,
+        "minY": 6240050.0,
+        "maxX": 260500.0,
+        "maxY": 6240400.0
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "polygons/geology.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "7d73dd11702e1eeeb4567a4ef0427985e52c5735de5ee23e0cae506ab047968f",
+        "shx": "0c72ea63ff6c24e4d045ee7945519bad9dfd78978d610e644f5b0da9f34c33a4",
+        "dbf": "f8b5125fd5dffe048804b33a31860ef437b0411c48425f0ebb71108ec34c9be2",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "geology",
+      "checksum": "geology"
+    }
+  ]
+}

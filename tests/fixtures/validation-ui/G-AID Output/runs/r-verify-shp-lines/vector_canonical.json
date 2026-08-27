@@ -1,0 +1,102 @@
+{
+  "kind": "gis-vector",
+  "layers": [
+    {
+      "kind": "gis-vector",
+      "source_format": "shapefile",
+      "shapefile_contract": "esri-shp-shx-dbf-prj",
+      "parser": "pyshp-2.3.1",
+      "encoding": "cp1252",
+      "encoding_source": "undeclared-cp1252",
+      "crs": "EPSG:32734",
+      "crs_epsg": 32734,
+      "crs_source": "shapefile-prj",
+      "crs_confidence": "high",
+      "geojson_contract": null,
+      "axis_order": "east-north",
+      "coordinate_order": "east-north",
+      "location_quality": "documented",
+      "geometry_types": [
+        "LineString"
+      ],
+      "attribute_names": [
+        "ID",
+        "NAME"
+      ],
+      "feature_count": 2,
+      "features": [
+        {
+          "id": "F1",
+          "geometry_type": "LineString",
+          "coordinates": [
+            {
+              "x": 260120.0,
+              "y": 6240120.0
+            },
+            {
+              "x": 260220.0,
+              "y": 6240220.0
+            }
+          ],
+          "properties": {
+            "ID": "F1",
+            "NAME": "fault-a"
+          },
+          "semantics": "unknown"
+        },
+        {
+          "id": "F2",
+          "geometry_type": "LineString",
+          "coordinates": [
+            {
+              "x": 260130.0,
+              "y": 6240200.0
+            },
+            {
+              "x": 260200.0,
+              "y": 6240140.0
+            }
+          ],
+          "properties": {
+            "ID": "F2",
+            "NAME": "fault-b"
+          },
+          "semantics": "unknown"
+        }
+      ],
+      "bbox": {
+        "minX": 260120.0,
+        "minY": 6240120.0,
+        "maxX": 260220.0,
+        "maxY": 6240220.0
+      },
+      "role": "generic-vector",
+      "role_reviewed": false,
+      "source_path": "lines/faults.shp",
+      "shapefile_sidecars": {
+        "shp": true,
+        "shx": true,
+        "dbf": true,
+        "prj": true,
+        "cpg": false
+      },
+      "sidecar_checksums": {
+        "shp": "3b887a2165378e8eec43189c3f55c559bc8778ecae5bce801fbe894ee279bc2d",
+        "shx": "b7529f01bfdb3a4d8d598373261c1d6adb512e941209ecfac9ab6860287e1901",
+        "dbf": "dbf973ba7ec9fee83494ce5891033141ba9a0d58eda6c2c3202d026a78b1a5c5",
+        "prj": "55e57e0f7b582960a52f694cca61e4fc03a3cac6daa1f6c8364d8785eef8bf91",
+        "cpg": null
+      },
+      "reprojected": false,
+      "warnings": [
+        "No .cpg encoding declaration. DBF text is decoded as undeclared windows-1252/cp1252. This is not a silent UTF-8 assumption.",
+        "Attribute names have unknown semantics. Geology, tenure, and mineral meaning are not inferred from field names or filenames.",
+        "CRS source is shapefile .prj (EPSG:32734, confidence=high). Coordinates were not reprojected."
+      ],
+      "errors": [],
+      "formula": "ESRI shapefile (.shp/.shx/.dbf) with documented .prj EPSG. Overlay is not geological proof. No silent reprojection or axis swap.",
+      "catalog_id": "lines",
+      "checksum": "lines"
+    }
+  ]
+}
