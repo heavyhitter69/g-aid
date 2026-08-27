@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import { headerSummaryFromText, looksMostlyText, firstLines } from "../peek.ts";
+import { headerSummaryFromText, looksMostlyText, firstLines } from "../peek-text.ts";
 import {
   deferredRead,
   okIfRecognised,
@@ -18,18 +17,7 @@ import {
   looksLikeLasWellText,
 } from "../las-contract.ts";
 
-const LAS_INSPECT_BYTES = 65536;
-
 function lasText(ctx: SniffContext): string {
-  if (ctx.absPath) {
-    try {
-      const buf = fs.readFileSync(ctx.absPath);
-      if (isLasfSignature(buf)) return buf.subarray(0, 4).toString("ascii");
-      return buf.subarray(0, Math.min(buf.length, LAS_INSPECT_BYTES)).toString("utf8");
-    } catch {
-      return ctx.peekText;
-    }
-  }
   return ctx.peekText;
 }
 

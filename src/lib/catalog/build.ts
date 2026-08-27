@@ -60,7 +60,7 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
   const parseErrors: string[] = [];
   let peek = Buffer.alloc(0);
   try {
-    peek = peekFile(absPath, stat.size);
+    peek = peekFile(absPath, stat.size, extension === "las" ? 65536 : undefined);
   } catch (err) {
     parseErrors.push(`Peek failed: ${err instanceof Error ? err.message : String(err)}`);
   }

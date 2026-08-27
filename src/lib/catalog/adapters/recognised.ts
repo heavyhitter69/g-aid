@@ -1,5 +1,5 @@
 import { MAX_COLUMNS, type CatalogBBox } from "../types.ts";
-import { firstLines, headerSummaryFromText, looksMostlyText, splitHeader } from "../peek.ts";
+import { firstLines, headerSummaryFromText, looksMostlyText, splitHeader } from "../peek-text.ts";
 import {
   deferredRead,
   okIfRecognised,

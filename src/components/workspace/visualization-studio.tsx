@@ -6,26 +6,20 @@ import { useAppStore } from "@/store/app-store";
 import { GridMapView, parseEsriAscii } from "@/components/workspace/grid-map-view";
 import { folderOf } from "@/lib/job-results";
 import { companionAsciiPath } from "@/lib/survey-file-kinds";
+import { compareRunLayers, provenanceLabel } from "@/lib/map/compare";
+import { overlayDecision, crsFromPrj, type CrsInfo } from "@/lib/map/crs";
+import { parseGeojson, pointsFromVector, linesFromVector } from "@/lib/map/geojson";
+import { sampleProfile, type ProfileResult } from "@/lib/map/inspect";
 import {
   buildMapLayers,
-  compareRunLayers,
-  crsFromPrj,
-  linesFromVector,
   mapValueUnits,
-  overlayDecision,
-  parseGeojson,
-  parseGridSidecarMeta,
-  pointsFromVector,
-  provenanceLabel,
   runIdFromPath,
-  sampleProfile,
   selectLayerById,
   selectLayerByPath,
-  type CrsInfo,
   type MapLayerSpec,
-  type ProfileResult,
-  type RasterGrid,
-} from "@/lib/map";
+} from "@/lib/map/layers";
+import { parseGridSidecarMeta } from "@/lib/map/ascii";
+import type { RasterGrid } from "@/lib/map/types";
 import { cn } from "@/lib/utils";
 import { isErtSectionPath, isGprSectionPath, isSectionPath, parseSectionCsv } from "@/lib/section/parse";
 import { isBoreholeCollarPath, isBoreholeLogPath, parseBoreholeTracks } from "@/lib/log/parse";

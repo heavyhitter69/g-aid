@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LogView } from "@/components/workspace/log-view";
 import { GridMapView } from "@/components/workspace/grid-map-view";
 import { parseBoreholeTracks } from "@/lib/log/parse";
-import { parseGeojson, pointsFromVector } from "@/lib/map";
+import { parseGeojson, pointsFromVector } from "@/lib/map/geojson";
 
 type Pack = {
   runId: string;

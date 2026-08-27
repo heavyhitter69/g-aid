@@ -1,4 +1,4 @@
-import { overlayDecision, parseEpsg, type CrsInfo } from "./map/index.ts";
+import { overlayDecision, parseEpsg, type CrsInfo } from "./map/crs.ts";
 
 export const BOREHOLE_PRODUCT_NAME = "G-AID LAS 2.0 measured-depth log";
 export const BOREHOLE_COLLAR_LABEL = "Borehole collar (documented CRS)";

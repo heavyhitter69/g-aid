@@ -5,7 +5,7 @@
  */
 
 import type { CatalogBBox } from "./types.ts";
-import { firstLines, headerSummaryFromText } from "./peek.ts";
+import { firstLines, headerSummaryFromText } from "./peek-text.ts";
 
 export const DEM_ASCII_FORMAT = "dem-ascii";
 export const DEM_ADAPTER_ID = "dem-ascii";

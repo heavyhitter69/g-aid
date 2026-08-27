@@ -1,5 +1,5 @@
 import { MAX_COLUMNS } from "../types.ts";
-import { firstLines, headerSummaryFromText, splitHeader } from "../peek.ts";
+import { firstLines, headerSummaryFromText, splitHeader } from "../peek-text.ts";
 import {
   deferredRead,
   okIfSupported,

@@ -1,4 +1,4 @@
-import { firstLines, headerSummaryFromText } from "../peek.ts";
+import { firstLines, headerSummaryFromText } from "../peek-text.ts";
 import {
   deferredRead,
   okIfSupported,
