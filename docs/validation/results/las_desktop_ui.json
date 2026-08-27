@@ -1,0 +1,78 @@
+{
+  "product_name": "G-AID LAS 2.0 measured-depth log",
+  "las_standard": "CWLS LAS 2.0 WRAP.NO",
+  "capabilities": ["borehole.ingest_las", "borehole.view_logs", "borehole.map_collar", "borehole.interpret"],
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["LogView", "GridMapView"],
+  "url": "http://127.0.0.1:3000/workspace/verify-las",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-27T16:04:00Z",
+  "electron_packaged_app": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same LogView).",
+    "A packaged Electron executable was not launched.",
+    "Measured depth is plotted downward and is not TVD or a well trajectory.",
+    "Curve mnemonics stay unknown semantics. GR/RHOB/NPHI were not treated as lithology, density lithology, or porosity claims.",
+    "A collar GeoJSON is mapped only with coordinates and documented CRS. Missing CRS skips the map and does not invent a position.",
+    "GR checkbox was unchecked then rechecked; the GR track hid and returned.",
+    "/workspace compiled after client bundles stopped importing node:fs."
+  ],
+  "tabs": {
+    "log": {
+      "passed": true,
+      "measured_depth": true,
+      "tvd_claimed": false,
+      "title": "Borehole log (measured depth, not TVD or trajectory)",
+      "well_id": "DEMO-1",
+      "depth_index": "DEPT",
+      "depth_units": "M",
+      "axis": "MD M ↓",
+      "curves": ["GR [GAPI] unknown semantics", "RHOB [G/C3] unknown semantics", "NPHI [V/V] unknown semantics"],
+      "null_value": -999.25,
+      "trajectory": "not computed",
+      "curve_toggle": "GR checkbox hid then restored the GR track",
+      "warnings": "Depth is measured depth. It is not true vertical depth unless a validated survey contract exists (it does not). Curve mnemonics do not establish lithology, water, ore, or reservoir.",
+      "screenshot": "docs/validation/results/screenshots/las-log-viewer.webp"
+    },
+    "collar": {
+      "passed": true,
+      "title": "Borehole collar (EPSG:4326)",
+      "crs": "EPSG:4326",
+      "coordinate_kind": "geographic",
+      "location_quality": "documented",
+      "overlap_includes": ["TMI grid"],
+      "overlap_excludes": ["other CRS grid"],
+      "well_path": false,
+      "warnings": "Collar is a point with documented CRS, not a well path. Overlapping layers are geometric coincidence, not a joint interpretation.",
+      "screenshot": "docs/validation/results/screenshots/las-collar-map.webp"
+    },
+    "missing_crs": {
+      "passed": true,
+      "skipped": true,
+      "reason": "borehole_crs_required",
+      "fabricated_geojson": false,
+      "log_viewing_available": true,
+      "screenshot": "docs/validation/results/screenshots/las-missing-crs.webp"
+    },
+    "interpretation": {
+      "passed": true,
+      "geological_certainty_improved": false,
+      "run": "r-verify-las",
+      "product_name": "G-AID LAS 2.0 measured-depth log",
+      "not_established": [
+        "Lithology is not established.",
+        "Aquifer identification is not established.",
+        "Mineralisation is not established.",
+        "Water, ore, or reservoir is not established.",
+        "Well-to-well correlation is not established.",
+        "Resource estimation is not established.",
+        "Drill targeting is not established.",
+        "True vertical depth is not established.",
+        "A 3-D well trajectory is not established."
+      ],
+      "screenshot": "docs/validation/results/screenshots/las-interpretation.webp"
+    }
+  }
+}

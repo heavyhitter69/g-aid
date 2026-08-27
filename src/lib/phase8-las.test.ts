@@ -356,7 +356,38 @@ test("overlapping layers require matching CRS and a containing bbox", () => {
   assert.equal(hits[0].path, "grids/tmi.asc");
 });
 
+test("desktop verification fixtures cover log, collar, missing CRS, and interpretation products", () => {
+  const runs = path.join(process.cwd(), "tests/fixtures/validation-ui/G-AID Output/runs");
+  const tracks = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-las", "borehole_tracks.json"), "utf8"));
+  assert.equal(tracks.kind, "borehole-log");
+  assert.equal(tracks.depth_reference, "measured depth");
+  assert.equal(tracks.trajectory_computed, false);
+  assert.equal(tracks.tracks.some((track: { mnemonic: string }) => track.mnemonic === "GR"), true);
+  const collarQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-las-collar", "borehole_collar_qc.json"), "utf8"));
+  assert.equal(collarQc.skipped, false);
+  assert.equal(collarQc.coordinate_kind, "geographic");
+  assert.equal(collarQc.location_quality, "documented");
+  assert.ok(fs.existsSync(path.join(runs, "r-verify-las-collar", "borehole_collar.geojson")));
+  const skipQc = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-las-ncrs", "borehole_collar_qc.json"), "utf8"));
+  assert.equal(skipQc.skipped, true);
+  assert.equal(skipQc.reason, "borehole_crs_required");
+  assert.equal(fs.existsSync(path.join(runs, "r-verify-las-ncrs", "borehole_collar.geojson")), false);
+  const interp = JSON.parse(fs.readFileSync(path.join(runs, "r-verify-las", "borehole_interpretation.json"), "utf8"));
+  assert.equal(interp.geological_certainty_improved, false);
+  assert.equal(interp.not_established.some((line: string) => /lithology/i.test(line)), true);
+  const uiPath = path.join(process.cwd(), "docs/validation/results/las_desktop_ui.json");
+  const ui = JSON.parse(fs.readFileSync(uiPath, "utf8"));
+  assert.equal(ui.passed, true);
+  assert.equal(ui.las_standard, "CWLS LAS 2.0 WRAP.NO");
+  assert.equal(ui.tabs.log.measured_depth, true);
+  assert.equal(ui.tabs.log.tvd_claimed, false);
+  assert.equal(ui.tabs.collar.well_path, false);
+  assert.equal(ui.tabs.missing_crs.fabricated_geojson, false);
+  assert.equal(ui.tabs.interpretation.geological_certainty_improved, false);
+});
+
 if (failed) {
   console.error(`\n${failed} failed`);
   process.exit(1);
 }
+console.log("\nall tests passed");
