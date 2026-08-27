@@ -107,8 +107,7 @@ provenance is recorded in `results/radiometrics_desktop_ui.json`.
 
 ## Next recommended complete pack
 
-**Far-zone / intermediate-zone gravity terrain** has been started on the shared
-catalog/DAG (see `gravity-zoned-terrain.md`). Complete Bouguer is still **not**
-justified. **GPR** is the next unsupported method with existing stubs. Do
+**GPR** is now a supported G-AID GPR 1.0 pack on the shared catalog/DAG
+(see `gpr-pack.md`). Complete Bouguer is still **not** justified. Do
 **not** begin topography-aware ERT, and do **not** promote `ert.invert2d` to
 production until its stated recovery gates are met.

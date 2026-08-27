@@ -131,6 +131,10 @@ export function collectPlanInputs(
       crs: record.crs,
       bbox: record.bbox,
       cellSizeM: record.cellSizeM,
+      dtNs: record.dtNs,
+      dxM: record.dxM,
+      antennaMHz: record.antennaMHz,
+      velocityMs: record.velocityMs,
     }));
   }
   void index;

@@ -50,11 +50,20 @@ export const RADIO_NODE_ORDER = [
   "rad_interpret",
 ] as const;
 
+export const GPR_NODE_ORDER = [
+  "gpr_ingest",
+  "gpr_process",
+  "gpr_migrate",
+  "gpr_gis_export",
+  "gpr_interpret",
+] as const;
+
 export const KERNEL_NODE_ORDER = [
   ...MAGNETIC_NODE_ORDER,
   ...GRAVITY_NODE_ORDER,
   ...ERT_NODE_ORDER,
   ...RADIO_NODE_ORDER,
+  ...GPR_NODE_ORDER,
 ] as const;
 
 export const MAGNETIC_NODE_DEPS: Record<string, string[]> = {
@@ -105,11 +114,20 @@ export const RADIO_NODE_DEPS: Record<string, string[]> = {
   rad_interpret: ["rad_ingest"],
 };
 
+export const GPR_NODE_DEPS: Record<string, string[]> = {
+  gpr_ingest: [],
+  gpr_process: ["gpr_ingest"],
+  gpr_migrate: ["gpr_process"],
+  gpr_gis_export: ["gpr_ingest"],
+  gpr_interpret: ["gpr_process", "gpr_migrate"],
+};
+
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...MAGNETIC_NODE_DEPS,
   ...GRAVITY_NODE_DEPS,
   ...ERT_NODE_DEPS,
   ...RADIO_NODE_DEPS,
+  ...GPR_NODE_DEPS,
 };
 
 const NODE_LABELS: Record<string, string> = {
@@ -149,6 +167,11 @@ const NODE_LABELS: Record<string, string> = {
   rad_ratios: "Radiometric concentration ratios",
   rad_gis_export: "Radiometric GIS export",
   rad_interpret: "Radiometric interpretation limits",
+  gpr_ingest: "Read bound G-AID GPR 1.0 catalog records",
+  gpr_process: "Dewow, time-zero, SEC gain, and bandpass",
+  gpr_migrate: "Kirchhoff time migration (user velocity only)",
+  gpr_gis_export: "GPR trace GIS export",
+  gpr_interpret: "GPR interpretation limits",
 };
 
 export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
@@ -169,25 +192,27 @@ export function expandCapabilityIds(requested: string[]): UserCapabilityId[] {
 function ownerCapability(
   nodeId: string,
   expanded: UserCapabilityId[]
-): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" {
+): UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq" {
   for (const id of expanded) {
     const capability = getCapability(id);
     if (capability?.kernelNodeIds.includes(nodeId)) return id;
   }
+  if (nodeFamily(nodeId) === "gpr") return "gpr.prereq";
   if (nodeFamily(nodeId) === "rad") return "rad.prereq";
   if (nodeFamily(nodeId) === "ert") return "ert.prereq";
   if (nodeFamily(nodeId) === "grav") return "grav.prereq";
   return "mag.prereq";
 }
 
-function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" {
+function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" {
+  if ((GPR_NODE_ORDER as readonly string[]).includes(nodeId)) return "gpr";
   if ((RADIO_NODE_ORDER as readonly string[]).includes(nodeId)) return "rad";
   if ((ERT_NODE_ORDER as readonly string[]).includes(nodeId)) return "ert";
   if ((GRAVITY_NODE_ORDER as readonly string[]).includes(nodeId)) return "grav";
   return "mag";
 }
 
-/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, and radiometrics never wait on each other. */
+/** Remap declared deps onto the compiled subset. Mag, gravity, ERT, radiometrics, and GPR never wait on each other. */
 export function remapKernelDeps(nodeId: string, compiled: Set<string>): string[] {
   const original = KERNEL_NODE_DEPS[nodeId] || [];
   const present = original.filter((dep) => compiled.has(dep));
@@ -226,7 +251,8 @@ export function compileCapabilityDag(requested: string[]): CompiledDag {
       capabilityId === "mag.prereq" ||
       capabilityId === "grav.prereq" ||
       capabilityId === "ert.prereq" ||
-      capabilityId === "rad.prereq"
+      capabilityId === "rad.prereq" ||
+      capabilityId === "gpr.prereq"
         ? undefined
         : getCapability(capabilityId);
     nodes.push({

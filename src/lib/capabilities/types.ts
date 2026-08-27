@@ -1,5 +1,5 @@
 /**
- * Live scientific capability model. Magnetics, gravity, ERT, and radiometrics are the registered packs.
+ * Live scientific capability model. Magnetics, gravity, ERT, radiometrics, and GPR are the registered packs.
  */
 
 export const USER_CAPABILITY_IDS = [
@@ -33,6 +33,11 @@ export const USER_CAPABILITY_IDS = [
   "rad.ratios",
   "rad.gis",
   "rad.interpret",
+  "gpr.ingest",
+  "gpr.process",
+  "gpr.migrate",
+  "gpr.gis",
+  "gpr.interpret",
 ] as const;
 
 export type UserCapabilityId = (typeof USER_CAPABILITY_IDS)[number];
@@ -48,7 +53,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section";
   adapterIds: string[];
   required: boolean;
   description: string;
@@ -66,7 +71,7 @@ export interface ScientificCapability {
   version: string;
   title: string;
   description: string;
-  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics";
+  domain: "magnetics" | "gravity" | "resistivity" | "radiometrics" | "gpr";
   kernelNodeIds: string[];
   dependsOn: UserCapabilityId[];
   inputRoles: CapabilityInputRole[];
@@ -84,7 +89,7 @@ export interface ScientificCapability {
 
 export interface CompiledDagNode {
   id: string;
-  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq";
+  capabilityId: UserCapabilityId | "mag.prereq" | "grav.prereq" | "ert.prereq" | "rad.prereq" | "gpr.prereq";
   capabilityVersion?: string;
   label: string;
   dependencies: string[];
@@ -149,4 +154,8 @@ export interface BoundInput {
     maxY: number;
   };
   cellSizeM?: number;
+  dtNs?: number;
+  dxM?: number;
+  antennaMHz?: number;
+  velocityMs?: number;
 }

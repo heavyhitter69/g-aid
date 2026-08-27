@@ -117,6 +117,10 @@ export interface CatalogRecord {
   instrument?: string;
   elevationDatum?: string;
   gravityDatum?: string;
+  dtNs?: number;
+  dxM?: number;
+  antennaMHz?: number;
+  velocityMs?: number;
   provenance: CatalogProvenance;
 }
 

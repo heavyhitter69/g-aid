@@ -78,7 +78,11 @@ def get_handler(node_id: str):
         "rad_interpret": rad_interpret,
         "seismic_process": seismic_process,
         "radiometric_correct": radiometric_correct,
+        "gpr_ingest": gpr_ingest,
         "gpr_process": gpr_process,
+        "gpr_migrate": gpr_migrate,
+        "gpr_gis_export": gpr_gis_export,
+        "gpr_interpret": gpr_interpret,
         "las_ingest": las_ingest,
         "crs_reproject": crs_reproject,
         "xyz_ingest": xyz_ingest,
@@ -890,42 +894,29 @@ def seismic_process(payload: dict) -> dict:
     return {"artifacts": [make_artifact("artifact-segy", "seismic", "json", path, node_id, [src], qc)], "events": events}
 
 
-def gpr_process(payload: dict) -> dict:
-    if not step_enabled(payload, "gpr", default=True):
-        return skipped("gpr_process", "not in plan")
-    from formats import parse_dzt
-    from science.gpr import process_section
-    from science.gis import write_ascii_grid
-    from science.grid import Grid
+def gpr_ingest(payload: dict) -> dict:
+    from kernels.gpr import gpr_ingest as impl
+    return impl(payload)
 
-    node_id = "gpr_process"
-    out = task_dir(payload)
-    src = _params(payload).get("inputPath")
-    if not src:
-        raise FileNotFoundError("GPR processing needs parameters.inputPath (.dzt)")
-    dzt = parse_dzt(src)
-    vel = _params(payload).get("velocityMs")
-    result = process_section(dzt["traces"], dzt["dt_s"], dzt["dx_m"], float(vel) if vel else None)
-    np.savez(
-        os.path.join(out, "gpr_processed.npz"),
-        dewow=result["dewow"],
-        bandpassed=result["bandpassed"],
-        migrated=result["migrated"] if result["migrated"] is not None else np.array([]),
-        dt=dzt["dt_s"],
-        dx=dzt["dx_m"],
-    )
-    section = result["bandpassed"]
-    ntr, ns = np.atleast_2d(section).shape
-    step_t = max(1, ntr // 400)
-    step_s = max(1, ns // 500)
-    preview = np.atleast_2d(section)[::step_t, ::step_s]
-    write_ascii_grid(
-        Grid(values=preview.T, x0=0.0, y0=0.0, dx=float(dzt["dx_m"]) * step_t, dy=float(dzt["dt_s"]) * step_s, crs_epsg=0, units="amp", name="gpr_section"),
-        os.path.join(out, "gpr_section.asc"),
-    )
-    qc = {"time_zero_sample": result["time_zero_sample"], "n_traces": dzt["n_traces"], "dt_s": dzt["dt_s"], "formula": result["formula"]}
-    path = write_json(os.path.join(out, "gpr_qc.json"), qc)
-    return {"artifacts": [make_artifact("artifact-gpr", "section", "json", path, node_id, [src])], "events": [{"type": "NODE_PROGRESS", "message": f"GPR {dzt['n_traces']} traces processed."}]}
+
+def gpr_process(payload: dict) -> dict:
+    from kernels.gpr import gpr_process as impl
+    return impl(payload)
+
+
+def gpr_migrate(payload: dict) -> dict:
+    from kernels.gpr import gpr_migrate as impl
+    return impl(payload)
+
+
+def gpr_gis_export(payload: dict) -> dict:
+    from kernels.gpr import gpr_gis_export as impl
+    return impl(payload)
+
+
+def gpr_interpret(payload: dict) -> dict:
+    from kernels.gpr import gpr_interpret as impl
+    return impl(payload)
 
 
 def las_ingest(payload: dict) -> dict:

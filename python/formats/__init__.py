@@ -338,37 +338,11 @@ def parse_las(path: str) -> dict:
 
 
 def parse_dzt(path: str) -> dict:
-    """GSSI SIR DZT (1024-byte header when rh_nbits==16 and rh_ant=..., common case)."""
-    with open(path, "rb") as handle:
-        header = handle.read(1024)
-        if len(header) < 128:
-            raise ValueError(f"DZT header too short: {path}")
-        nsamp = struct_u16(header, 4)
-        bits = struct_u16(header, 6)
-        zero = struct_u16(header, 8)
-        sps = struct_u16(header, 10) or 1
-        spm = struct_f32(header, 14) or 1.0
-        range_ns = struct_f32(header, 18) or 50.0
-        data = handle.read()
-    width = 4 if bits == 32 else 2
-    n_trace_bytes = nsamp * width
-    if n_trace_bytes <= 0:
-        raise ValueError("DZT nsamp is zero")
-    n_traces = len(data) // n_trace_bytes
-    dtype = np.int32 if bits == 32 else np.int16
-    traces = np.frombuffer(data[: n_traces * n_trace_bytes], dtype=dtype).reshape(n_traces, nsamp).astype(np.float32)
-    traces -= zero
-    dt = (range_ns * 1e-9) / max(nsamp, 1)
-    dx = 1.0 / spm if spm else 0.05
-    return {
-        "traces": traces,
-        "ns": int(nsamp),
-        "n_traces": int(n_traces),
-        "dt_s": float(dt),
-        "dx_m": float(dx),
-        "range_ns": float(range_ns),
-        "path": path,
-    }
+    """Recognised-unsupported. G-AID does not invent dt, dx, or antenna from a DZT header."""
+    raise ValueError(
+        f"GSSI DZT is recognised-unsupported ({path}). Convert to a documented G-AID GPR 1.0 CSV. "
+        "I will not invent dt, dx, or antenna frequency from a binary header."
+    )
 
 
 def struct_u16(buf: bytes, offset: int) -> int:

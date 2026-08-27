@@ -54,6 +54,11 @@ const NODE_SCRIPTS: Record<string, string> = {
   rad_ratios: SCIENCE,
   rad_gis_export: SCIENCE,
   rad_interpret: SCIENCE,
+  gpr_ingest: SCIENCE,
+  gpr_process: SCIENCE,
+  gpr_migrate: SCIENCE,
+  gpr_gis_export: SCIENCE,
+  gpr_interpret: SCIENCE,
 };
 
 export class MagneticPreprocessingPipeline extends PipelineEngine {
@@ -63,6 +68,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     // Gravity uses this same engine. Do not add a GravityPipeline execution route.
     // ERT uses this same engine. Do not add a ResistivityPipeline execution route.
     // Radiometrics uses this same engine. Do not add a RadiometricsPipeline execution route.
+    // GPR uses this same engine. Do not add a GprPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);
     for (const id of KERNEL_NODE_ORDER) {
@@ -94,6 +100,7 @@ export class SeismicPipeline extends PipelineEngine {
   }
 }
 
+/** Unused stub. GPR executes through MagneticPreprocessingPipeline + compileCapabilityDag. */
 export class GprPipeline extends PipelineEngine {
   constructor() {
     super();

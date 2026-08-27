@@ -53,26 +53,45 @@ def process_section(
     section: np.ndarray,
     dt: float,
     dx: float,
-    velocity_ms: float | None = None,
-    f_low: float = 50e6,
-    f_high: float = 400e6,
+    f_low: float | None = None,
+    f_high: float | None = None,
+    antenna_mhz: float | None = None,
+    dewow_window: int = 32,
+    sec_power: float = 2.0,
 ) -> dict:
-    wow = dewow(section)
+    wow = dewow(section, window=dewow_window)
     tz = time_zero(wow)
     shifted = wow[:, tz:] if wow.ndim == 2 else wow[tz:]
-    gained = sec_gain(shifted, dt, power=2.0)
-    try:
-        bp = bandpass(gained, dt, f_low, f_high)
-    except ValueError:
-        bp = gained
-    migrated = None
-    if velocity_ms:
-        migrated = kirchhoff_time_migrate_2d(bp, dt, dx, velocity_ms)
+    gained = sec_gain(shifted, dt, power=sec_power)
+    bandpass_applied = False
+    bandpass_defaulted = False
+    used_low = f_low
+    used_high = f_high
+    if (used_low is None or used_high is None) and antenna_mhz:
+        used_low = 0.2 * float(antenna_mhz) * 1e6
+        used_high = 2.0 * float(antenna_mhz) * 1e6
+        bandpass_defaulted = True
+    bp = gained
+    if used_low and used_high:
+        try:
+            bp = bandpass(gained, dt, float(used_low), float(used_high))
+            bandpass_applied = True
+        except ValueError:
+            bp = gained
+            bandpass_applied = False
     return {
         "dewow": wow,
         "time_zero_sample": tz,
         "gained": gained,
         "bandpassed": bp,
-        "migrated": migrated,
-        "formula": "dewow + SEC t^2 + Butterworth; Kirchhoff if velocity supplied (Jol 2009; Yilmaz 2001)",
+        "dt_s": dt,
+        "dx_m": dx,
+        "f_low_hz": float(used_low) if used_low else None,
+        "f_high_hz": float(used_high) if used_high else None,
+        "bandpass_applied": bandpass_applied,
+        "bandpass_defaulted_from_antenna": bandpass_defaulted,
+        "dewow_window": dewow_window,
+        "sec_power": sec_power,
+        "formula": "dewow + time-zero + SEC t^2 + optional Butterworth (Jol 2009)",
     }
+

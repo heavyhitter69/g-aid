@@ -3,7 +3,7 @@ import path from "path";
 import { TEMP_TASKS_ID } from "@/lib/workspace-file-ids";
 import { workStepFromEvent } from "@/lib/work-steps";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
-import { ertStepsEnabled, gravityStepsEnabled, magneticStepsEnabled, radiometricsStepsEnabled, validatePlan } from "@/lib/plan-spec";
+import { ertStepsEnabled, gprStepsEnabled, gravityStepsEnabled, magneticStepsEnabled, radiometricsStepsEnabled, validatePlan } from "@/lib/plan-spec";
 import {
   allocateApprovedRun,
   appendRunLog,
@@ -184,6 +184,9 @@ async function runDiurnalPipeline(
     radioMapping: pending.parameters.radioMapping,
     radioQuantity: (pending.inputs || []).find((item) => item.radioQuantity)?.radioQuantity,
     correctionHistory: (pending.inputs || []).find((item) => item.correctionHistory)?.correctionHistory,
+    velocityMs: pending.parameters.velocityMs,
+    fLowHz: pending.parameters.fLowHz,
+    fHighHz: pending.parameters.fHighHz,
     steps: pending.steps,
     runId: pending.runId,
     parentRunId: pending.parentRunId,
@@ -355,13 +358,14 @@ export function streamPlanDecision(
         const grav = gravityStepsEnabled(frozen.steps);
         const ert = ertStepsEnabled(frozen.steps);
         const radio = radiometricsStepsEnabled(frozen.steps);
+        const gpr = gprStepsEnabled(frozen.steps);
 
-        if (!mag && !grav && !ert && !radio) {
+        if (!mag && !grav && !ert && !radio && !gpr) {
           ranOk = false;
-          enqueue("- ❌ **No registered steps to execute.** Seismic and GPR are not in this release. Height correction, stripping, and NASVD are not live radiometric capabilities.\n");
+          enqueue("- ❌ **No registered steps to execute.** Seismic is not in this release. Height correction, stripping, and NASVD are not live radiometric capabilities.\n");
         } else if (!(frozen.inputs || []).length) {
           ranOk = false;
-          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, and/or RAD-contract catalog IDs first.\n");
+          enqueue("- ❌ **No bound catalog records.** I will not search the folder by extension. Bind supported MagArrow/GSM-19, gravity-contract, dem-ascii, ERT-contract, RAD-contract, and/or GPR-contract catalog IDs first.\n");
         } else {
           const created = await runDiurnalPipeline(frozen, enqueue, onTasks, tasksContent);
           projectFilesUpdates.push(...created.files);

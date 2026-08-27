@@ -117,11 +117,11 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   const wantsWork =
     /\b(do|run|perform|apply|start|process|correct|execute|analyse|analyze|plan|invert|grid|reduce)\b/.test(m) ||
     /\bday\s*\d+\b/.test(m);
+  if (/\b(gpr|ground[\s-]?penetrating|radargram)\b/.test(m)) return "gpr";
   if (/\b(segy|seismic|nmo|stack|kirchhoff)\b/.test(m)) return "seismic";
   if (/\b(ert|resistivity|wenner|schlumberger|dipole[\s-]?dipole|pseudosection)\b/.test(m)) return "resistivity";
   if (/\b(bouguer|free[\s-]?air|gravity|mgal)\b/.test(m)) return "gravity";
   if (/\b(radiometr|spectrometer|nasvd)\b/.test(m)) return "radiometrics";
-  if (/\b(gpr|ground[\s-]?penetrating)\b/.test(m)) return "gpr";
   const diurnal =
     /\bdiurnal\b/.test(m) ||
     (/\bbase[\s-]?station\b/.test(m) && /\b(correct|correction|reduc)/.test(m));

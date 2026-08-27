@@ -35,8 +35,8 @@ function paintPlan(plan: AgentPlan): AgentPlan {
   const runId = plan.runId || generateRunId();
   const layout = resolveRunLayout(plan.workspaceRoot, plan.targetFolder, runId);
   const notes = [...(plan.notes || [])];
-  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "none") {
-    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, or radiometric checklist.");
+  if (plan.intent !== "diurnal" && plan.intent !== "rtp" && plan.intent !== "magnetic" && plan.intent !== "gravity" && plan.intent !== "resistivity" && plan.intent !== "radiometrics" && plan.intent !== "gpr" && plan.intent !== "none") {
+    notes.push("That method is not in this release. I did not add a magnetic, gravity, ERT, radiometric, or GPR checklist.");
   }
   const next: AgentPlan = {
     ...plan,
@@ -78,6 +78,7 @@ function paintPlan(plan: AgentPlan): AgentPlan {
     farRadiusM: next.parameters.farRadiusM,
     requestIntent: next.parameters.requestIntent,
     productName: next.parameters.productName,
+    velocityMs: next.parameters.velocityMs,
   });
   return next;
 }
@@ -166,6 +167,10 @@ export function upsertAgentPlan(options: {
   }
 
   draft.inputs = collectPlanInputs(options.workspaceIndex, draft.targetFolder, catalog);
+  if (!(typeof draft.parameters.velocityMs === "number" && draft.parameters.velocityMs > 0)) {
+    const documented = (draft.inputs || []).find((item) => typeof item.velocityMs === "number" && item.velocityMs > 0);
+    if (documented?.velocityMs) draft.parameters.velocityMs = documented.velocityMs;
+  }
   draft.workspaceBrief = [
     buildWorkspaceBrief(
       options.workspaceIndex,

@@ -261,7 +261,7 @@ function formatOrchestratorResponse(
       return [
         `I am **G-AID**, your assistant in this desktop app.`,
         ``,
-        `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, seismic) and auto-generating structured workflows. Let me know what data we're looking at, and I can start analyzing!`,
+        `I'm specialized in interpreting geophysical data (magnetic, gravity, resistivity, already-corrected radiometrics, G-AID GPR 1.0) and auto-generating structured workflows. Seismic is not in this release.`,
       ].join("\n");
     }
 
@@ -283,7 +283,7 @@ function formatOrchestratorResponse(
       ``,
       datasets.length > 0
         ? `You currently have **${datasets.length} dataset${datasets.length > 1 ? "s" : ""}** loaded. Tell me what geophysical anomalies or inversion tasks you'd like to tackle next.`
-        : `No datasets are loaded yet. Upload your gravity, magnetic, ERT, or seismic data files, and let's get started!`,
+        : `No datasets are loaded yet. Open a folder with MagArrow/GSM-19, gravity-contract, ERT-contract, RAD-contract, or G-AID GPR 1.0 files.`,
     ].join("\n");
   }
 

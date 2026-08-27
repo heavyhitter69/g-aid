@@ -64,6 +64,9 @@ export function validateCapabilityContracts(options: {
       tc?: string;
       reviewed: boolean;
     };
+    velocityMs?: number;
+    fLowHz?: number;
+    fHighHz?: number;
   };
   catalog?: ProjectCatalog | null;
   dag?: CompiledDag | null;
@@ -76,7 +79,7 @@ export function validateCapabilityContracts(options: {
       issues.push({
         level: "blocker",
         code: "unregistered_capability",
-        message: `${id} is not a registered capability. Seismic, GPR, GIS processing, and other unregistered packs are not in this release. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities.`,
+        message: `${id} is not a registered capability. Seismic, GIS processing, and other unregistered packs are not in this release. Height correction, stripping, NASVD, and concentration conversion are not live radiometric capabilities.`,
       });
     }
   }
@@ -335,6 +338,43 @@ export function validateCapabilityContracts(options: {
             "Radiometric quantity/units are missing from the catalog record. Unit-specific legend, ternary, ratios, and interpretation claims are blocked until metadata is documented. I will not infer %K or cps from filenames.",
         });
       }
+    }
+  }
+
+  const gprInputs = boundSupported(options.inputs, "gpr-csv");
+  const needsGpr = expanded.some((id) => id.startsWith("gpr."));
+  if (needsGpr && options.inputs.length && gprInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_gpr_files",
+      message:
+        "GPR processing needs a supported G-AID GPR 1.0 catalog record (Units, dt_ns, dx_m, AntennaMHz, Trace/Sample/Amplitude). An arbitrary .dzt file is not a processing input.",
+    });
+  }
+  if (expanded.includes("gpr.migrate")) {
+    const vel = options.parameters.velocityMs;
+    const fromInputs = options.inputs.some((item) => typeof item.velocityMs === "number" && item.velocityMs > 0);
+    const fromCatalog = catalogRecordsForInputs(gprInputs, options.catalog || null).some(
+      (record) => typeof record.velocityMs === "number" && record.velocityMs > 0
+    );
+    if (!(typeof vel === "number" && Number.isFinite(vel) && vel > 0) && !fromInputs && !fromCatalog) {
+      issues.push({
+        level: "blocker",
+        code: "gpr_velocity_required",
+        message:
+          "Kirchhoff time migration needs a user-supplied velocity in m/s (or VelocityMns on the contract). I will not assume 0.1 m/ns or a dielectric constant.",
+      });
+    }
+  }
+  if (expanded.includes("gpr.gis")) {
+    const records = catalogRecordsForInputs(gprInputs, options.catalog || null);
+    const hasCrs = records.some((record) => record.crs) || gprInputs.some((item) => item.crs);
+    if (gprInputs.length && !hasCrs) {
+      issues.push({
+        level: "blocker",
+        code: "gpr_crs_required",
+        message: "GPR GIS export needs a documented EPSG. Section viewing does not invent a map CRS.",
+      });
     }
   }
 

@@ -34,6 +34,8 @@ export const RADIO_DEFAULT: UserCapabilityId[] = [
   "rad.interpret",
 ];
 
+export const GPR_DEFAULT: UserCapabilityId[] = ["gpr.ingest", "gpr.process", "gpr.interpret"];
+
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
 }
@@ -47,6 +49,7 @@ export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id === "ert.invert2d") return "ertInvert";
   if (id.startsWith("ert.")) return "ert";
   if (id.startsWith("rad.")) return "radiometrics";
+  if (id.startsWith("gpr.")) return "gpr";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
   return found?.[0] || id;
 }
@@ -103,6 +106,11 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
       if (!ids.includes(id)) ids.push(id);
     }
   }
+  if (steps.gpr) {
+    for (const id of GPR_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
   return ids;
 }
 
@@ -117,6 +125,7 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.ert = false;
   steps.ertInvert = false;
   steps.radiometrics = false;
+  steps.gpr = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
     if (id === "grav.residual") {
@@ -156,6 +165,10 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
     }
     if (id.startsWith("rad.")) {
       steps.radiometrics = true;
+      continue;
+    }
+    if (id.startsWith("gpr.")) {
+      steps.gpr = true;
       continue;
     }
     steps[stepKeyFromCapability(id)] = true;
@@ -255,13 +268,20 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     for (const id of RADIO_DEFAULT) next.add(id);
   }
 
+  const gprDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(gpr|ground[\s-]?penetrating)/.test(m);
+  const gprAsk = /\b(gpr|ground[\s-]?penetrating|radargram)\b/.test(m);
+  if (gprAsk && !gprDeny) {
+    for (const id of GPR_DEFAULT) next.add(id);
+    if (/\bmigrat/.test(m) && !/\b(skip|omit|without|no)\b.{0,24}\bmigrat/.test(m)) next.add("gpr.migrate");
+    if (/\b(geojson|gis|map the traces|trace positions)\b/.test(m)) next.add("gpr.gis");
+  }
+
   return USER_CAPABILITY_IDS.filter((id) => next.has(id));
 }
 
 export function unregisteredProposal(message: string): string | undefined {
   const m = message.toLowerCase();
   if (/\b(seismic|segy|nmo)\b/.test(m)) return "seismic";
-  if (/\b(gpr|ground[\s-]?penetrating)\b/.test(m)) return "gpr";
   if (
     /\b(nasvd|stripp(?:ing|ed)|height[\s-]?correct|dead[\s-]?time|background[\s-]?correct|concentration conversion|window[\s-]?strip)\b/.test(
       m

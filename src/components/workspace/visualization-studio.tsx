@@ -27,10 +27,11 @@ import {
   type RasterGrid,
 } from "@/lib/map";
 import { cn } from "@/lib/utils";
-import { isErtSectionPath, parseSectionCsv } from "@/lib/section/parse";
+import { isErtSectionPath, isGprSectionPath, isSectionPath, parseSectionCsv } from "@/lib/section/parse";
 import { SectionView } from "@/components/workspace/section-view";
 import { gravityProductWarnings } from "@/lib/gravity-product";
 import { radioProductWarnings } from "@/lib/radio-product";
+import { gprProductWarnings } from "@/lib/gpr-product";
 import { isRadioTernaryPath, parseRadioTernaryJson } from "@/lib/radio/ternary";
 import { TernaryView } from "@/components/workspace/ternary-view";
 
@@ -82,7 +83,7 @@ export function VisualizationStudio() {
   const layers = useMemo(() => {
     const mapped = buildMapLayers({ catalog: projectCatalog, files: allPaths });
     const extras = allPaths
-      .filter((path) => isErtSectionPath(path) || isRadioTernaryPath(path))
+      .filter((path) => isSectionPath(path) || isRadioTernaryPath(path))
       .filter((path) => !mapped.some((layer) => layer.path === path));
     const extraLayers: MapLayerSpec[] = extras.map((path) => ({
       id: `${isRadioTernaryPath(path) ? "ternary" : "section"}:${path}`,
@@ -90,10 +91,10 @@ export function VisualizationStudio() {
       label: path.replace(/\\/g, "/").split("/").pop() || path,
       origin: "derived-run",
       displayStatus: "viewable",
-      formatId: isRadioTernaryPath(path) ? "rad-ternary" : "ert-section",
+      formatId: isRadioTernaryPath(path) ? "rad-ternary" : isGprSectionPath(path) ? "gpr-section" : "ert-section",
       mediaClass: "section",
       runId: runIdFromPath(path),
-      units: isRadioTernaryPath(path) ? "unknown" : "ohm.m",
+      units: isRadioTernaryPath(path) ? "unknown" : isGprSectionPath(path) ? "amp" : "ohm.m",
       representation: "full",
     }));
     return [...mapped, ...extraLayers];
@@ -309,7 +310,7 @@ export function VisualizationStudio() {
       : "";
 
   const section = useMemo(() => {
-    if (!active || !text || !isErtSectionPath(active.path)) return null;
+    if (!active || !text || !isSectionPath(active.path)) return null;
     return parseSectionCsv(text, active.path);
   }, [active, text]);
 
@@ -341,14 +342,8 @@ export function VisualizationStudio() {
     geojsonExtentNote,
     raster?.preview || vector?.data.preview ? "This view is a preview/overview — not the full dataset." : "",
     ...(active ? gravityProductWarnings({ path: active.path }) : []),
-    ...(active
-      ? radioProductWarnings({
-          path: active.path,
-          formatId: active.formatId,
-          quantity,
-          units,
-        })
-      : []),
+    ...(active ? radioProductWarnings({ path: active.path, quantity, units }) : []),
+    ...(active ? gprProductWarnings({ path: active.path }) : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
   ].filter(Boolean);

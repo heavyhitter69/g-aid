@@ -124,6 +124,10 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     instrument: classified.inspect.instrument,
     elevationDatum: classified.inspect.elevationDatum,
     gravityDatum: classified.inspect.gravityDatum,
+    dtNs: classified.inspect.dtNs,
+    dxM: classified.inspect.dxM,
+    antennaMHz: classified.inspect.antennaMHz,
+    velocityMs: classified.inspect.velocityMs,
     provenance: {
       method: classified.method,
       adapterId: classified.adapterId || undefined,

@@ -4,6 +4,7 @@ import { gravityCsvAdapter, gravityXyzAdapter } from "./adapters/gravity.ts";
 import { demAsciiAdapter } from "./adapters/dem.ts";
 import { ertCsvAdapter, ertDatAdapter } from "./adapters/ert.ts";
 import { radiometricCsvAdapter, radiometricSpectrumAdapter, radiometricXyzAdapter } from "./adapters/radio.ts";
+import { gprCsvAdapter, gprDztAdapter } from "./adapters/gpr.ts";
 import { recognisedAdapters } from "./adapters/recognised.ts";
 import type { CatalogAdapter } from "./adapters/types.ts";
 
@@ -18,6 +19,8 @@ const adapters: CatalogAdapter[] = [
   radiometricXyzAdapter,
   radiometricCsvAdapter,
   radiometricSpectrumAdapter,
+  gprCsvAdapter,
+  gprDztAdapter,
   ...recognisedAdapters,
 ];
 
