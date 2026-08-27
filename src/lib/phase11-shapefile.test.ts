@@ -333,6 +333,8 @@ test("desktop verification fixtures cover shapefile catalog, blocked datasets, C
     const ui = JSON.parse(fs.readFileSync(uiPath, "utf8"));
     assert.equal(ui.passed, true);
     assert.equal(ui.parser, "pyshp-2.3.1");
+    assert.equal(ui.topology_engine, "g-aid-evenodd-segment");
+    assert.equal(ui.exterior_ring_only, false);
     assert.equal(ui.geopackage_parsed, false);
     assert.equal(ui.silent_reprojection, false);
     assert.equal(ui.filename_inferred_geology, false);
