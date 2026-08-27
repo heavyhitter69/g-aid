@@ -19,8 +19,8 @@ import {
   isRegisteredCapability,
   proposeCapabilitiesFromMessage,
   unregisteredProposal,
-  verifyBoundInputIdentity,
 } from "./capabilities/index.ts";
+import { verifyBoundInputIdentity } from "./capabilities/inputs.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
 import { parseSectionCsv } from "./section/parse.ts";
 import {

@@ -5,11 +5,11 @@ import path from "node:path";
 import type { WorkspaceIndex } from "./workspace-index.ts";
 import {
   extractSearchNeedles,
-  grepWorkspaceRoot,
   inferTargetFolder,
   searchWorkspaceIndex,
   unmatchedNeedles,
 } from "./workspace-search.ts";
+import { grepWorkspaceRoot } from "./workspace-search-fs.ts";
 
 const index: WorkspaceIndex = {
   root: "/surveys/KUMASI-2026",

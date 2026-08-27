@@ -7,13 +7,13 @@ import {
 } from "@/lib/workspace-index";
 import {
   extractSearchNeedles,
-  grepWorkspaceRoot,
   inferTargetFolder,
   mergeSearchHits,
   searchWorkspaceIndex,
   unmatchedNeedles,
   type WorkspaceSearchHit,
 } from "@/lib/workspace-search";
+import { grepWorkspaceRoot } from "@/lib/workspace-search-fs";
 import { generateRunId, resolveRunLayout } from "@/lib/run-layout";
 import { loadProjectCatalog, summarizeCatalog, type ProjectCatalog } from "@/lib/catalog";
 import { EMPTY_STEPS, getPendingPlan, setPendingPlan, type AgentPlan } from "./implementation-plan";

@@ -32,5 +32,4 @@ export {
   GPR_DEFAULT,
   BOREHOLE_DEFAULT,
 } from "./propose.ts";
-export { catalogInputsPayload, verifyBoundInputIdentity } from "./inputs.ts";
 export { dagForPlan, generateTasksMarkdown, taskNodeIdsFromMarkdown } from "./tasks.ts";

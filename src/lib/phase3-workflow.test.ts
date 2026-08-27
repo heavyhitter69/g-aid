@@ -16,8 +16,8 @@ import {
   compileCapabilityDag,
   isRegisteredCapability,
   listCapabilities,
-  verifyBoundInputIdentity,
 } from "./capabilities/index.ts";
+import { verifyBoundInputIdentity } from "./capabilities/inputs.ts";
 import { generateTasksMarkdown, taskNodeIdsFromMarkdown } from "./capabilities/tasks.ts";
 import { allocateApprovedRun, hashPlan, planHashMatches, writeFrozenPlanJson } from "./run-layout.ts";
 

@@ -17,8 +17,8 @@ import {
   compileCapabilityDag,
   isRegisteredCapability,
   unregisteredProposal,
-  verifyBoundInputIdentity,
 } from "./capabilities/index.ts";
+import { verifyBoundInputIdentity } from "./capabilities/inputs.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
 import { buildMapLayers, mapValueUnits } from "./map/index.ts";
 import { layerLabel } from "./raster-layers.ts";

@@ -18,8 +18,8 @@ import {
 import {
   compileCapabilityDag,
   isRegisteredCapability,
-  verifyBoundInputIdentity,
 } from "./capabilities/index.ts";
+import { verifyBoundInputIdentity } from "./capabilities/inputs.ts";
 import { allocateApprovedRun, hashPlan, planHashMatches, writeFrozenPlanJson } from "./run-layout.ts";
 import { buildMapLayers, mapValueUnits, selectLayerByPath } from "./map/index.ts";
 import type { CatalogRecord } from "./catalog/types.ts";
