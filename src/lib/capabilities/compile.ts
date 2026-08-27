@@ -79,7 +79,7 @@ export const ERT_NODE_DEPS: Record<string, string[]> = {
   ert_pseudosection: ["ert_ingest"],
   ert_invert: ["ert_pseudosection"],
   ert_gis_export: ["ert_ingest"],
-  ert_interpret: ["ert_invert"],
+  ert_interpret: ["ert_pseudosection"],
 };
 
 export const KERNEL_NODE_DEPS: Record<string, string[]> = {
@@ -116,7 +116,7 @@ const NODE_LABELS: Record<string, string> = {
   grav_interpret: "Gravity interpretation limits",
   ert_ingest: "Read bound ERT catalog records",
   ert_pseudosection: "ERT pseudosection (not a depth model)",
-  ert_invert: "ERT 2-D smoothness inversion",
+  ert_invert: "Experimental ERT 2-D invert (not production)",
   ert_gis_export: "ERT electrode GIS export",
   ert_interpret: "ERT interpretation limits",
 };

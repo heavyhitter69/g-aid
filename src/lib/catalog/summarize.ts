@@ -106,7 +106,7 @@ export function inventoryAnswer(catalog: ProjectCatalog | null): string {
       ? "A documented DEM ASCII record is available as a near-zone terrain source. I will not download a DEM or apply far-zone terrain."
       : "Near-zone terrain-corrected Bouguer is blocked until a documented DEM (EPSG, Units=m, ElevationDatum) is in the catalog.",
     ert
-      ? "I can plan ERT ingest/QC, a labelled pseudosection, and a tested 2-D smoothness inversion if you ask."
+      ? "I can plan ERT ingest/QC and a labelled pseudosection if you ask. 2-D inversion is experimental and is not in the default ERT workflow."
       : "ERT processing needs a documented Res2DInv-style .dat or reviewed ERT CSV, not the first .dat file.",
     "Recognised-unsupported and unknown files never go to Proceed as processing inputs.",
   ].filter(Boolean);

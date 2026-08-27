@@ -356,7 +356,7 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
     case "ert":
       return "Ingest ERT and build a labelled pseudosection (not a depth model)";
     case "ertInvert":
-      return "Run the tested 2-D smoothness inversion (not Res2DInv, not 3-D)";
+      return "Run the experimental 2-D invert (not production, not Res2DInv, not 3-D; off by default)";
     case "seismic":
       return "Process the SEG-Y (filter, gain, spectrum)";
     case "radiometrics":
@@ -698,6 +698,8 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
               ? "Near-zone terrain-corrected Bouguer needs a documented DEM and a terrain radius (or use DEM extent). Far-zone is not implemented. This is not a Complete Bouguer Anomaly."
               : completeAsk
                 ? "Accepted grav.terrain_near_zone as a near-zone terrain-corrected Bouguer anomaly. G-AID does not produce a Complete Bouguer Anomaly: far-zone and intermediate-zone terrain are not included, and this is not equivalent to a commercial complete Bouguer product."
+                : id === "ert.invert2d"
+                  ? "Accepted experimental ert.invert2d. This is not a production inversion pack. Independent two-layer true resistivities are not recovered. Not Res2DInv. Default ERT work is ingest and pseudosection only."
                 : `Accepted ${capability?.title || id}. Only the registry can run it.`,
       });
     }
@@ -936,7 +938,7 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
       level: "blocker",
       code: "unsupported_method",
       message:
-        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, or the ERT pack after you click Proceed. Seismic, GPR, and radiometrics are not available yet.",
+        "That method is not in this release. G-AID can run MagArrow + GSM-19 magnetics, a gravity-contract pack, or supported ERT ingest and a labelled pseudosection after you click Proceed. 2-D ERT inversion is experimental and is not a production pack. Seismic, GPR, and radiometrics are not available yet.",
     });
   } else if (unsupportedStepsEnabled(plan.steps)) {
     warnings.push({

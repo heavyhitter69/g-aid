@@ -6,12 +6,17 @@
   "topography_used": false,
   "n_measurements": 30,
   "units": "ohm.m",
-  "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity. Not Res2DInv.",
+  "formula": "Historical Gaussian half-space sensitivity (Roy & Apparao 1971). Fixture model retained from the desktop UI capture. Not the live 2.5-D invert. Not Res2DInv.",
   "limitations": [
     "Homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+    "Does not recover 1-D layering. Preserved as a failed-benchmark kernel.",
     "Topography is not used in the forward kernel.",
     "3-D inversion is not implemented."
   ],
   "not_res2dinv": true,
-  "not_3d": true
+  "not_3d": true,
+  "experimental": true,
+  "production_supported": false,
+  "support_level": "experimental",
+  "kernel": "gaussian_halfspace_sensitivity"
 }

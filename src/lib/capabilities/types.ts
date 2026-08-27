@@ -70,6 +70,8 @@ export interface ScientificCapability {
   viewerTypes: string[];
   interpretationLimits: string[];
   expectedArtifacts: string[];
+  /** omitted means supported for existing magnetic/gravity ids */
+  supportLevel?: "supported" | "experimental";
 }
 
 export interface CompiledDagNode {

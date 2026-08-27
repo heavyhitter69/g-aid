@@ -35,7 +35,7 @@ const NODE_LABELS: Record<string, { running: string; done: string }> = {
   regional_residual: { running: "Separating regional-residual", done: "Separated regional-residual" },
   ert_ingest: { running: "Reading ERT measurements", done: "Read ERT measurements" },
   ert_pseudosection: { running: "Building ERT pseudosection", done: "Wrote ERT pseudosection" },
-  ert_invert: { running: "Inverting ERT (2-D smoothness)", done: "Inverted ERT (2-D smoothness)" },
+  ert_invert: { running: "Experimental ERT invert (not production)", done: "Wrote experimental ERT invert (not production)" },
   ert_gis_export: { running: "Writing ERT electrode GIS", done: "Wrote ERT electrode GIS" },
   ert_interpret: { running: "Writing ERT interpretation limits", done: "Wrote ERT interpretation limits" },
   seismic_process: { running: "Processing seismic", done: "Processed seismic" },

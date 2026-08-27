@@ -35,10 +35,9 @@ def test_wenner_geometric_factor():
 
 
 def test_ert_homogeneous_recovery():
-    xs = np.linspace(0, 100, 21)
-    meas = [{"midpoint_x": float(x), "a": 5.0, "n": 1.0, "rhoa": 100.0} for x in xs]
-    meas += [{"midpoint_x": float(x), "a": 5.0, "n": 2.0, "rhoa": 100.0} for x in xs[1:-1]]
-    result = invert_2d_smooth(meas, n_x=16, n_z=8, max_iter=6)
+    xs = np.linspace(10, 70, 9)
+    meas = [{"midpoint_x": float(x), "a": 8.0, "n": 1.0, "rhoa": 100.0, "array": "wenner"} for x in xs]
+    result = invert_2d_smooth(meas, n_x=8, n_z=6, max_iter=6, n_k=4)
     model = np.array(result["resistivity_ohm_m"])
     assert 70 < np.median(model) < 140
     assert result["misfit_percent"] < 15

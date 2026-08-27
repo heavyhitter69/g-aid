@@ -515,6 +515,7 @@ const CAPABILITIES: ScientificCapability[] = [
       "Unknown array codes are refused. Array type is never defaulted.",
       "Topography is recorded when present and is not used in the 2-D forward kernel of this pack.",
     ],
+    supportLevel: "supported",
     qcRequirements: ["n measurements", "array type", "spacing", "units", "duplicate/outlier report"],
     viewerTypes: ["table", "json"],
     interpretationLimits: ["Ingest does not invert resistivity or imply geology."],
@@ -543,6 +544,7 @@ const CAPABILITIES: ScientificCapability[] = [
       "Pseudo-depth n·a/2 is a plotting convention, not inversion depth.",
       "Apparent resistivity is not true resistivity.",
     ],
+    supportLevel: "supported",
     qcRequirements: ["n points", "array type", "units ohm.m", "pseudo-depth labelled"],
     viewerTypes: ["section", "json"],
     interpretationLimits: [
@@ -553,9 +555,9 @@ const CAPABILITIES: ScientificCapability[] = [
   mag({
     id: "ert.invert2d",
     version: "1.0.0",
-    title: "ERT 2-D smoothness inversion",
+    title: "Experimental ERT 2-D inversion",
     description:
-      "Loke & Barker-style smoothness least-squares with a Roy–Apparao sensitivity kernel. Homogeneous recovery is tested. This is not Res2DInv.",
+      "Experimental flat-topography 2.5-D smoothness invert. Not a production inversion pack. Not Res2DInv. Off the default ERT workflow until synthetic recovery meets declared true-resistivity thresholds.",
     domain: "resistivity",
     kernelNodeIds: ["ert_invert"],
     dependsOn: ["ert.pseudosection"],
@@ -573,22 +575,26 @@ const CAPABILITIES: ScientificCapability[] = [
     ],
     parameters: {
       maxIterations: { type: "number", required: false, description: "Gauss–Newton iterations", defaultValue: 8 },
-      dampingFactor: { type: "number", required: false, description: "Smoothness λ", defaultValue: 0.2 },
+      dampingFactor: { type: "number", required: false, description: "Smoothness λ", defaultValue: 0.08 },
       maxMisfitPercent: { type: "number", required: false, description: "Fail if RMS misfit exceeds this percent", defaultValue: 25 },
     },
     metadataRequirements: ["≥ 8 measurements", "positive apparent resistivity", "documented array"],
     scientificConstraints: [
-      "Forward kernel is a homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+      "Experimental. Not a production-supported inversion workflow.",
+      "Forward is a flat-topography 2.5-D finite-difference Poisson solve (Dey & Morrison 1979). Independent two-layer true resistivities are not recovered.",
       "Topography is not used in the forward kernel.",
       "3-D inversion is not implemented.",
       "Non-convergent inversions fail closed; a model is not written.",
+      "Buried-target recovery is not established by an independent 2-D oracle.",
     ],
-    qcRequirements: ["misfit percent", "iterations", "predicted vs observed ρa", "topography_used: false"],
+    qcRequirements: ["misfit percent", "iterations", "predicted vs observed ρa", "topography_used: false", "experimental: true"],
     viewerTypes: ["section", "json"],
     interpretationLimits: [
-      "A smoothness model is not Res2DInv, not true resistivity, not lithology, not groundwater, not an ore body, and not a drill target.",
+      "An experimental invert is not Res2DInv, not true resistivity, not lithology, not groundwater, not an ore body, and not a drill target.",
+      "Failed or poorly resolved models must not generate affirmative interpretation language.",
     ],
     expectedArtifacts: ["ert_2d_model.csv", "ert_2d_model.json", "ert_invert_qc.json"],
+    supportLevel: "experimental",
   }),
   mag({
     id: "ert.gis",
@@ -614,6 +620,7 @@ const CAPABILITIES: ScientificCapability[] = [
     viewerTypes: ["map"],
     interpretationLimits: ["Electrode locations are survey geometry, not geology."],
     expectedArtifacts: ["ert_electrodes.geojson"],
+    supportLevel: "supported",
   }),
   mag({
     id: "ert.interpret",
@@ -636,14 +643,18 @@ const CAPABILITIES: ScientificCapability[] = [
     metadataRequirements: ["QC JSON from ingest/pseudosection"],
     scientificConstraints: [
       "Does not infer groundwater, lithology, ore bodies, or drill targets as fact.",
-      "Does not claim 3-D inversion.",
+      "Does not claim 3-D inversion or a production-supported invert.",
+      "Does not speak affirmatively from a failed or poorly resolved model.",
     ],
     qcRequirements: ["observations vs assumptions listed"],
     viewerTypes: ["json"],
     interpretationLimits: [
-      "Apparent resistivity and a smoothness model are observations/models, not geology.",
+      "A pseudosection is not a depth model.",
+      "An experimental invert is not groundwater, lithology, ore-body, or drill-target evidence.",
+      "Failed or poorly resolved models must not generate affirmative interpretation language.",
     ],
     expectedArtifacts: ["ert_interpretation.json"],
+    supportLevel: "supported",
   }),
 ];
 

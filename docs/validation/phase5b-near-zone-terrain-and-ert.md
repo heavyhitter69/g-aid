@@ -2,14 +2,17 @@
 
 G-AID does **not** advertise a Complete Bouguer Anomaly. The implemented gravity
 product is a **near-zone terrain-corrected Bouguer anomaly** (`grav.terrain_near_zone`).
-The ERT pack is G-AID ERT 1.0 ingest, labelled pseudosection, and a tested 2-D
-smoothness invert. Neither pack claims Oasis montaj or Res2DInv equivalence.
+The ERT pack is G-AID ERT 1.0 **ingest** and a **labelled pseudosection**.
+`ert.invert2d` is **experimental** and is not in the default ERT workflow.
+It is not a production inversion pack and does not claim Res2DInv equivalence.
 
-**Support bar for this pack:** met with the documented limits below. Independent
-kernel benchmarks, synthetic ERT recovery limits, and a live desktop UI pass of
-map / section / CRS / provenance are recorded. This does **not** meet the support
-bar for Complete Bouguer, far-zone terrain, Hayford–Bowie, Res2DInv, 3-D ERT, or
-topography-aware ERT.
+**Support bar for this pack:** gravity near-zone terrain-corrected Bouguer is met
+with documented limits. ERT **ingest and pseudosection** are supported. ERT
+**invert2d is experimental** and has not earned production support (see
+`ert-invert2d-experimental.md`). Independent kernel benchmarks and a live
+desktop UI pass of the gravity map and ERT pseudosection are recorded. This does
+**not** meet the support bar for Complete Bouguer, far-zone terrain,
+Hayford–Bowie, Res2DInv, 3-D ERT, topography-aware ERT, or a production invert.
 
 ## Gravity kernel benchmarks
 
@@ -32,7 +35,9 @@ as in Nagy 1966.
 ## ERT synthetic recovery
 
 Independent forward: homogeneous ρa = ρtrue, and Wenner two-layer image series
-(Telford 1990 §8.4). Invert is the production smoothness kernel.
+(Telford 1990 §8.4). The **historical** invert in this file is the Gaussian
+half-space kernel (`invert_2d_sensitivity_kernel`). Live 2.5-D invert results
+are in `results/ert_invert2d_benchmarks.json`.
 
 | Case | Expected limit | Result |
 |---|---|---|
@@ -57,7 +62,7 @@ Live React pass recorded 2026-08-26 at viewport 1280×800
 | Warning bar: DEM radius/extent, far-zone/intermediate omitted, Bullard B off, DEM 25 m / 100% coverage / orthometric, density 2.67 g/cm³ user-confirmed, not commercial Complete Bouguer | pass |
 | Colorbar units mGal; CRS EPSG:32630 | pass |
 | ERT pseudosection labelled not a depth model | pass |
-| ERT invert labelled 2-D smoothness model, not Res2DInv | pass |
+| ERT invert labelled experimental, not production, not Res2DInv | live label; screenshot captured before this wording |
 | CRS overlay blocked (EPSG:32630 vs 4326) | pass |
 | Versioned run ids `r-verify-grav` / `r-verify-ert` | pass |
 
@@ -77,11 +82,7 @@ versioned run folder when present.
 
 ## Next complete scientific pack (recommendation)
 
-**Topography-aware ERT 2.5-D forward and invert** — only as a full pack with
-ingest, an independent forward oracle, recovery tests on known structure plus
-topography, QC, section visualisation, provenance, and interpretation limits.
-Do not advertise it as Res2DInv.
-
-Far-zone gravity terrain (Hayford–Bowie or equivalent) remains a separate pack
-and is the only honest path to a Complete Bouguer product. It is not supported
-today.
+Do **not** start topography-aware ERT yet. Finish flat-terrain `ert.invert2d`
+production thresholds first (true two-layer resistivities and an independent 2-D
+target oracle). Until then, invert stays experimental and off the default ERT
+workflow.

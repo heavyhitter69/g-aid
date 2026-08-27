@@ -22,12 +22,8 @@ const GRAVITY_DEFAULT: UserCapabilityId[] = [
   "grav.interpret",
 ];
 
-const ERT_DEFAULT: UserCapabilityId[] = [
-  "ert.ingest",
-  "ert.pseudosection",
-  "ert.invert2d",
-  "ert.interpret",
-];
+const ERT_DEFAULT: UserCapabilityId[] = ["ert.ingest", "ert.pseudosection", "ert.interpret"];
+const ERT_INVERT_EXPERIMENTAL: UserCapabilityId = "ert.invert2d";
 
 export function capabilityFromStepKey(key: string): UserCapabilityId | undefined {
   return STEP_TO_CAPABILITY[key];
@@ -66,7 +62,6 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
   }
   if (steps.ert) {
     for (const id of ERT_DEFAULT) {
-      if (id === "ert.invert2d") continue;
       if (!ids.includes(id)) ids.push(id);
     }
   }
@@ -74,6 +69,7 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
     for (const id of ERT_DEFAULT) {
       if (!ids.includes(id)) ids.push(id);
     }
+    if (!ids.includes(ERT_INVERT_EXPERIMENTAL)) ids.push(ERT_INVERT_EXPERIMENTAL);
   }
   return ids;
 }
@@ -175,11 +171,13 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
 
   const ertDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(ert|resistivity)\b/.test(m);
   const ertAsk = /\b(ert|resistivity|pseudosection|wenner|schlumberger|dipole[\s-]?dipole)\b/.test(m);
+  const ertInvertAsk =
+    /\b(ert|resistivity)\b.{0,40}\binvert|\binvert(?:ing|ed)?\s+(?:the\s+)?(?:ert|resistivity)|\b2[\s-]?d invert|\bexperimental invert/.test(
+      m
+    );
   if (ertAsk && !ertDeny) {
-    for (const id of ERT_DEFAULT) {
-      if (id === "ert.invert2d" && /\bpseudosection only\b/.test(m)) continue;
-      next.add(id);
-    }
+    for (const id of ERT_DEFAULT) next.add(id);
+    if (ertInvertAsk && !/\bpseudosection only\b/.test(m)) next.add(ERT_INVERT_EXPERIMENTAL);
     if (/\bcatalog\b.{0,20}\bcrs\b|\bgeojson\b|\bmap the electrodes\b/.test(m)) next.add("ert.gis");
   }
 

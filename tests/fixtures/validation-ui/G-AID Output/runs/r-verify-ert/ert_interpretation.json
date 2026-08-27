@@ -2,26 +2,29 @@
   "observations": [
     "ERT measurements were ingested under the G-AID ERT 1.0 contract.",
     "Pseudosection present: True",
-    "2-D inversion present: True"
+    "An experimental 2-D invert is present. It is not a production-supported resistivity model."
   ],
   "assumptions": [
     "Apparent resistivity is as supplied in ohm\u00b7m.",
     "Pseudo-depth n\u00b7a/2 is a plotting convention.",
-    "2-D model uses a homogeneous-half-space sensitivity kernel; topography is not in the forward operator."
+    "The invert in this verification fixture used the historical Gaussian half-space kernel; topography is not in the operator."
   ],
   "uncertainty": [
     "A smoothness model is non-unique.",
     "The kernel is not equivalent to Res2DInv or a 2.5-D finite-difference forward model."
   ],
   "recommendations": [
-    "Do not treat a resistivity high/low as lithology, groundwater, ore, or a drill target."
+    "Do not treat a resistivity high/low as lithology, groundwater, ore, or a drill target.",
+    "Do not treat an experimental invert as a production ERT inversion pack.",
+    "Do not generate affirmative structure language from a failed or poorly resolved invert."
   ],
   "not_established": [
     "Groundwater is not established.",
     "Lithology is not established.",
     "Ore bodies are not established.",
     "Drill targets are not established.",
-    "3-D inversion was not performed."
+    "3-D inversion was not performed.",
+    "A production-supported 2-D resistivity model is not established."
   ],
   "qc": {
     "ert_ingest_qc.json": {
@@ -67,15 +70,23 @@
       "topography_used": false,
       "n_measurements": 30,
       "units": "ohm.m",
-      "formula": "Loke & Barker 1996 smoothness-constrained LS; Roy & Apparao 1971 sensitivity. Not Res2DInv.",
+      "formula": "Historical Gaussian half-space sensitivity (Roy & Apparao 1971). Fixture model retained from the desktop UI capture. Not the live 2.5-D invert. Not Res2DInv.",
       "limitations": [
         "Homogeneous-half-space sensitivity, not 2.5-D finite difference.",
+        "Does not recover 1-D layering. Preserved as a failed-benchmark kernel.",
         "Topography is not used in the forward kernel.",
         "3-D inversion is not implemented."
       ],
       "not_res2dinv": true,
-      "not_3d": true
+      "not_3d": true,
+      "experimental": true,
+      "production_supported": false,
+      "support_level": "experimental",
+      "kernel": "gaussian_halfspace_sensitivity"
     }
   },
-  "interpretation_limit": "Apparent resistivity and a smoothness model are not geology."
+  "interpretation_limit": "Apparent resistivity and an experimental smoothness model are not geology.",
+  "experimental_invert": true,
+  "affirmative_language_allowed": false,
+  "pseudosection_is_depth_model": false
 }

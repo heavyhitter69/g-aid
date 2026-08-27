@@ -85,12 +85,12 @@ export function parseSectionCsv(text: string, path = ""): SectionGrid {
       : "pseudo-depth n·a/2 (not inversion depth)"),
     interpolation: (interpCol >= 0 ? sample[interpCol] : "") || (model ? "smoothness-constrained model cells" : "none — discrete measurements"),
     modelStatus: (statusCol >= 0 ? sample[statusCol] : "") || (model
-      ? "2-D smoothness inversion; not Res2DInv"
+      ? "experimental 2-D smoothness inversion; not production; not Res2DInv"
       : "not a depth model"),
     points,
     warnings: [
       model
-        ? "This smoothness model is not Res2DInv, not 3-D, and not lithology, groundwater, ore, or a drill target."
+        ? "This experimental smoothness model is not a production invert, not Res2DInv, not 3-D, and not lithology, groundwater, ore, or a drill target."
         : "A pseudosection is not a depth model and is not true resistivity.",
     ],
   };

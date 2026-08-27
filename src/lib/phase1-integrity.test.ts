@@ -107,8 +107,9 @@ test("a non-magnetic request does not create a magnetic plan", () => {
   assert.equal(ert.diurnal, false);
   assert.equal(ert.igrf, false);
   assert.equal(ert.grid, false);
-  assert.equal(magneticStepsEnabled(ert), false);
+    assert.equal(magneticStepsEnabled(ert), false);
   assert.equal(ert.ert, true);
+  assert.equal(ert.ertInvert, false);
 
   const detected = detectAnalysisIntent("process the ERT pseudosection on LINE 4");
   assert.equal(detected, "resistivity");
@@ -121,6 +122,7 @@ test("a non-magnetic request does not create a magnetic plan", () => {
   assert.equal(intent, "resistivity");
   const steps = intentToSteps(intent, "process the ERT pseudosection on LINE 4");
   assert.equal(magneticStepsEnabled(steps), false);
+  assert.equal(steps.ertInvert, false);
   const check = validatePlan(
     basePlan("/surveys/LINE", {
       intent,

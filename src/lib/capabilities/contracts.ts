@@ -244,7 +244,8 @@ export function validateCapabilityContracts(options: {
       issues.push({
         level: "blocker",
         code: "ert_too_few_measurements",
-        message: "2-D inversion needs at least 8 measurements. A smaller set can still build a labelled pseudosection.",
+        message:
+          "Experimental 2-D inversion needs at least 8 measurements. A smaller set can still build a labelled pseudosection. Invert is not in the default ERT workflow.",
       });
     }
   }

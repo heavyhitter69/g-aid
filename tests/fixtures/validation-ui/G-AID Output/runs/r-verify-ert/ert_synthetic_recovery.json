@@ -1,5 +1,6 @@
 {
-  "product": "G-AID ERT 1.0 2-D smoothness inversion",
+  "product": "G-AID ERT 1.0 historical Gaussian-kernel invert (not the live engine)",
+  "kernel": "gaussian_halfspace_sensitivity",
   "not_res2dinv": true,
   "not_3d": true,
   "topography_in_forward": false,
@@ -51,5 +52,5 @@
     }
   ],
   "all_passed": true,
-  "support_bar": "ingest/QC/pseudosection/tested invert with documented qualitative recovery limits \u2014 not commercial ERT equivalence"
+  "support_bar": "Historical failed two-layer case preserved. Live invert results are in ert_invert2d_benchmarks.json. ert.invert2d is experimental."
 }

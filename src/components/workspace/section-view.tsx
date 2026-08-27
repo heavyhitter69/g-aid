@@ -29,7 +29,7 @@ export function SectionView({ section }: { section: SectionGrid }) {
       <header>
         <p className="text-[10px] uppercase tracking-wide text-[#858585]">Section workspace</p>
         <h2 className="text-sm font-medium">
-          {section.kind === "pseudosection" ? "ERT pseudosection" : "ERT 2-D smoothness model"}
+          {section.kind === "pseudosection" ? "ERT pseudosection" : "Experimental ERT 2-D invert (not production)"}
         </h2>
         <p className="text-[11px] text-[#9d9d9d] mt-1">
           Units: {section.units}. Depth/elevation: {section.zReference}. Interpolation: {section.interpolation}. Model: {section.modelStatus}.

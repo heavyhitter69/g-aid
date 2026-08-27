@@ -7,7 +7,7 @@ import { buildProjectCatalog } from "./catalog/build.ts";
 import { inspectErtText } from "./catalog/ert-contract.ts";
 import { collectPlanInputs } from "./plan-intent.ts";
 import { applyChatPatches, EMPTY_STEPS, validatePlan, type AgentPlan } from "./plan-spec.ts";
-import { compileCapabilityDag, isRegisteredCapability, verifyBoundInputIdentity } from "./capabilities/index.ts";
+import { compileCapabilityDag, getCapability, isRegisteredCapability, proposeCapabilitiesFromMessage, verifyBoundInputIdentity } from "./capabilities/index.ts";
 import { allocateApprovedRun, hashPlan, writeFrozenPlanJson } from "./run-layout.ts";
 import { parseSectionCsv, isErtSectionPath } from "./section/parse.ts";
 import type { CatalogRecord } from "./catalog/types.ts";
@@ -59,17 +59,29 @@ function ertPlan(root: string, overrides: Partial<AgentPlan> = {}): AgentPlan {
   };
 }
 
-test("ert capabilities are registered; ert.invert is not a product id", () => {
-  assert.equal(isRegisteredCapability("ert.ingest"), true);
-  assert.equal(isRegisteredCapability("ert.pseudosection"), true);
+test("ert.invert2d is registered as experimental; default ERT chat does not grant it", () => {
   assert.equal(isRegisteredCapability("ert.invert2d"), true);
-  assert.equal(isRegisteredCapability("ert.invert"), false);
+  assert.equal(getCapability("ert.invert2d")?.supportLevel, "experimental");
+  assert.equal(getCapability("ert.ingest")?.supportLevel, "supported");
+  assert.equal(getCapability("ert.pseudosection")?.supportLevel, "supported");
+  assert.equal(getCapability("ert.interpret")?.supportLevel, "supported");
+  const defaultErt = proposeCapabilitiesFromMessage("process the ERT line");
+  assert.equal(defaultErt.includes("ert.ingest"), true);
+  assert.equal(defaultErt.includes("ert.pseudosection"), true);
+  assert.equal(defaultErt.includes("ert.invert2d"), false);
+  const withInvert = proposeCapabilitiesFromMessage("process the ERT pseudosection and invert");
+  assert.equal(withInvert.includes("ert.invert2d"), true);
 });
 
 test("ERT DAG compiles without magnetic file_discovery", () => {
   const dag = compileCapabilityDag(["ert.ingest", "ert.pseudosection", "ert.invert2d", "ert.interpret"]);
   const ids = dag.nodes.map((node) => node.id);
   assert.deepEqual(ids, ["ert_ingest", "ert_pseudosection", "ert_invert", "ert_interpret"]);
+  const supported = compileCapabilityDag(["ert.ingest", "ert.pseudosection", "ert.interpret"]);
+  assert.deepEqual(
+    supported.nodes.map((node) => node.id),
+    ["ert_ingest", "ert_pseudosection", "ert_interpret"]
+  );
   assert.equal(ids.includes("file_discovery"), false);
   assert.equal(ids.includes("gravity_ingest"), false);
 });
@@ -135,6 +147,12 @@ test("bad geometry, missing array, invalid units, and bad topography are not sup
 });
 
 test("chat requesting ERT does not create a magnetic plan", () => {
+  const defaultChat = applyChatPatches(
+    ertPlan("/tmp", { steps: { ...EMPTY_STEPS }, capabilities: [] }),
+    "run ERT on this line"
+  );
+  assert.equal(defaultChat.capabilities?.includes("ert.invert2d"), false);
+  assert.equal(defaultChat.steps.ertInvert, false);
   const plan = ertPlan("/tmp", { steps: { ...EMPTY_STEPS }, capabilities: [] });
   const patched = applyChatPatches(plan, "process the ERT pseudosection and invert");
   assert.ok(patched.capabilities?.includes("ert.ingest"));
@@ -171,6 +189,7 @@ test("section parser labels pseudosection vs smoothness model", () => {
   assert.ok(pseudo.warnings.some((w) => /not a depth model/i.test(w)));
   const model = parseSectionCsv("x,z,resistivity_ohm_m\n0,2,90\n5,2,95\n", "ert_2d_model.csv");
   assert.equal(model.kind, "resistivity-model");
+  assert.match(model.modelStatus, /experimental/i);
   assert.match(model.modelStatus, /not Res2DInv/i);
 });
 
@@ -231,9 +250,14 @@ test("end-to-end ERT ingest, pseudosection, invert, and failed inversion when sc
     assert.equal(qc.converged, true);
     assert.equal(qc.topography_used, false);
     assert.equal(qc.not_res2dinv, true);
+    assert.equal(qc.experimental, true);
+    assert.equal(qc.production_supported, false);
     const report = JSON.parse(fs.readFileSync(path.join(run, "ert_interpretation.json"), "utf8"));
     assert.ok(report.not_established.some((line: string) => /groundwater/i.test(line)));
     assert.ok(report.not_established.some((line: string) => /drill/i.test(line)));
+    assert.equal(report.affirmative_language_allowed, false);
+    assert.equal(report.experimental_invert, true);
+    assert.ok(report.recommendations.some((line: string) => /affirmative/i.test(line)));
     const section = parseSectionCsv(fs.readFileSync(path.join(run, "ert_pseudosection.csv"), "utf8"), "ert_pseudosection.csv");
     assert.ok(section.points.length >= 8);
 

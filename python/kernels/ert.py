@@ -197,11 +197,20 @@ def ert_invert(payload: dict) -> dict:
     df = pd.read_csv(src)
     if len(df) < 8:
         raise ValueError("2-D inversion needs at least 8 measurements.")
-    meas = [{"midpoint_x": float(r.midpoint_x), "a": float(r.a), "n": float(r.n), "rhoa": float(r.rhoa)} for r in df.itertuples()]
+    meas = [
+        {
+            "midpoint_x": float(r.midpoint_x),
+            "a": float(r.a),
+            "n": float(r.n),
+            "rhoa": float(r.rhoa),
+            "array": str(getattr(r, "array", "") or "wenner"),
+        }
+        for r in df.itertuples()
+    ]
     result = invert_2d_smooth(
         meas,
         max_iter=int(params.get("maxIterations") or params.get("max_iterations") or 8),
-        lam=float(params.get("dampingFactor") or params.get("damping_factor") or 0.2),
+        lam=float(params.get("dampingFactor") or params.get("damping_factor") or 0.08),
         max_misfit_percent=float(params.get("maxMisfitPercent") or params.get("max_misfit_percent") or 25.0),
         fail_on_divergence=True,
     )
@@ -216,7 +225,7 @@ def ert_invert(payload: dict) -> dict:
             "z_reference": "model depth below a flat surface; topography not used",
             "resistivity_ohm_m": float(rho[i, j]),
             "interpolation": "smoothness-constrained model cells",
-            "model_status": "2-D smoothness inversion — not Res2DInv",
+            "model_status": "experimental 2-D smoothness inversion — not production, not Res2DInv",
         }
         for i in range(len(z))
         for j in range(len(x))
@@ -235,9 +244,16 @@ def ert_invert(payload: dict) -> dict:
         "limitations": result["limitations"],
         "not_res2dinv": True,
         "not_3d": True,
+        "experimental": True,
+        "production_supported": False,
+        "support_level": "experimental",
+        "kernel": result.get("kernel"),
+        "jacobian_row_sum_median": result.get("jacobian_row_sum_median"),
+        "homogeneous_scale": result.get("homogeneous_scale"),
     }
     qc_path = write_json(os.path.join(out, "ert_invert_qc.json"), qc)
     validation_path = _attach_validation_copy(out, "ert_synthetic_recovery.json")
+    bench_path = _attach_validation_copy(out, "ert_invert2d_benchmarks.json")
     ui_path = _attach_validation_copy(out, "phase5b_desktop_ui.json")
     write_lineage(
         out,
@@ -247,6 +263,7 @@ def ert_invert(payload: dict) -> dict:
         [src],
         [json_path, csv_path, qc_path]
         + ([validation_path] if validation_path else [])
+        + ([bench_path] if bench_path else [])
         + ([ui_path] if ui_path else []),
     )
     artifacts = [
@@ -256,6 +273,8 @@ def ert_invert(payload: dict) -> dict:
     ]
     if validation_path:
         artifacts.append(make_artifact("artifact-ert-recovery", "qc_report", "json", validation_path, node_id, [src]))
+    if bench_path:
+        artifacts.append(make_artifact("artifact-ert-invert-bench", "qc_report", "json", bench_path, node_id, [src]))
     if ui_path:
         artifacts.append(make_artifact("artifact-ert-desktop-ui", "qc_report", "json", ui_path, node_id, [src]))
     return {
@@ -263,7 +282,10 @@ def ert_invert(payload: dict) -> dict:
         "events": [
             {
                 "type": "NODE_PROGRESS",
-                "message": f"2-D smoothness inversion misfit={qc['misfit_percent']:.2f}%. Topography not used. Not Res2DInv.",
+                "message": (
+                    f"Experimental 2-D invert misfit={qc['misfit_percent']:.2f}%. "
+                    "Not a production ERT inversion. Topography not used. Not Res2DInv."
+                ),
             }
         ],
     }
@@ -299,25 +321,46 @@ def ert_interpret(payload: dict) -> dict:
             with open(path, encoding="utf-8") as handle:
                 qcs[name] = json.load(handle)
     inverted = "ert_invert_qc.json" in qcs
+    invert_qc = qcs.get("ert_invert_qc.json") or {}
+    experimental = bool(invert_qc.get("experimental", inverted))
+    production = bool(invert_qc.get("production_supported"))
+    poor = inverted and (
+        invert_qc.get("converged") is False
+        or (isinstance(invert_qc.get("misfit_percent"), (int, float)) and float(invert_qc["misfit_percent"]) > 20)
+    )
+    observations = [
+        "ERT measurements were ingested under the G-AID ERT 1.0 contract.",
+        f"Pseudosection present: {'ert_survey.json' in qcs}. A pseudosection is not a depth model.",
+    ]
+    if inverted:
+        observations.append(
+            "An experimental 2-D invert is present. It is not a production-supported resistivity model."
+            if experimental or not production
+            else "A 2-D invert is present."
+        )
+        if poor:
+            observations.append(
+                "The invert is poorly resolved or did not meet misfit limits. No affirmative structure is reported."
+            )
+    else:
+        observations.append("2-D inversion did not run in this plan.")
     report = {
-        "observations": [
-            "ERT measurements were ingested under the G-AID ERT 1.0 contract.",
-            f"Pseudosection present: {'ert_survey.json' in qcs}",
-            f"2-D inversion present: {inverted}",
-        ],
+        "observations": observations,
         "assumptions": [
             "Apparent resistivity is as supplied in ohm·m.",
-            "Pseudo-depth n·a/2 is a plotting convention.",
+            "Pseudo-depth n·a/2 is a plotting convention, not inversion depth.",
             inverted
-            and "2-D model uses a homogeneous-half-space sensitivity kernel; topography is not in the forward operator."
+            and "Experimental invert uses a flat-topography 2.5-D finite-difference forward; topography is not in the operator."
             or "2-D inversion did not run in this plan.",
         ],
         "uncertainty": [
-            "A smoothness model is non-unique.",
-            "The kernel is not equivalent to Res2DInv or a 2.5-D finite-difference forward model.",
+            "A smoothness model is non-unique. Equivalence and suppression apply.",
+            "The invert is not equivalent to Res2DInv and is not a 3-D inversion.",
         ],
         "recommendations": [
             "Do not treat a resistivity high/low as lithology, groundwater, ore, or a drill target.",
+            "Do not treat an experimental invert as a production ERT inversion pack.",
+            "Do not generate affirmative structure language from a failed or poorly resolved invert.",
         ],
         "not_established": [
             "Groundwater is not established.",
@@ -325,9 +368,13 @@ def ert_interpret(payload: dict) -> dict:
             "Ore bodies are not established.",
             "Drill targets are not established.",
             "3-D inversion was not performed.",
+            "A production-supported 2-D resistivity model is not established.",
         ],
         "qc": qcs,
-        "interpretation_limit": "Apparent resistivity and a smoothness model are not geology.",
+        "interpretation_limit": "Apparent resistivity and an experimental smoothness model are not geology.",
+        "experimental_invert": inverted and (experimental or not production),
+        "affirmative_language_allowed": False,
+        "pseudosection_is_depth_model": False,
     }
     path = write_json(os.path.join(out, "ert_interpretation.json"), report)
     return {

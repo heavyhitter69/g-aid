@@ -100,7 +100,7 @@ export default function Phase5bVerifyPage() {
               : id === "pseudo"
                 ? "ERT pseudosection"
                 : id === "invert"
-                  ? "ERT invert"
+                  ? "Experimental invert"
                   : "Provenance / CRS"}
           </button>
         ))}
@@ -133,7 +133,11 @@ export default function Phase5bVerifyPage() {
               {(Number(data.gravity.qc.mean_coverage_fraction) * 100).toFixed(1)}%
             </p>
             <p>Far-zone: {String(data.gravity.qc.far_zone)}; intermediate-zone: {String(data.gravity.qc.intermediate_zone)}</p>
-            <p>ERT invert topography used: {String(data.ert.qc.topography_used)}; not Res2DInv: {String(data.ert.qc.not_res2dinv)}</p>
+            <p>
+              ERT invert topography used: {String(data.ert.qc.topography_used)}; not Res2DInv:{" "}
+              {String(data.ert.qc.not_res2dinv)}; experimental: {String(data.ert.qc.experimental ?? true)};
+              production_supported: {String(data.ert.qc.production_supported ?? false)}
+            </p>
             <ul className="list-disc pl-5 text-[#9d9d9d]">
               {(data.gravity.interpretation.not_established || []).map((line) => (
                 <li key={line}>{line}</li>

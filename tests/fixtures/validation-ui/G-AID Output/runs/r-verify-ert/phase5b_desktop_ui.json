@@ -41,12 +41,12 @@
     },
     "invert": {
       "passed": true,
-      "heading": "ERT 2-D smoothness model",
+      "heading": "Experimental ERT 2-D invert (not production)",
       "section_visible": true,
       "units": "ohm.m",
       "z_reference": "model depth below a flat surface; topography not used",
-      "model_status": "2-D smoothness inversion — not Res2DInv",
-      "warnings": "This smoothness model is not Res2DInv, not 3-D, and not lithology, groundwater, ore, or a drill target.",
+      "model_status": "experimental 2-D smoothness inversion; not production; not Res2DInv",
+      "warnings": "This experimental smoothness model is not a production invert, not Res2DInv, not 3-D, and not lithology, groundwater, ore, or a drill target.",
       "screenshot": "docs/validation/results/screenshots/ert-invert.webp"
     },
     "provenance": {

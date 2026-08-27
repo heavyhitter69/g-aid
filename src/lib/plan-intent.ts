@@ -39,7 +39,9 @@ export function intentToSteps(
   }
   if (intent === "resistivity" || /\bert\b|\bpseudosection\b|\bresistivity\b/.test(m)) {
     next.ert = true;
-    next.ertInvert = !/\bpseudosection only\b/.test(m);
+    next.ertInvert =
+      /\binvert(?:ing|ed)?\b|\b2[\s-]?d invert|\bexperimental invert/.test(m) &&
+      !/\bpseudosection only\b/.test(m);
   }
   if (intent === "seismic") next.seismic = true;
   if (intent === "radiometrics") next.radiometrics = true;

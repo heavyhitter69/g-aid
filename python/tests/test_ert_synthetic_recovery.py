@@ -1,7 +1,9 @@
 """ERT synthetic-model recovery with an independent forward model.
 
-The 2-D invert kernel uses a homogeneous-half-space Roy–Apparao sensitivity.
-These tests generate apparent resistivity from a different forward:
+The 2-D invert kernel previously used a homogeneous-half-space Roy–Apparao
+sensitivity. These tests freeze that historical kernel
+(`invert_2d_sensitivity_kernel`) so the failed two-layer case is not deleted.
+Live invert results live in test_ert_invert2d_benchmarks.py.
 
 - Homogeneous half-space (ρa = ρtrue), plus 5% Gaussian noise
 - Two-layer earth using the Wenner image-series formula (Telford et al. 1990
@@ -22,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from science.ert import invert_2d_smooth  # noqa: E402
+from science.ert import invert_2d_sensitivity_kernel  # noqa: E402
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "validation", "results")
 
@@ -68,7 +70,7 @@ def test_homogeneous_recovery_with_noise():
     noisy = _noise(rhoa, rng, 0.05)
     for m, v in zip(meas, noisy):
         m["rhoa"] = float(max(v, 1.0))
-    result = invert_2d_smooth(meas, n_x=12, n_z=8, max_iter=6, fail_on_divergence=False)
+    result = invert_2d_sensitivity_kernel(meas, n_x=12, n_z=8, max_iter=6, fail_on_divergence=False)
     model = np.array(result["resistivity_ohm_m"], float)
     median = float(np.median(model))
     rel = abs(median - true_rho) / true_rho
@@ -107,7 +109,7 @@ def test_two_layer_wenner_documents_layer_recovery_limit():
     noisy = _noise(rhoa, rng, 0.05)
     for m, v in zip(meas, noisy):
         m["rhoa"] = float(max(v, 1.0))
-    result = invert_2d_smooth(meas, n_x=14, n_z=10, max_iter=8, fail_on_divergence=False)
+    result = invert_2d_sensitivity_kernel(meas, n_x=14, n_z=10, max_iter=8, fail_on_divergence=False)
     model = np.array(result["resistivity_ohm_m"], float)
     n = model.shape[0]
     shallow = float(np.median(model[: max(1, n // 3)]))
@@ -160,7 +162,7 @@ def test_lateral_contrast_qualitative():
     noisy = _noise(rhoa, rng, 0.05)
     for m, v in zip(meas, noisy):
         m["rhoa"] = float(max(v, 1.0))
-    result = invert_2d_smooth(meas, n_x=16, n_z=8, max_iter=7, fail_on_divergence=False)
+    result = invert_2d_sensitivity_kernel(meas, n_x=16, n_z=8, max_iter=7, fail_on_divergence=False)
     model = np.array(result["resistivity_ohm_m"], float)
     x = np.array(result["x_m"], float)
     left = model[:, x < split]
@@ -189,13 +191,14 @@ def write_results(cases: list[dict]) -> str:
     os.makedirs(RESULTS_DIR, exist_ok=True)
     path = os.path.abspath(os.path.join(RESULTS_DIR, "ert_synthetic_recovery.json"))
     payload = {
-        "product": "G-AID ERT 1.0 2-D smoothness inversion",
+        "product": "G-AID ERT 1.0 historical Gaussian-kernel invert (not the live engine)",
+        "kernel": "gaussian_halfspace_sensitivity",
         "not_res2dinv": True,
         "not_3d": True,
         "topography_in_forward": False,
         "cases": cases,
         "all_passed": all(c.get("pass") for c in cases),
-        "support_bar": "ingest/QC/pseudosection/tested invert with documented qualitative recovery limits — not commercial ERT equivalence",
+        "support_bar": "Historical failed two-layer case preserved. Live invert results are in ert_invert2d_benchmarks.json. ert.invert2d is experimental.",
     }
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
