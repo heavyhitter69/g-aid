@@ -126,10 +126,10 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
   if (/\b(segy|seismic|nmo|stack|kirchhoff)\b/.test(m)) return "seismic";
   if (/\b(ert|resistivity|wenner|schlumberger|dipole[\s-]?dipole|pseudosection)\b/.test(m)) return "resistivity";
   if (/\b(bouguer|free[\s-]?air|gravity|mgal)\b/.test(m)) return "gravity";
-  if (/\b(radiometr|spectrometer|nasvd)\b/.test(m)) return "radiometrics";
+  if (/\bradiometr|\bspectrometer\b|\bnasvd\b/.test(m)) return "radiometrics";
   if (
-    /\b(geochem|geochemical|assay|soil sample|stream[\s-]?sediment|rock[\s-]?chip|rock sample)\b/.test(m) &&
-    !/\b(radiometr|spectrometer|airborne gamma|geojson|shapefile)\b/.test(m)
+    /\b(geochem|geochemical|assays?|soil samples?|stream[\s-]?sediments?|rock[\s-]?chips?|rock samples?)\b/.test(m) &&
+    !/\bradiometr|\bspectrometer\b|\bairborne gamma\b|\bgeojson\b|\bshapefile\b/.test(m)
   ) {
     return "geochemistry";
   }

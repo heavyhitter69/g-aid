@@ -94,7 +94,7 @@ export function inferIntentFromFiles(
 ): AnalysisIntent | "none" {
   if (detected) return detected;
   const m = message.toLowerCase();
-  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay|geochem|assay|soil sample|stream[\s-]?sediment)\b/.test(m)) {
+  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay|geochem|assays?|soil samples?|stream[\s-]?sediments?)\b/.test(m)) {
     return detectAnalysisIntent(message) || "none";
   }
   void index;

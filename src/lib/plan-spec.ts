@@ -490,7 +490,7 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "gpr", re: /\bgpr\b|ground[ -]?penetrating/i },
   { key: "borehole", re: /\bborehole\b|\bwell[ -]?log\b|\blas\b|cwls/i },
   { key: "gisVector", re: /\bgeojson\b|\bshapefile\b|\bgeopackage\b|\bvector overlay\b|\bspatial overlap\b|\bgeology layer\b|\btenure layer\b/i },
-  { key: "geochem", re: /\bgeochem|\bassay\b|\bsoil sample\b|\bstream[\s-]?sediment\b|\brock[\s-]?chip\b/i },
+  { key: "geochem", re: /\bgeochem|\bassays?\b|\bsoil samples?\b|\bstream[\s-]?sediments?\b|\brock[\s-]?chips?\b/i },
 ];
 
 export function cloneSteps(steps: PlanSteps = EMPTY_STEPS): PlanSteps {

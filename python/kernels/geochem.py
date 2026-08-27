@@ -117,12 +117,13 @@ def geochem_ingest(payload: dict) -> dict:
     from formats.geochem import parse_geochem_table
 
     node_id = "geochem_ingest"
-    out = _out(payload)
     params = _params(payload)
+    bound = _bound_geochem(params)
+    out = _out(payload)
     tables = []
     sources = []
     events = []
-    for item in _bound_geochem(params):
+    for item in bound:
         filepath = _abs(params, item)
         parsed = parse_geochem_table(filepath, mapping=_mapping(item))
         parsed["catalog_id"] = item.get("catalogId") or item.get("catalog_id")

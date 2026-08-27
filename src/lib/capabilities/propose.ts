@@ -363,10 +363,10 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     if (/\bexport\b/.test(m)) next.add("gis.export_vector");
   }
 
-  const geochemDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(geochem|assay|soil sample)\b/.test(m);
+  const geochemDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(geochem|assays?|soil samples?)\b/.test(m);
   const geochemAsk =
-    /\b(geochem|geochemical|assay|soil sample|stream[\s-]?sediment|rock[\s-]?chip|rock sample)\b/.test(m) &&
-    !/\b(radiometr|spectrometer|airborne gamma|geojson|shapefile)\b/.test(m);
+    /\b(geochem|geochemical|assays?|soil samples?|stream[\s-]?sediments?|rock[\s-]?chips?|rock samples?)\b/.test(m) &&
+    !/\bradiometr|\bspectrometer\b|\bairborne gamma\b|\bgeojson\b|\bshapefile\b/.test(m);
   if (geochemAsk && !geochemDeny) {
     for (const id of GEOCHEM_DEFAULT) next.add(id);
     if (/\b(log10|log transform|display transform)\b/.test(m) && !/\b(skip|omit|without|no)\b.{0,24}\b(log|transform)/.test(m)) {
@@ -383,7 +383,7 @@ export function unregisteredProposal(message: string): string | undefined {
     /\b(anomal(?:y|ies)|prospectiv(?:ity)?|mineral targets?|drill targets?|resource estimat\w*|machine[\s-]?learning|ml classif)\b/.test(
       m
     ) &&
-    /\b(geochem|assay|soil sample|stream[\s-]?sediment)\b/.test(m)
+    /\b(geochem|assays?|soil samples?|stream[\s-]?sediments?)\b/.test(m)
   ) {
     return "geochem.anomaly";
   }
