@@ -22,7 +22,7 @@ export type DownloadCatalog = {
 export const GITHUB_OWNER = "heavyhitter69";
 export const GITHUB_REPO = "g-aid";
 export const NO_PUBLIC_RELEASE_MESSAGE =
-  "No public installer release has been published yet. G-AID is a local desktop workspace; signed installers are not available from this site.";
+  "No public installer release has been published yet. G-AID is a local desktop workspace; installer files are not available from this site.";
 
 type GithubAsset = {
   name?: string;

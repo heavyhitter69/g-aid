@@ -70,6 +70,20 @@ const FORBIDDEN_CLAIMS = [
   'href="#"',
 ];
 
+await test("client catalog adapters do not import node:fs", () => {
+  const adaptersDir = path.join(root, "src/lib/catalog/adapters");
+  const hits: string[] = [];
+  for (const name of fs.readdirSync(adaptersDir)) {
+    if (!name.endsWith(".ts") || name.endsWith("-node.ts")) continue;
+    const text = fs.readFileSync(path.join(adaptersDir, name), "utf8");
+    if (text.includes("node:fs") || text.includes("node:crypto")) {
+      hits.push(name);
+    }
+  }
+  assert.deepEqual(hits, []);
+  assert.equal(fs.existsSync(path.join(root, "src/lib/catalog/adapters/shapefile-node.ts")), true);
+});
+
 await test("grid-map-view re-exports parseEsriAscii so workspace compile cannot 500 marketing", () => {
   const source = read("src/components/workspace/grid-map-view.tsx");
   assert.match(source, /export \{\s*parseEsriAscii\s*\}/);
@@ -96,7 +110,7 @@ await test("download catalog is unpublished when GitHub has no assets", () => {
   const empty = catalogFromGithubRelease(null);
   assert.equal(empty.published, false);
   assert.equal(empty.platforms.win, undefined);
-  assert.match(empty.message, /not been published/i);
+  assert.match(empty.message, /has been published yet/i);
 
   const noAssets = catalogFromGithubRelease({ tag_name: "v9.9.9", assets: [] });
   assert.equal(noAssets.published, false);
@@ -192,28 +206,48 @@ function get(url: string): Promise<{ status: number; body: string }> {
   });
 }
 
-function waitForServer(url: string, timeoutMs: number): Promise<void> {
+function stopExistingDevServer() {
+  const lockPath = path.join(root, ".next/dev/lock");
+  if (!fs.existsSync(lockPath)) return;
+  try {
+    const lock = JSON.parse(fs.readFileSync(lockPath, "utf8")) as { pid?: number };
+    if (lock.pid && lock.pid !== process.pid) {
+      try {
+        process.kill(lock.pid, "SIGTERM");
+      } catch {
+        /* already gone */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function waitForChildReady(readyHint: () => string, timeoutMs: number): Promise<void> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const tick = () => {
-      http
-        .get(url, (res) => {
-          res.resume();
-          resolve();
-        })
-        .on("error", () => {
-          if (Date.now() - start > timeoutMs) reject(new Error("server did not start"));
-          else setTimeout(tick, 400);
-        });
+      if (/\bReady in\b/i.test(readyHint())) {
+        resolve();
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error(`dev server did not become Ready\n${readyHint().slice(-2000)}`));
+        return;
+      }
+      setTimeout(tick, 400);
     };
     tick();
   });
 }
 
 await test("visiting /workspace does not 500 /, /download, or /api/download", async () => {
+  stopExistingDevServer();
+  await new Promise((r) => setTimeout(r, 800));
   const port = 3055;
   const base = `http://127.0.0.1:${port}`;
-  const child = spawn("npx", ["next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
+  const nextBin = path.join(root, "node_modules/next/dist/bin/next");
+  const child = spawn(process.execPath, [nextBin, "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: root,
     env: { ...process.env },
     stdio: ["ignore", "pipe", "pipe"],
@@ -226,21 +260,27 @@ await test("visiting /workspace does not 500 /, /download, or /api/download", as
     output += d.toString();
   });
   try {
-    await waitForServer(`${base}/`, 90000);
+    await waitForChildReady(() => output, 90000);
     const workspace = await get(`${base}/workspace`);
-    assert.notEqual(workspace.status, 500, workspace.body.slice(0, 500));
+    assert.notEqual(workspace.status, 500, workspace.body.slice(0, 800));
+    assert.equal(workspace.body.includes("Failed to compile"), false, workspace.body.slice(0, 800));
     const home = await get(`${base}/`);
     assert.equal(home.status, 200, home.body.slice(0, 400));
+    assert.equal(home.body.includes("Failed to compile"), false, home.body.slice(0, 400));
     const download = await get(`${base}/download`);
     assert.equal(download.status, 200, download.body.slice(0, 400));
+    assert.equal(download.body.includes("Failed to compile"), false, download.body.slice(0, 400));
     const api = await get(`${base}/api/download?platform=win`);
     assert.notEqual(api.status, 500, api.body.slice(0, 400));
     assert.ok(api.status === 404 || api.status === 200 || api.status === 302);
   } finally {
     child.kill("SIGTERM");
-    await new Promise((r) => setTimeout(r, 500));
-    if (!child.killed) child.kill("SIGKILL");
-    void output;
+    await new Promise((r) => setTimeout(r, 800));
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* gone */
+    }
   }
 });
 

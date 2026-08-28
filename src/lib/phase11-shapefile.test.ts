@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { buildProjectCatalog } from "./catalog/build.ts";
-import { inspectShapefilePath } from "./catalog/adapters/shapefile.ts";
+import { inspectShapefilePath } from "./catalog/adapters/shapefile-node.ts";
 import { shapefileReadyForSupport } from "./catalog/shapefile-contract.ts";
 import { applyReviewedVectorRole } from "./catalog/vector-role.ts";
 import { collectPlanInputs } from "./plan-intent.ts";
