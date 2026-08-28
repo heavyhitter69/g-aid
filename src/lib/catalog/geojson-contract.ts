@@ -233,6 +233,7 @@ export function inspectGeojsonText(
     geometry?: { type?: string; coordinates?: unknown };
     properties?: Record<string, unknown>;
     id?: unknown;
+    coordinates?: unknown;
   };
 
   const features: Array<{

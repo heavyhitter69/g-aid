@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildProjectCatalog } from "@/lib/catalog/build";
 import { layersOverlappingVectors } from "@/lib/gis-product";
+import type { CrsAxisOrder, GeojsonContractKind } from "@/lib/map/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -140,8 +141,8 @@ export async function GET(): Promise<Response> {
     formatId: "geojson",
     bbox: layer.bbox,
     crs: layer.crs,
-    geojsonContract: layer.geojson_contract,
-    coordinateOrder: layer.coordinate_order,
+    geojsonContract: layer.geojson_contract as GeojsonContractKind | undefined,
+    coordinateOrder: layer.coordinate_order as CrsAxisOrder | undefined,
   }));
   const bboxHits = layersOverlappingVectors(overlapLayers);
   return Response.json({

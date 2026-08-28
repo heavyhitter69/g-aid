@@ -1,5 +1,7 @@
 import type { CrsAxisOrder, CrsInfo, GeojsonContractKind, OverlayDecision } from "./types.ts";
 
+export type { CrsAxisOrder, CrsInfo, GeojsonContractKind, OverlayDecision };
+
 const EPSG_RE = /EPSG[:\s]*([0-9]{4,6})/i;
 const AUTHORITY_RE = /AUTHORITY\["EPSG","(\d+)"\]/gi;
 

@@ -62,7 +62,7 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
   const filename = path.basename(relativePath);
   const extension = fileExtension(filename);
   const parseErrors: string[] = [];
-  let peek = Buffer.alloc(0);
+  let peek: ReturnType<typeof peekFile> = Buffer.alloc(0);
   try {
     peek = peekFile(absPath, stat.size, extension === "las" || extension === "geojson" ? 65536 : undefined);
   } catch (err) {

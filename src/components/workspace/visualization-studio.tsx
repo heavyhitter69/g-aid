@@ -563,7 +563,7 @@ export function VisualizationStudio() {
       : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
-  ].filter(Boolean);
+  ].filter((warning): warning is string => Boolean(warning));
 
   function moveLayer(id: string, dir: -1 | 1) {
     setLayerOrder((current) => {

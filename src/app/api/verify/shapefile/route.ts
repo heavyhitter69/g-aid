@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildProjectCatalog } from "@/lib/catalog/build";
 import { layersOverlappingVectors } from "@/lib/gis-product";
+import type { CrsAxisOrder } from "@/lib/map/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -159,7 +160,7 @@ export async function GET(): Promise<Response> {
     formatId: "shapefile",
     bbox: layer.bbox,
     crs: layer.crs,
-    coordinateOrder: layer.coordinate_order,
+    coordinateOrder: layer.coordinate_order as CrsAxisOrder | undefined,
   }));
   const bboxHits = layersOverlappingVectors(overlapLayers);
   return Response.json({

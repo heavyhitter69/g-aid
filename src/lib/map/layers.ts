@@ -8,6 +8,8 @@ import { gravityProductWarnings, isNearZoneTerrainPath } from "../gravity-produc
 import { gisLayerHeading, gisProductWarnings } from "../gis-product.ts";
 import { geochemLayerHeading, geochemProductWarnings } from "../geochem-product.ts";
 
+export type { MapLayerSpec, RunArtifact };
+
 function posix(path: string): string {
   return path.replace(/\\/g, "/");
 }

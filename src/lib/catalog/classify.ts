@@ -1,5 +1,5 @@
-import type { CatalogInspection, CatalogRecord, DomainHint, MediaClass, SupportStatus } from "./types.ts";
-import type { AdapterSniff, CatalogAdapter, SniffContext } from "./adapters/types.ts";
+import type { CatalogRecord, DomainHint, MediaClass, SupportStatus } from "./types.ts";
+import type { AdapterSniff, CatalogAdapter, CatalogInspection, SniffContext } from "./adapters/types.ts";
 import { adapterRegistry } from "./registry.ts";
 
 export interface Classification {
