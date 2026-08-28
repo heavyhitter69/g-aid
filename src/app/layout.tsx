@@ -16,7 +16,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "G-AID",
-  description: "Intelligent multi-agent geophysical platform powered by G-AID",
+  description: "Local desktop workspace for geophysical survey files",
+  icons: {
+    icon: [{ url: "/favicon.ico" }, { url: "/icon.png" }],
+  },
 };
 
 export default function RootLayout({

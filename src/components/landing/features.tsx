@@ -20,10 +20,10 @@ export function Features() {
           className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-primary">
-            Enterprise <span className="text-primary">Capabilities</span>
+            What the desktop workspace does
           </h2>
           <p className="text-zinc-300 max-w-2xl mx-auto">
-            Built for exploration teams, research institutions, and consulting firms
+            Shipment 13 capability packs on a local Electron app — not a cloud platform.
           </p>
         </motion.div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

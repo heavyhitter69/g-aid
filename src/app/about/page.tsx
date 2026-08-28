@@ -5,68 +5,62 @@ import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { AnimatedBackground } from "@/components/shared/animated-background";
 import { CuratedPill } from "@/components/landing/curated-pill";
-import { 
-  Compass, 
-  Cpu, 
-  Globe, 
-  Layers, 
-  ShieldAlert, 
-  Zap, 
-  ArrowUpRight 
+import {
+  Compass,
+  HardDrive,
+  Layers,
+  ShieldAlert,
+  ArrowUpRight,
 } from "lucide-react";
 import Link from "next/link";
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
 const STATS = [
-  { value: "7+", label: "Geophysical Disciplines" },
-  { value: "60%", label: "Latency Reduction" },
-  { value: "100%", label: "Physics-Calibrated" },
-  { value: "24/7", label: "Agentic Orchestration" },
+  { value: "Local", label: "Desktop workspace" },
+  { value: "S13", label: "Shipment 13 packs" },
+  { value: "2D", label: "Maps and sections" },
+  { value: "No GA", label: "Installers unpublished" },
 ];
 
 const PRINCIPLES = [
   {
-    icon: Cpu,
-    title: "Multi-Agent Orchestration",
-    desc: "Every domain boots its own agent pre-loaded with specialized priors. Multiple agents work collaboratively to cross-validate interpretations.",
+    icon: HardDrive,
+    title: "Local-first files",
+    desc: "Survey data stays in folders on your machine. G-AID is an Electron desktop workspace, not a hosted cloud project system.",
   },
   {
     icon: Layers,
-    title: "Layered Visualization",
-    desc: "3D subsurface renders, ERT inversion grids, and voxel point clouds dynamically layered together for unparalleled structural context.",
+    title: "Packs with limits",
+    desc: "Magnetics, gravity near-zone, ERT ingest, radiometrics, GPR, LAS, geochemistry, GeoJSON, and shapefiles. Experimental invert2d is labelled experimental. Complete Bouguer is not auto-granted.",
   },
   {
-    icon: Globe,
-    title: "Scientific Fidelity",
-    desc: "All interpretations are strictly bound to thermodynamic, gravitational, and electromagnetic physical models for absolute reliability.",
+    icon: Compass,
+    title: "Maps, not voxels",
+    desc: "The live UI is 2D grids, vectors, radargrams, logs, and sections. There is no production 3D voxel or WebGL volume renderer.",
   },
   {
-    icon: Zap,
-    title: "Autonomous Workflows",
-    desc: "From raw data ingestion to inversion, agents automate repetitive QA/QC checks, allowing geophysicists to focus on the big picture.",
+    icon: ShieldAlert,
+    title: "Refuse rather than fake",
+    desc: "Unsupported formats and unfinished physics are documented as out of scope instead of presented as finished cloud agents.",
   },
 ];
 
 const TIMELINE = [
   {
-    year: "2024",
-    title: "Conception",
-    desc: "G-AID was founded with a singular focus: to bring agentic LLM architectures to highly specialized geophysical datasets.",
+    year: "Research",
+    title: "Desktop prototype",
+    desc: "G-AID started as a local workspace for geophysical survey files, maps, and processing packs — not as a public SaaS.",
   },
   {
-    year: "2025",
-    title: "Alpha Release",
-    desc: "Initial deployment of three core agents (Seismology, Magnetics, and ERT) showing 40% efficiency gains in pipeline configuration.",
+    year: "Shipment 13",
+    title: "Capability packs",
+    desc: "Catalog/DAG foundation plus magnetics, gravity near-zone and zoned planar, ERT ingest, RAD 1.0, GPR 1.0, LAS 2.0, GEOCHEM 1.0, GeoJSON CRS84, and shapefiles with topology-aware holes.",
   },
   {
-    year: "2026",
-    title: "General Availability (1.0)",
-    desc: "Expansion to seven major disciplines, launching a fully modular desktop interface and general availability cloud framework.",
+    year: "Now",
+    title: "Public site integrity",
+    desc: "This website describes that desktop software honestly. Public installers, billed accounts, and hosted inference are not available.",
   },
 ];
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AboutPage() {
   return (
@@ -77,7 +71,6 @@ export default function AboutPage() {
       <AnimatedBackground variant="grid" />
       <Navbar />
 
-      {/* Hero Section */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-32 pb-16">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <motion.div
@@ -86,7 +79,7 @@ export default function AboutPage() {
             transition={{ duration: 0.4 }}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-mono text-[var(--text-secondary)] mb-6"
           >
-            GEOPHYSICS - AGENT ITERATION DOMAIN
+            LOCAL DESKTOP GEOPHYSICS WORKSPACE
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 16 }}
@@ -95,7 +88,7 @@ export default function AboutPage() {
             className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6"
             style={{ color: "var(--text-primary)" }}
           >
-            Empowering Earth Science with Intelligent Agents
+            A local workspace for earth-science survey files
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -104,11 +97,12 @@ export default function AboutPage() {
             className="text-lg leading-relaxed"
             style={{ color: "var(--text-secondary)" }}
           >
-            G-AID bridges specialized geophysical interpretation with cutting-edge multi-agent systems. We build robust tools that allow scientists to visualize, simulate, and automate complex subsurface exploration.
+            G-AID is built by Genie Platforms as an Electron + Next.js + Python desktop
+            app. It helps you catalog, map, and process supported geophysical files on
+            your own machine. It is not a general-availability cloud product.
           </motion.p>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-24">
           {STATS.map((stat, i) => (
             <motion.div
@@ -132,17 +126,15 @@ export default function AboutPage() {
           ))}
         </div>
 
-        {/* Divider */}
         <hr className="border-t mb-24" style={{ borderColor: "var(--border-subtle)" }} />
 
-        {/* Core Principles */}
         <div className="mb-24">
           <div className="max-w-2xl mb-16">
             <h2 className="text-3xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-              The Pillars of G-AID
+              How G-AID is built
             </h2>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              Our platform architecture is built around ensuring maximum precision, collaborative modeling, and modern visualization systems.
+              The public site describes the desktop software that exists today, including its limits.
             </p>
           </div>
 
@@ -178,21 +170,20 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* Story / Timeline */}
         <div className="mb-24">
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-1">
-              <h2 className="text-3xl font-bold mb-4 animate-pulse" style={{ color: "var(--text-primary)" }}>
-                Our Journey
+              <h2 className="text-3xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
+                Status
               </h2>
               <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
-                From a bold prototype in a geophysics lab to a comprehensive multi-agent workspace used worldwide, we have consistently pushed computational boundaries.
+                Shipment 13 is the current capability set. A public installer and hosted accounts are not part of that shipment.
               </p>
               <Link
                 href="/download"
                 className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-[#e8613a] hover:underline"
               >
-                Get Started Today
+                Desktop app status
                 <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>
@@ -221,17 +212,15 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* Divider */}
         <hr className="border-t mb-24" style={{ borderColor: "var(--border-subtle)" }} />
 
-        {/* Key Collaborators */}
         <div className="mb-24">
           <div className="max-w-2xl mb-12">
             <h2 className="text-3xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-              Key Collaborators
+              Contributors
             </h2>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              G-AID is built and curated in close academic and technical collaboration with esteemed research leaders.
+              G-AID is developed at Genie Platforms with academic collaborators.
             </p>
           </div>
 
@@ -239,7 +228,7 @@ export default function AboutPage() {
             {[
               { name: "Daniel Amoah", role: "Lead Core Contributor" },
               { name: "Prof. Forson", role: "Academic & Science Advisor" },
-              { name: "Prof. Amponsah", role: "Geophysical Inversion Director" }
+              { name: "Prof. Amponsah", role: "Geophysical Inversion Director" },
             ].map((collab, i) => (
               <motion.div
                 key={collab.name}
@@ -266,7 +255,6 @@ export default function AboutPage() {
               </motion.div>
             ))}
 
-            {/* Dev Pill Card */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -280,11 +268,10 @@ export default function AboutPage() {
               <div className="text-[10px] font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>
                 Curated By
               </div>
-              <CuratedPill devHref="#" />
+              <CuratedPill devHref={null} />
             </motion.div>
           </div>
         </div>
-
       </section>
 
       <Footer />

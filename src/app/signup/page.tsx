@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useAppStore } from "@/store/app-store";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { getAgentForDiscipline, DISCIPLINES } from "@/lib/data";
 import type { DisciplineId, UserRole } from "@/types";
+import { AuthUnavailableNotice } from "@/components/auth/auth-unavailable-notice";
 import {
   Waves, Zap, Droplets, Fuel, Pickaxe, Compass, Leaf,
   ArrowRight, CheckCircle2, User, Mail, Lock, ChevronLeft, ChevronRight, AlertCircle,
@@ -142,6 +143,11 @@ function SignUpBody() {
 
     if (hasError) return;
 
+    if (!hasSupabaseConfig()) {
+      setError("Account creation is not available in this environment.");
+      return;
+    }
+
     setCreating(true);
 
     try {
@@ -247,7 +253,7 @@ function SignUpBody() {
               ))}
             </div>
             <p className="text-xs text-zinc-600 font-mono mt-4">
-              Calibrating geophysical interpretation models...
+              Preparing a local desktop workspace...
             </p>
           </figure>
         </aside>
@@ -278,7 +284,13 @@ function SignUpBody() {
                   transition={{ duration: 0.3, ease: "easeInOut" }}
                 >
                   <h1 className="text-2xl font-bold mb-1 text-white">Create your account</h1>
-                  <p className="text-zinc-500 mb-6 text-sm">Step 1 of 2 — Your credentials</p>
+                  <p className="text-zinc-500 mb-6 text-sm">Step 1 of 2 — Your credentials. Optional, and only if authentication is configured.</p>
+
+                  {!hasSupabaseConfig() && (
+                    <div className="mb-4">
+                      <AuthUnavailableNotice title="Account creation is not available here" />
+                    </div>
+                  )}
 
                   {error && (
                     <p role="alert" className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
@@ -495,10 +507,10 @@ function SignUpBody() {
                       </button>
                       <button
                         type="submit"
-                        disabled={creating}
+                        disabled={creating || !hasSupabaseConfig()}
                         className="flex-1 h-11 rounded-lg bg-white text-black font-semibold text-sm hover:bg-zinc-100 active:bg-zinc-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {creating ? "Creating account..." : "Done — Create Account"}
+                        {creating ? "Creating account..." : hasSupabaseConfig() ? "Done — Create Account" : "Unavailable"}
                       </button>
                     </div>
                   </form>

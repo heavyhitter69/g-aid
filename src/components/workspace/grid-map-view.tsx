@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map as MapIcon } from "lucide-react";
 import { parseEsriAscii, type RasterGrid } from "@/lib/map/ascii";
 
+export { parseEsriAscii };
+export type { RasterGrid };
+
 export type OverlayPolygon =
   | { x: number; y: number }[]
   | { exterior: { x: number; y: number }[]; holes?: { x: number; y: number }[][] };

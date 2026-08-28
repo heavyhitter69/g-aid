@@ -1,0 +1,251 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import { catalogFromGithubRelease, emptyDownloadCatalog, matchPlatformAsset } from "./public-download.ts";
+import { parseEsriAscii } from "./map/ascii.ts";
+import { isUsableSupabaseConfig } from "./supabase/config.ts";
+
+let failed = 0;
+function test(name: string, fn: () => void | Promise<void>) {
+  return Promise.resolve()
+    .then(fn)
+    .then(() => {
+      console.log(`ok  ${name}`);
+    })
+    .catch((err) => {
+      failed += 1;
+      console.error(`not ok  ${name}`);
+      console.error(err);
+    });
+}
+
+const root = process.cwd();
+
+function read(rel: string) {
+  return fs.readFileSync(path.join(root, rel), "utf8");
+}
+
+function walkFiles(dir: string, acc: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return acc;
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) walkFiles(full, acc);
+    else if (/\.(tsx|ts|jsx|js)$/.test(ent.name)) acc.push(full);
+  }
+  return acc;
+}
+
+const MARKETING_DIRS = [
+  "src/app/about",
+  "src/app/docs",
+  "src/app/download",
+  "src/app/release-notes",
+  "src/app/privacy",
+  "src/app/terms",
+  "src/app/security",
+  "src/app/data-use",
+  "src/app/signin",
+  "src/app/signup",
+  "src/app/onboarding",
+  "src/app/auth",
+  "src/components/landing",
+];
+
+const FORBIDDEN_CLAIMS = [
+  "SOC 2",
+  "ISO 27001",
+  "BYOK",
+  "Stripe",
+  "signed and notarized",
+  "Launch Demo Workspace",
+  "Cloud Workspaces",
+  "zero-knowledge",
+  "14x Faster",
+  "Raw SEGY Ingestion",
+  "G-AID Setup",
+  "Hardware Security Module",
+  "/workspace/verify",
+  'href="#"',
+];
+
+await test("grid-map-view re-exports parseEsriAscii so workspace compile cannot 500 marketing", () => {
+  const source = read("src/components/workspace/grid-map-view.tsx");
+  assert.match(source, /export \{\s*parseEsriAscii\s*\}/);
+  const editor = read("src/components/workspace/file-editor.tsx");
+  assert.match(editor, /import \{ parseEsriAscii \} from "@\/lib\/map\/ascii"/);
+  const sample = "ncols 1\nnrows 1\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n1\n";
+  assert.ok(parseEsriAscii(sample));
+});
+
+await test("hero and CTA route downloads to /download, not a missing installer file", () => {
+  const hero = read("src/components/landing/hero.tsx");
+  const cta = read("src/components/landing/cta.tsx");
+  const navbar = read("src/components/landing/navbar.tsx");
+  assert.match(hero, /href="\/download"/);
+  assert.equal(hero.includes(".exe"), false);
+  assert.equal(hero.includes("Launch Demo Workspace"), false);
+  assert.match(cta, /href="\/download"/);
+  assert.match(navbar, /href="\/download"/);
+  assert.equal(navbar.includes("Demo Workspace"), false);
+  assert.equal(navbar.includes("handleEnterDemo"), false);
+});
+
+await test("download catalog is unpublished when GitHub has no assets", () => {
+  const empty = catalogFromGithubRelease(null);
+  assert.equal(empty.published, false);
+  assert.equal(empty.platforms.win, undefined);
+  assert.match(empty.message, /not been published/i);
+
+  const noAssets = catalogFromGithubRelease({ tag_name: "v9.9.9", assets: [] });
+  assert.equal(noAssets.published, false);
+
+  const win = matchPlatformAsset(
+    [{ name: "G-AID-Setup.exe", browser_download_url: "https://example.test/a.exe", size: 12 }],
+    "win"
+  );
+  assert.equal(win?.url, "https://example.test/a.exe");
+
+  const published = catalogFromGithubRelease({
+    tag_name: "v0.2.0",
+    published_at: "2026-08-28T00:00:00Z",
+    assets: [{ name: "G-AID-Setup.exe", browser_download_url: "https://example.test/a.exe", size: 100 }],
+  });
+  assert.equal(published.published, true);
+  assert.equal(published.version, "v0.2.0");
+  assert.equal(emptyDownloadCatalog().published, false);
+});
+
+await test("download page shows unavailable copy until a release exists", () => {
+  const page = read("src/app/download/page.tsx");
+  assert.match(page, /Installers are not available yet/);
+  assert.equal(page.includes("signed and notarized"), false);
+  assert.equal(/version\s*1\.0/i.test(page), false);
+  assert.equal(page.includes("May 2026"), false);
+  assert.equal(page.includes(">1.0<"), false);
+  assert.match(page, /\/api\/download\?info=1/);
+});
+
+await test("placeholder Supabase is unconfigured and sign-in surfaces that state", () => {
+  assert.equal(isUsableSupabaseConfig("https://placeholder.supabase.co", "eyJplaceholder"), false);
+  const signin = read("src/app/signin/page.tsx");
+  assert.match(signin, /AuthUnavailableNotice/);
+  assert.match(signin, /hasSupabaseConfig/);
+  assert.equal(signin.includes("Google"), false);
+  assert.equal(/GitHub/.test(signin), false);
+  const signup = read("src/app/signup/page.tsx");
+  assert.match(signup, /AuthUnavailableNotice/);
+  const notice = read("src/components/auth/auth-unavailable-notice.tsx");
+  assert.match(notice, /data-testid="auth-unavailable"/);
+});
+
+await test("marketing copy does not include unsupported product claims", () => {
+  const files = [
+    path.join(root, "src/app/page.tsx"),
+    ...MARKETING_DIRS.flatMap((dir) => walkFiles(path.join(root, dir))),
+    path.join(root, "src/lib/data.ts"),
+  ];
+  const hits: string[] = [];
+  for (const file of files) {
+    const text = fs.readFileSync(file, "utf8");
+    for (const claim of FORBIDDEN_CLAIMS) {
+      if (text.includes(claim)) hits.push(`${path.relative(root, file)}: ${claim}`);
+    }
+  }
+  assert.deepEqual(hits, []);
+});
+
+await test("navbar/footer do not expose verify routes or placeholder socials", () => {
+  const navbar = read("src/components/landing/navbar.tsx");
+  const footer = read("src/components/landing/footer.tsx");
+  assert.equal(navbar.includes("/workspace/verify"), false);
+  assert.equal(footer.includes("/workspace/verify"), false);
+  assert.equal(footer.includes('href="#"'), false);
+  assert.equal(footer.includes("Demo Workspace"), false);
+  assert.match(footer, /github.com\/heavyhitter69\/g-aid/);
+});
+
+await test("public serving path does not include leftover starter assets or internal tasks", () => {
+  assert.equal(fs.existsSync(path.join(root, "public/g-aid output")), false);
+  assert.equal(fs.existsSync(path.join(root, "public/vercel.svg")), false);
+  assert.equal(fs.existsSync(path.join(root, "public/next.svg")), false);
+  assert.equal(fs.existsSync(path.join(root, "public/file.svg")), false);
+  assert.equal(fs.existsSync(path.join(root, "public/globe.svg")), false);
+  assert.equal(fs.existsSync(path.join(root, "public/window.svg")), false);
+  assert.equal(fs.existsSync(path.join(root, "src/app/favicon.ico")) || fs.existsSync(path.join(root, "public/favicon.ico")), true);
+});
+
+function get(url: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        resolve({ status: res.statusCode || 0, body: Buffer.concat(chunks).toString("utf8") });
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(20000, () => {
+      req.destroy(new Error("timeout"));
+    });
+  });
+}
+
+function waitForServer(url: string, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      http
+        .get(url, (res) => {
+          res.resume();
+          resolve();
+        })
+        .on("error", () => {
+          if (Date.now() - start > timeoutMs) reject(new Error("server did not start"));
+          else setTimeout(tick, 400);
+        });
+    };
+    tick();
+  });
+}
+
+await test("visiting /workspace does not 500 /, /download, or /api/download", async () => {
+  const port = 3055;
+  const base = `http://127.0.0.1:${port}`;
+  const child = spawn("npx", ["next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
+    cwd: root,
+    env: { ...process.env },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  child.stdout?.on("data", (d) => {
+    output += d.toString();
+  });
+  child.stderr?.on("data", (d) => {
+    output += d.toString();
+  });
+  try {
+    await waitForServer(`${base}/`, 90000);
+    const workspace = await get(`${base}/workspace`);
+    assert.notEqual(workspace.status, 500, workspace.body.slice(0, 500));
+    const home = await get(`${base}/`);
+    assert.equal(home.status, 200, home.body.slice(0, 400));
+    const download = await get(`${base}/download`);
+    assert.equal(download.status, 200, download.body.slice(0, 400));
+    const api = await get(`${base}/api/download?platform=win`);
+    assert.notEqual(api.status, 500, api.body.slice(0, 400));
+    assert.ok(api.status === 404 || api.status === 200 || api.status === 302);
+  } finally {
+    child.kill("SIGTERM");
+    await new Promise((r) => setTimeout(r, 500));
+    if (!child.killed) child.kill("SIGKILL");
+    void output;
+  }
+});
+
+if (failed) {
+  console.error(`\n${failed} failed`);
+  process.exit(1);
+}
+console.log("\nall tests passed");

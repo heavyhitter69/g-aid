@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Download, ChevronUp, ArrowRight, Check, Clock, Shield } from "lucide-react";
+import { Clock } from "lucide-react";
 import { AnimatedBackground } from "@/components/shared/animated-background";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import Link from "next/link";
-
-// ─── OS Icon Components ───────────────────────────────────────────────────────
+import type { DownloadCatalog } from "@/lib/public-download";
 
 function AppleIcon() {
   return (
@@ -35,120 +34,34 @@ function LinuxIcon() {
   );
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface DownloadEntry {
-  label: string;
-  href: string;
-  available: boolean;
-  fileSize?: string;
-}
-
-interface OsSection {
-  os: "macOS" | "Windows" | "Linux";
-  icon: React.ReactNode;
-  entries: DownloadEntry[];
-}
-
-// ─── Data ────────────────────────────────────────────────────────────────────
-
-const OS_SECTIONS: OsSection[] = [
-  {
-    os: "macOS",
-    icon: <AppleIcon />,
-    entries: [
-      { label: "Mac (Universal) — Setup", href: "/api/download?platform=mac", available: true },
-    ],
-  },
-  {
-    os: "Windows",
-    icon: <WindowsIcon />,
-    entries: [
-      { label: "Windows (x64) — Setup", href: "/api/download?platform=win", available: true },
-    ],
-  },
-  {
-    os: "Linux",
-    icon: <LinuxIcon />,
-    entries: [
-      { label: "Linux AppImage", href: "/api/download?platform=linux", available: true },
-    ],
-  },
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
+  if (bytes === 0) return "";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
-
-// ─── OS Column ────────────────────────────────────────────────────────────────
-
-function OsColumn({ section, winSize }: { section: OsSection; winSize: string | null }) {
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-2 text-white font-semibold text-sm mb-4 pb-3 border-b border-white/10">
-        {section.icon}
-        <span>{section.os}</span>
-      </div>
-      <ul className="divide-y divide-white/5">
-        {section.entries.map((entry) => (
-          <li key={entry.label}>
-            {entry.available ? (
-              <a
-                href={entry.href}
-                className="flex items-center justify-between py-3 px-1 text-[13px] text-zinc-400 hover:text-white group transition-colors duration-150"
-              >
-                <div className="flex items-center gap-2">
-                  <span>{entry.label}</span>
-                  {section.os === "Windows" && winSize && (
-                    <span className="text-[11px] text-zinc-600 font-mono">({winSize})</span>
-                  )}
-                </div>
-                <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-3" />
-              </a>
-            ) : (
-              <div className="flex items-center justify-between py-3 px-1 text-[13px] text-zinc-600 cursor-default">
-                <div className="flex items-center gap-2">
-                  <span>{entry.label}</span>
-                </div>
-                <span className="flex items-center gap-1 text-[11px] text-zinc-700 font-mono">
-                  <Clock className="w-3 h-3" />
-                  Soon
-                </span>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DownloadPage() {
-  const [winSize, setWinSize] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<DownloadCatalog | null>(null);
 
   useEffect(() => {
-    // Check if the Windows installer is available and get its size
-    fetch("/api/download?platform=win&arch=x64", { method: "HEAD" })
-      .then((res) => {
-        if (res.ok) {
-          const contentLength = res.headers.get("content-length");
-          if (contentLength) {
-            setWinSize(formatBytes(parseInt(contentLength, 10)));
-          }
-        }
-      })
-      .catch(() => {
-        // Installer not available yet, that's fine
-      });
+    fetch("/api/download?info=1")
+      .then((res) => res.json())
+      .then((data: DownloadCatalog) => setCatalog(data))
+      .catch(() =>
+        setCatalog({
+          published: false,
+          version: null,
+          publishedAt: null,
+          platforms: {},
+          message: "Could not check for public installers. Try again later.",
+        })
+      );
   }, []);
+
+  const published = Boolean(catalog?.published);
+  const loading = catalog === null;
 
   return (
     <main className="relative min-h-screen bg-[#0a0a0a] text-white">
@@ -156,7 +69,6 @@ export default function DownloadPage() {
       <Navbar />
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 pt-32 pb-20">
-        {/* Page header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -168,88 +80,119 @@ export default function DownloadPage() {
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Download</h1>
           <p className="text-zinc-500 text-sm">
-            Available for macOS, Windows, and Linux. All builds are signed and notarized.
+            G-AID is a local Electron desktop workspace. Public installers are published only when a GitHub Release exists.
           </p>
         </motion.div>
 
-        {/* Installer features */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="flex flex-wrap gap-6 mb-8"
-        >
-          {([] as { text: string; icon: React.ReactNode }[]).map((feature) => (
-            <div
-              key={feature.text}
-              className="flex items-center gap-2 text-zinc-500 text-xs"
-            >
-              <span className="text-[#e8613a]">{feature.icon}</span>
-              <span>{feature.text}</span>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Version block */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
           className="border border-white/10 rounded-xl overflow-hidden bg-[#141414]"
         >
-          {/* Version header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <span className="text-white font-bold text-base">1.0</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-white/20 text-zinc-400">
-                Latest
+              <span className="text-white font-bold text-base">
+                {published ? catalog?.version : "Shipment 13"}
               </span>
-              <span className="text-zinc-600 text-xs font-mono">May 2026</span>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-white/20 text-zinc-400">
+                {published ? "Latest release" : "No public installer"}
+              </span>
             </div>
-            <ChevronUp className="w-4 h-4 text-zinc-500" />
           </div>
 
-          {/* OS columns */}
-          <div className="px-6 pb-6 pt-4">
-            <div className="flex gap-6">
-              {OS_SECTIONS.map((section) => (
-                <OsColumn key={section.os} section={section} winSize={section.os === "Windows" ? winSize : null} />
-              ))}
+          {loading ? (
+            <p className="px-6 py-10 text-sm text-zinc-500">Checking GitHub Releases…</p>
+          ) : published ? (
+            <div className="px-6 pb-6 pt-4 grid md:grid-cols-3 gap-6">
+              {(
+                [
+                  { os: "macOS", icon: <AppleIcon />, platform: "mac" as const, label: "Mac (Universal) — Setup" },
+                  { os: "Windows", icon: <WindowsIcon />, platform: "win" as const, label: "Windows (x64) — Setup" },
+                  { os: "Linux", icon: <LinuxIcon />, platform: "linux" as const, label: "Linux installer" },
+                ] as const
+              ).map((section) => {
+                const asset = catalog?.platforms[section.platform];
+                return (
+                  <div key={section.os} className="min-w-0">
+                    <div className="flex items-center gap-2 text-white font-semibold text-sm mb-4 pb-3 border-b border-white/10">
+                      {section.icon}
+                      <span>{section.os}</span>
+                    </div>
+                    {asset ? (
+                      <a
+                        href={`/api/download?platform=${section.platform}`}
+                        className="flex items-center justify-between py-3 text-[13px] text-zinc-400 hover:text-white"
+                      >
+                        <span>
+                          {section.label}
+                          {asset.size ? (
+                            <span className="ml-2 text-[11px] text-zinc-600 font-mono">
+                              ({formatBytes(asset.size)})
+                            </span>
+                          ) : null}
+                        </span>
+                      </a>
+                    ) : (
+                      <p className="py-3 text-[13px] text-zinc-600">No installer for this platform in the latest release.</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+          ) : (
+            <div className="px-6 py-10">
+              <div className="flex items-start gap-3 text-zinc-400">
+                <Clock className="w-5 h-5 shrink-0 mt-0.5 text-zinc-500" />
+                <div>
+                  <p className="text-white font-medium mb-2">Installers are not available yet</p>
+                  <p className="text-sm leading-relaxed text-zinc-500" data-testid="download-unavailable">
+                    {catalog?.message ||
+                      "No public installer release has been published yet. G-AID currently runs as a local desktop app from source. This page will list Mac, Windows, and Linux builds when a GitHub Release is published."}
+                  </p>
+                  <p className="text-sm mt-4 text-zinc-500">
+                    There is no waitlist form on this site. Watch{" "}
+                    <a
+                      href="https://github.com/heavyhitter69/g-aid/releases"
+                      className="text-zinc-300 underline underline-offset-2 hover:text-white"
+                    >
+                      GitHub Releases
+                    </a>{" "}
+                    for the first public installer.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-            {/* Release notes link */}
-            <div className="mt-6">
-              <Link
-                href="/release-notes"
-                className="inline-flex items-center gap-1.5 text-sm text-[#e8613a] hover:text-[#f07858] transition-colors"
-              >
-                View release notes
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+          <div className="px-6 pb-6">
+            <Link
+              href="/release-notes"
+              className="inline-flex items-center gap-1.5 text-sm text-[#e8613a] hover:text-[#f07858] transition-colors"
+            >
+              View capability notes
+            </Link>
           </div>
         </motion.div>
 
-        {/* What gets installed */}
-        {/* Footer note */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
           className="mt-10 text-zinc-600 text-xs"
         >
-          By downloading G-AID you agree to the{" "}
+          By using G-AID you agree to the{" "}
           <Link href="/terms" className="text-zinc-500 hover:text-white underline underline-offset-2 transition-colors">
-            License Agreement
+            Terms of Service
           </Link>
           . Need help?{" "}
           <Link href="/docs" className="text-zinc-500 hover:text-white underline underline-offset-2 transition-colors">
-            View the docs
+            Read the docs
           </Link>
           .
         </motion.p>
       </div>
-        <Footer />
-      </main>
-    );
+      <Footer />
+    </main>
+  );
 }

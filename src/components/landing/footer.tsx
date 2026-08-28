@@ -4,9 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAppStore } from "@/store/app-store";
-import { useRouter } from "next/navigation";
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const COLUMNS = [
   {
@@ -23,7 +20,6 @@ const COLUMNS = [
       { label: "Disciplines", href: "/#disciplines" },
       { label: "Features", href: "/#features" },
       { label: "About", href: "/about" },
-      { label: "Demo Workspace", href: "/workspace" },
     ],
   },
   {
@@ -36,17 +32,10 @@ const COLUMNS = [
     ],
   },
   {
-    heading: "Connect",
-    links: [
-      { label: "X", href: "#" },
-      { label: "LinkedIn", href: "#" },
-      { label: "YouTube", href: "#" },
-      { label: "GitHub", href: "#" },
-    ],
+    heading: "Source",
+    links: [{ label: "GitHub", href: "https://github.com/heavyhitter69/g-aid" }],
   },
 ];
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
 
 function DesktopIcon() {
   return (
@@ -74,21 +63,10 @@ function MoonIcon() {
   );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 type ThemeMode = "system" | "light" | "dark";
 
 export function Footer() {
-  const { 
-    theme, 
-    setTheme,
-    setAuthenticated,
-    setUser,
-    setCurrentProject,
-    setProjectFiles
-  } = useAppStore();
-  
-  const router = useRouter();
+  const { theme, setTheme } = useAppStore();
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<ThemeMode>("system");
 
@@ -96,22 +74,11 @@ export function Footer() {
     setMounted(true);
   }, []);
 
-  const handleEnterDemo = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!mounted) return;
-    setAuthenticated(false);
-    setUser(null);
-    setCurrentProject(null);
-    setProjectFiles([]);
-    router.push("/workspace");
-  };
-
   useEffect(() => {
     if (!mounted) return;
     const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const systemTheme: "dark" | "light" = systemDark ? "dark" : "light";
     setMode(theme === systemTheme ? "system" : theme);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, theme]);
 
   useEffect(() => {
@@ -127,21 +94,25 @@ export function Footer() {
     setMode("system");
     setTheme(systemDark ? "dark" : "light");
   };
-  const handleLight = () => { setMode("light"); setTheme("light"); };
-  const handleDark  = () => { setMode("dark");  setTheme("dark");  };
+  const handleLight = () => {
+    setMode("light");
+    setTheme("light");
+  };
+  const handleDark = () => {
+    setMode("dark");
+    setTheme("dark");
+  };
 
   const handleHashLinkClick = (e: React.MouseEvent, id: string) => {
     if (typeof window !== "undefined" && window.location.pathname === "/") {
       e.preventDefault();
       const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
-      }
+      if (el) el.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-  const btnBase     = "w-7 h-7 rounded flex items-center justify-center transition-all duration-150";
-  const btnActive   = "text-[var(--text-primary)] bg-[var(--subtle)] ring-1 ring-[var(--border-subtle)]";
+  const btnBase = "w-7 h-7 rounded flex items-center justify-center transition-all duration-150";
+  const btnActive = "text-[var(--text-primary)] bg-[var(--subtle)] ring-1 ring-[var(--border-subtle)]";
   const btnInactive = "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--subtle)]";
 
   return (
@@ -153,8 +124,6 @@ export function Footer() {
       }}
     >
       <div className="max-w-7xl mx-auto px-6 pt-16 pb-8">
-
-        {/* Top: logo + columns */}
         <div className="flex flex-col lg:flex-row gap-12 lg:gap-8 mb-16">
           <div className="shrink-0 lg:w-48">
             <Link href="/" className="inline-block mb-3">
@@ -164,7 +133,7 @@ export function Footer() {
               className="text-[11px] leading-relaxed font-mono transition-colors duration-200"
               style={{ color: "var(--text-muted)" }}
             >
-              Geophysics - Agent<br />Iteration Domain
+              Local desktop workspace<br />for geophysical survey data
             </p>
           </div>
 
@@ -180,32 +149,22 @@ export function Footer() {
                 <ul className="space-y-2.5">
                   {col.links.map((link) => (
                     <li key={link.label}>
-                      {link.label === "Demo Workspace" ? (
-                        <button
-                          onClick={handleEnterDemo}
-                          className="text-[13px] text-left transition-colors duration-150 bg-transparent border-none p-0 cursor-pointer font-medium"
-                          style={{ color: "var(--text-secondary)" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
-                        >
-                          {link.label}
-                        </button>
-                      ) : (
-                        <Link
-                          href={link.href}
-                          onClick={(e) => {
-                            if (link.href.startsWith("/#")) {
-                              handleHashLinkClick(e, link.href.substring(2));
-                            }
-                          }}
-                          className="text-[13px] transition-colors duration-150"
-                          style={{ color: "var(--text-secondary)" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
-                        >
-                          {link.label}
-                        </Link>
-                      )}
+                      <Link
+                        href={link.href}
+                        target={link.href.startsWith("http") ? "_blank" : undefined}
+                        rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                        onClick={(e) => {
+                          if (link.href.startsWith("/#")) {
+                            handleHashLinkClick(e, link.href.substring(2));
+                          }
+                        }}
+                        className="text-[13px] transition-colors duration-150"
+                        style={{ color: "var(--text-secondary)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+                      >
+                        {link.label}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -214,7 +173,6 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div
           className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors duration-200"
           style={{ borderColor: "var(--border-subtle)" }}
@@ -226,7 +184,6 @@ export function Footer() {
             <span>© 2026 Genie Platforms. All rights reserved.</span>
           </div>
 
-          {/* Theme switcher */}
           <div
             className="flex items-center gap-0.5 rounded-lg p-0.5 transition-colors duration-200"
             style={{
@@ -248,7 +205,6 @@ export function Footer() {
             </button>
           </div>
         </div>
-
       </div>
     </footer>
   );

@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { AuthUnavailableNotice } from "@/components/auth/auth-unavailable-notice";
 
 export default function DesktopAuthPage() {
   const router = useRouter();
@@ -40,6 +41,11 @@ export default function DesktopAuthPage() {
     }
     if (!password) {
       setPasswordError("Password is required.");
+      return;
+    }
+
+    if (!hasSupabaseConfig()) {
+      setPasswordError("Sign-in is not available in this environment.");
       return;
     }
 
@@ -79,6 +85,9 @@ export default function DesktopAuthPage() {
           <p className="mt-3 text-[#888] text-[17px]">The new way to interpret geophysical data with AI.</p>
 
           <form onSubmit={handleSubmit} noValidate className="mt-10 space-y-4">
+            {!hasSupabaseConfig() && (
+              <AuthUnavailableNotice title="Desktop sign-in is not configured" />
+            )}
             <Input
               label="Email"
               id="email"
@@ -98,9 +107,9 @@ export default function DesktopAuthPage() {
             <Button
               type="submit"
               className="w-full h-12 rounded-md bg-[#2a2a2a] text-white hover:bg-[#333]"
-              disabled={loading}
+              disabled={loading || !hasSupabaseConfig()}
             >
-              {loading ? "Continuing..." : "Continue with email"}
+              {loading ? "Continuing..." : hasSupabaseConfig() ? "Continue with email" : "Sign-in unavailable"}
             </Button>
           </form>
 

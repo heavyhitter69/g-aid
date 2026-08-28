@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PageTransition } from "@/components/shared/page-transition";
 import { useAppStore } from "@/store/app-store";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { isDesktop } from "@/lib/desktop";
 import { profileFromUser } from "@/lib/auth-user";
-import { Mail, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import { AuthUnavailableNotice } from "@/components/auth/auth-unavailable-notice";
 
 function SignInBody() {
   const router = useRouter();
@@ -37,6 +38,7 @@ function SignInBody() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [desktop, setDesktop] = useState(false);
   const [waitingForBrowser, setWaitingForBrowser] = useState(false);
+  const [authConfigured] = useState(() => hasSupabaseConfig());
 
   useEffect(() => {
     setDesktop(isDesktop());
@@ -86,6 +88,11 @@ function SignInBody() {
     }
     if (hasError) return;
 
+    if (!authConfigured) {
+      setPasswordError("Sign-in is not available in this environment.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -131,6 +138,10 @@ function SignInBody() {
             <p className="mt-10 text-sm text-[#888]">
               Finish signing in in your browser, then return to G-AID.
             </p>
+          ) : !authConfigured ? (
+            <div className="mt-10">
+              <AuthUnavailableNotice title="Desktop sign-in is not configured" />
+            </div>
           ) : (
             <div className="mt-10 space-y-3">
               <button
@@ -176,11 +187,14 @@ function SignInBody() {
         <article className="w-full max-w-md glass-panel rounded-2xl p-8 border border-white/10">
           <Logo className="mb-8" disableLink={desktop} />
           <h1 className="text-2xl font-bold mb-2">Welcome back</h1>
-          <p className="text-slate-500 mb-8">
-            Sign in to your{" "}
-            <Image src="/g-aid logo.png" alt="G-AID" width={48} height={16} className="inline object-contain align-middle" />{" "}
-            workspace
+      <p className="text-slate-500 mb-8">
+            Sign in with email if authentication is configured. This is not a public cloud workspace.
           </p>
+          {!authConfigured && (
+            <div className="mb-6">
+              <AuthUnavailableNotice />
+            </div>
+          )}
           <form onSubmit={handleLogin} noValidate className="space-y-4">
             <Input
               label="Email"
@@ -188,8 +202,9 @@ function SignInBody() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="alex@geomind.ai"
+              placeholder="you@example.org"
               error={emailError || undefined}
+              disabled={!authConfigured}
             />
             <PasswordInput
               label="Password"
@@ -198,19 +213,10 @@ function SignInBody() {
               onChange={(e) => setPassword(e.target.value)}
               error={passwordError || undefined}
             />
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Authenticating..." : "Sign In"}
+            <Button type="submit" className="w-full" disabled={loading || !authConfigured}>
+              {loading ? "Authenticating..." : authConfigured ? "Sign In" : "Sign-in unavailable"}
             </Button>
           </form>
-          <p className="my-6 text-center text-xs text-slate-500">OR</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" type="button">
-              <Mail className="h-4 w-4" /> Google
-            </Button>
-            <Button variant="outline" type="button">
-              GitHub
-            </Button>
-          </div>
           <p className="mt-6 text-center text-sm text-slate-500">
             New to <Image src="/g-aid logo.png" alt="G-AID" width={40} height={14} className="inline object-contain align-middle" />?{" "}
             <Link href="/signup" className="text-white hover:underline">
