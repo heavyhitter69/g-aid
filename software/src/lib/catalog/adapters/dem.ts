@@ -50,6 +50,7 @@ function demInspect(ctx: { peekText: string }): CatalogInspection {
     elevationDatum: inspected.elevationDatum,
     ncols: inspected.ncols,
     nrows: inspected.nrows,
+    nodata: inspected.nodata,
     bandCount: 1,
     dataType: "ascii-float",
     compression: "uncompressed",

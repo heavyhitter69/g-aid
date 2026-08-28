@@ -171,6 +171,7 @@ test("catalog classifies GeoTIFF/ASCII/DEM with honest support statuses", () => 
     assert.equal(dem.supportStatus, "supported");
     assert.equal(dem.elevationDatum, "orthometric");
     assert.equal(dem.units, "m");
+    assert.equal(dem.nodata, -9999);
 
     const named = byPath(catalog.records, "dem-filename-only/dem.asc");
     assert.equal(named.formatId, "esri-ascii-grid");

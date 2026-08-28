@@ -28,6 +28,7 @@ export interface DemContractResult {
   nrows?: number;
   errors: string[];
   warnings: string[];
+  nodata?: number;
 }
 
 const COMMENT_RE =
@@ -49,13 +50,14 @@ function parseAsciiHeader(text: string): {
   cellsize?: number;
   xll?: number;
   yll?: number;
+  nodata?: number;
 } {
   const map: Record<string, number> = {};
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || /^[/#;]/.test(trimmed)) continue;
     const match = trimmed.match(
-      /^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize)\s+([-+0-9.eE]+)/i
+      /^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize|nodata_value)\s+([-+0-9.eE]+)/i
     );
     if (!match) {
       if (Object.keys(map).length) break;
@@ -74,6 +76,7 @@ function parseAsciiHeader(text: string): {
     cellsize: cell,
     xll,
     yll,
+    nodata: map.nodata_value,
   };
 }
 
@@ -153,6 +156,7 @@ export function inspectDemText(text: string): DemContractResult {
     cellSizeM: Number.isFinite(header.cellsize) ? header.cellsize : undefined,
     ncols: header.ncols,
     nrows: header.nrows,
+    nodata: Number.isFinite(header.nodata) ? header.nodata : undefined,
     errors: looksLikeDem ? errors : [],
     warnings,
   };
