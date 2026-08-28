@@ -1,0 +1,32 @@
+{
+  "product_name": "G-AID documented raster layer",
+  "supported_format": "Classic GeoTIFF/COG metadata and uncompressed Classic TIFF strip pixels (uint8/uint16/int16/int32/float32, band 1), ESRI ASCII grids, documented DEM ASCII for terrain view",
+  "capabilities": [
+    "gis.raster_inspect",
+    "gis.raster_view",
+    "gis.terrain_view"
+  ],
+  "passed": true,
+  "support_bar_for_this_pack": "met_with_documented_limits",
+  "source": "live-react-page",
+  "components": ["GridMapView", "catalog table"],
+  "url": "http://127.0.0.1:47821/workspace/verify-raster",
+  "viewport": "1280x800",
+  "recorded_at": "2026-08-28T17:30:00Z",
+  "electron_packaged_app": false,
+  "silent_reprojection": false,
+  "filename_inferred_dem": false,
+  "pixels_loaded_into_llm": false,
+  "hillshade": false,
+  "slope": false,
+  "spectral_indices": false,
+  "raster_algebra": false,
+  "notes": [
+    "Verification used the Next.js workspace UI that Electron loads (same GridMapView).",
+    "A packaged Electron executable was not launched.",
+    "Catalog inspect is metadata-first. Compressed, tiled/COG, BigTIFF, and huge rasters do not load pixel cubes.",
+    "A file named dem.asc is not a DEM unless EPSG, Units=m, and ElevationDatum are documented.",
+    "Overlay of EPSG:32630 vs EPSG:4326 is blocked. Coordinates were not reprojected.",
+    "Hillshade/slope/NDVI/raster algebra are not registered capabilities."
+  ]
+}

@@ -75,6 +75,12 @@ export const GIS_NODE_ORDER = [
   "vector_interpret",
 ] as const;
 
+export const GIS_RASTER_NODE_ORDER = [
+  "raster_inspect",
+  "raster_view",
+  "terrain_view",
+] as const;
+
 export const GEOCHEM_NODE_ORDER = [
   "geochem_ingest",
   "geochem_qc",
@@ -92,6 +98,7 @@ export const KERNEL_NODE_ORDER = [
   ...GPR_NODE_ORDER,
   ...LAS_NODE_ORDER,
   ...GIS_NODE_ORDER,
+  ...GIS_RASTER_NODE_ORDER,
   ...GEOCHEM_NODE_ORDER,
 ] as const;
 
@@ -166,6 +173,12 @@ export const GIS_NODE_DEPS: Record<string, string[]> = {
   vector_interpret: ["vector_ingest", "vector_view", "vector_overlap"],
 };
 
+export const GIS_RASTER_NODE_DEPS: Record<string, string[]> = {
+  raster_inspect: [],
+  raster_view: ["raster_inspect"],
+  terrain_view: ["raster_inspect"],
+};
+
 export const GEOCHEM_NODE_DEPS: Record<string, string[]> = {
   geochem_ingest: [],
   geochem_qc: ["geochem_ingest"],
@@ -183,6 +196,7 @@ export const KERNEL_NODE_DEPS: Record<string, string[]> = {
   ...GPR_NODE_DEPS,
   ...LAS_NODE_DEPS,
   ...GIS_NODE_DEPS,
+  ...GIS_RASTER_NODE_DEPS,
   ...GEOCHEM_NODE_DEPS,
 };
 
@@ -237,6 +251,9 @@ const NODE_LABELS: Record<string, string> = {
   vector_overlap: "Same-CRS geometric overlap table (not geological proof)",
   vector_export: "Export ingested vectors as GeoJSON",
   vector_interpret: "GIS interpretation limits",
+  raster_inspect: "Inspect bound GeoTIFF and ESRI ASCII catalog records (metadata only)",
+  raster_view: "Build source raster viewer metadata",
+  terrain_view: "Build documented DEM terrain viewer metadata",
   geochem_ingest: "Read bound G-AID GEOCHEM 1.0 catalog records",
   geochem_qc: "Geochemistry QC (duplicates, mixed units, censored BDL)",
   geochem_map_points: "Map sample points when CRS is documented",
@@ -280,6 +297,7 @@ function ownerCapability(
 
 function nodeFamily(nodeId: string): "mag" | "grav" | "ert" | "rad" | "gpr" | "borehole" | "gis" | "geochem" {
   if ((GEOCHEM_NODE_ORDER as readonly string[]).includes(nodeId)) return "geochem";
+  if ((GIS_RASTER_NODE_ORDER as readonly string[]).includes(nodeId)) return "gis";
   if ((GIS_NODE_ORDER as readonly string[]).includes(nodeId)) return "gis";
   if ((LAS_NODE_ORDER as readonly string[]).includes(nodeId)) return "borehole";
   if ((GPR_NODE_ORDER as readonly string[]).includes(nodeId)) return "gpr";

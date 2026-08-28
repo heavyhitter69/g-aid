@@ -92,6 +92,9 @@ def get_handler(node_id: str):
         "vector_overlap": vector_overlap,
         "vector_export": vector_export,
         "vector_interpret": vector_interpret,
+        "raster_inspect": raster_inspect,
+        "raster_view": raster_view,
+        "terrain_view": terrain_view,
         "geochem_ingest": geochem_ingest,
         "geochem_qc": geochem_qc,
         "geochem_map_points": geochem_map_points,
@@ -975,6 +978,21 @@ def vector_export(payload: dict) -> dict:
 
 def vector_interpret(payload: dict) -> dict:
     from kernels.vector import vector_interpret as impl
+    return impl(payload)
+
+
+def raster_inspect(payload: dict) -> dict:
+    from kernels.raster import raster_inspect as impl
+    return impl(payload)
+
+
+def raster_view(payload: dict) -> dict:
+    from kernels.raster import raster_view as impl
+    return impl(payload)
+
+
+def terrain_view(payload: dict) -> dict:
+    from kernels.raster import terrain_view as impl
     return impl(payload)
 
 

@@ -472,13 +472,36 @@ export function validateCapabilityContracts(options: {
   const geojsonInputs = boundSupported(options.inputs, "geojson");
   const shapefileInputs = boundSupported(options.inputs, "shapefile");
   const gisInputs = [...geojsonInputs, ...shapefileInputs];
-  const needsGis = expanded.some((id) => id.startsWith("gis."));
-  if (needsGis && options.inputs.length && gisInputs.length === 0) {
+  const geotiffInputs = boundSupported(options.inputs, "geotiff");
+  const asciiInputs = boundSupported(options.inputs, "esri-ascii-grid");
+  const demInputs = boundSupported(options.inputs, "dem-ascii");
+  const rasterInputs = [...geotiffInputs, ...asciiInputs, ...demInputs];
+  const needsGisVector = expanded.some(
+    (id) => id.startsWith("gis.vector") || id === "gis.spatial_overlap" || id === "gis.export_vector" || id === "gis.interpret"
+  );
+  const needsGisRaster = expanded.some((id) => id.startsWith("gis.raster") || id === "gis.terrain_view");
+  if (needsGisVector && options.inputs.length && gisInputs.length === 0) {
     issues.push({
       level: "blocker",
       code: "no_geojson_files",
       message:
         "GIS vector processing needs a supported GeoJSON or shapefile catalog record. Incomplete shapefile sidecars and GeoPackage are not processing inputs.",
+    });
+  }
+  if (needsGisRaster && options.inputs.length && rasterInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_raster_files",
+      message:
+        "Raster inspect/view needs a supported GeoTIFF, ESRI ASCII grid, or documented DEM ASCII catalog record. I will not take the first .tif by extension.",
+    });
+  }
+  if (expanded.includes("gis.terrain_view") && options.inputs.length && demInputs.length === 0) {
+    issues.push({
+      level: "blocker",
+      code: "no_dem",
+      message:
+        "Terrain viewing needs a documented dem-ascii catalog record (EPSG, Units=m, ElevationDatum). A filename containing 'dem' is not a DEM.",
     });
   }
   const shapefileBoundUnsupported = options.inputs.filter(

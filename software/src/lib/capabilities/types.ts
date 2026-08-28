@@ -47,6 +47,9 @@ export const USER_CAPABILITY_IDS = [
   "gis.spatial_overlap",
   "gis.export_vector",
   "gis.interpret",
+  "gis.raster_inspect",
+  "gis.raster_view",
+  "gis.terrain_view",
   "geochem.ingest",
   "geochem.qc",
   "geochem.map_points",
@@ -68,7 +71,7 @@ export interface CapabilityParameter {
 }
 
 export interface CapabilityInputRole {
-  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log" | "gis-vector" | "geochem-samples";
+  role: "rover" | "base" | "corrected-points" | "grid" | "gravity-stations" | "dem" | "ert-measurements" | "radiometric-stations" | "gpr-section" | "well-log" | "gis-vector" | "gis-raster" | "geochem-samples";
   adapterIds: string[];
   required: boolean;
   description: string;

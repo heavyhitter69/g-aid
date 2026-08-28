@@ -64,6 +64,8 @@ const SUPPORTED_ADAPTER_IDS = new Set([
   "shapefile",
   "geochem-csv",
   "geochem-xyz",
+  "geotiff",
+  "esri-ascii-grid",
 ]);
 
 export function isSupportedProcessingRecord(record: Pick<CatalogRecord, "supportStatus" | "adapterId">): boolean {

@@ -24,7 +24,7 @@ export interface CrsInfo {
   epsg?: number;
   units?: string;
   datum?: string;
-  source: "prj" | "geotiff" | "geojson" | "catalog" | "rfc7946" | "legacy-crs" | "custom-import" | "shapefile-prj" | "unknown";
+  source: "prj" | "geotiff" | "geojson" | "catalog" | "rfc7946" | "legacy-crs" | "custom-import" | "shapefile-prj" | "geotiff-geokeys" | "unknown";
   assumed: boolean;
   authority?: "OGC" | "EPSG";
   axisOrder?: CrsAxisOrder;
@@ -100,6 +100,16 @@ export interface MapLayerSpec {
   };
   attributeNames?: string[];
   geometryTypes?: string[];
+  nodata?: number;
+  bandCount?: number;
+  dataType?: string;
+  compression?: string;
+  rasterLayout?: string;
+  overviewCount?: number;
+  previewRequired?: boolean;
+  pixelsDecodable?: boolean;
+  valueMin?: number;
+  valueMax?: number;
 }
 
 export interface OverlayDecision {

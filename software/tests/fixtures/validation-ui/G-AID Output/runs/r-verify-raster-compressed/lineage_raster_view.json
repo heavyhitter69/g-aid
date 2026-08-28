@@ -1,0 +1,15 @@
+{
+  "node_id": "raster_view",
+  "formula": "Raster viewer metadata",
+  "parameters": {
+    "n": 1
+  },
+  "inputs": [
+    "/workspace/software/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-raster-compressed/raster_canonical.json"
+  ],
+  "outputs": [
+    "/workspace/software/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-raster-compressed/raster_tracks.json",
+    "/workspace/software/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-raster-compressed/raster_tracks.meta.json"
+  ],
+  "created_at": "2026-08-28T17:44:49.359085Z"
+}

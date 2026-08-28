@@ -68,6 +68,9 @@ const NODE_SCRIPTS: Record<string, string> = {
   vector_overlap: SCIENCE,
   vector_export: SCIENCE,
   vector_interpret: SCIENCE,
+  raster_inspect: SCIENCE,
+  raster_view: SCIENCE,
+  terrain_view: SCIENCE,
   geochem_ingest: SCIENCE,
   geochem_qc: SCIENCE,
   geochem_map_points: SCIENCE,
@@ -86,6 +89,7 @@ export class MagneticPreprocessingPipeline extends PipelineEngine {
     // GPR uses this same engine. Do not add a GprPipeline execution route.
     // LAS borehole uses this same engine. Do not add a WellLogPipeline / BoreholePipeline execution route.
     // GIS vectors use this same engine. Do not add a GisPipeline / VectorPipeline execution route.
+    // Rasters use this same engine. Do not add a RasterPipeline execution route.
     // Geochemistry uses this same engine. Do not add a GeochemPipeline execution route.
     const requested = nodeIds?.length ? nodeIds : [];
     const compiled = new Set(requested);

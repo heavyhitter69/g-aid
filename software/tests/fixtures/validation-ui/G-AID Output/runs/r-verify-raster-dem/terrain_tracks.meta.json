@@ -1,0 +1,7 @@
+{
+  "kind": "gis-terrain",
+  "filename_dem_inference": false,
+  "hillshade": false,
+  "slope": false,
+  "terrain_correction": false
+}

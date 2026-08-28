@@ -121,7 +121,7 @@ test("catalog classifies mixed folder without defaulting to magnetics", () => {
     assert.notEqual(chem.adapterId, "geochem-xyz");
 
     const dem = byPath(catalog.records, "gis/dem.asc");
-    assert.equal(dem.supportStatus, "recognised-unsupported");
+    assert.equal(dem.supportStatus, "supported");
     assert.equal(dem.formatId, "esri-ascii-grid");
     assert.ok(dem.bbox);
 

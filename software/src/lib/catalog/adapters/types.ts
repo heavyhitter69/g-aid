@@ -92,6 +92,20 @@ export interface CatalogInspection {
   crsSource?: CatalogRecord["crsSource"];
   axisOrder?: CatalogRecord["axisOrder"];
   coordinateOrder?: CatalogRecord["coordinateOrder"];
+  ncols?: number;
+  nrows?: number;
+  nodata?: number;
+  bandCount?: number;
+  dataType?: string;
+  compression?: string;
+  rasterLayout?: string;
+  geotransform?: CatalogRecord["geotransform"];
+  valueMin?: number;
+  valueMax?: number;
+  overviewCount?: number;
+  previewRequired?: boolean;
+  pixelsDecodable?: boolean;
+  rasterContract?: string;
 }
 
 export interface AdapterValidation {

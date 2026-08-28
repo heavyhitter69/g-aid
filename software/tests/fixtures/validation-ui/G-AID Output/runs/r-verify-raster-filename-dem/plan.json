@@ -1,0 +1,11 @@
+{
+  "runId": "r-verify-raster-filename-dem",
+  "planHash": "fixture-r-verify-raster-filename-dem",
+  "intent": "raster",
+  "status": "complete",
+  "capabilities": [
+    "gis.terrain_view"
+  ],
+  "product": "G-AID documented raster layer",
+  "parameters": {}
+}

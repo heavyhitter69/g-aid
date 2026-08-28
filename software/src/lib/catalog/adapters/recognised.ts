@@ -1,4 +1,4 @@
-import { MAX_COLUMNS, type CatalogBBox } from "../types.ts";
+import { MAX_COLUMNS } from "../types.ts";
 import { firstLines, headerSummaryFromText, looksMostlyText, splitHeader } from "../peek-text.ts";
 import {
   deferredRead,
@@ -29,68 +29,6 @@ function makeAdapter(
 function startsWith(peek: Buffer, bytes: number[]): boolean {
   if (peek.length < bytes.length) return false;
   return bytes.every((b, i) => peek[i] === b);
-}
-
-function sniffGeotiff(ctx: SniffContext): AdapterSniff | null {
-  const tiffLe = startsWith(ctx.peek, [0x49, 0x49, 0x2a, 0x00]);
-  const tiffBe = startsWith(ctx.peek, [0x4d, 0x4d, 0x00, 0x2a]);
-  const bigtiffLe = startsWith(ctx.peek, [0x49, 0x49, 0x2b, 0x00]);
-  const bigtiffBe = startsWith(ctx.peek, [0x4d, 0x4d, 0x00, 0x2b]);
-  if (!tiffLe && !tiffBe && !bigtiffLe && !bigtiffBe) return null;
-  return {
-    confidence: 0.86,
-    formatId: "geotiff",
-    mediaClass: "raster",
-    domainHint: "gis",
-    notes: ["TIFF signature. GeoTIFF tags were not parsed; raster bytes were not loaded."],
-  };
-}
-
-function parseAsciiGrid(text: string): { bbox?: CatalogBBox; recordCount?: number; headerSummary?: string; cellSizeM?: number } {
-  const map: Record<string, number> = {};
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || /^[/#;]/.test(trimmed)) continue;
-    const match = trimmed.match(/^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize)\s+([-+0-9.eE]+)/i);
-    if (!match) {
-      if (Object.keys(map).length) break;
-      continue;
-    }
-    map[match[1].toLowerCase()] = Number(match[2]);
-  }
-  const ncols = map.ncols;
-  const nrows = map.nrows;
-  const cell = map.cellsize;
-  const xll = map.xllcorner ?? map.xllcenter;
-  const yll = map.yllcorner ?? map.yllcenter;
-  let bbox: CatalogBBox | undefined;
-  if ([ncols, nrows, cell, xll, yll].every((n) => Number.isFinite(n))) {
-    bbox = {
-      minX: xll,
-      minY: yll,
-      maxX: xll + ncols * cell,
-      maxY: yll + nrows * cell,
-    };
-  }
-  return {
-    bbox,
-    cellSizeM: Number.isFinite(cell) ? cell : undefined,
-    recordCount: Number.isFinite(ncols) && Number.isFinite(nrows) ? ncols * nrows : undefined,
-    headerSummary: headerSummaryFromText(text),
-  };
-}
-
-function sniffEsriAscii(ctx: SniffContext): AdapterSniff | null {
-  if (!looksMostlyText(ctx.peek)) return null;
-  const head = firstLines(ctx.peekText, 8).join("\n").toLowerCase();
-  if (!/\bncols\b/.test(head) || !/\bnrows\b/.test(head)) return null;
-  return {
-    confidence: 0.9,
-    formatId: "esri-ascii-grid",
-    mediaClass: "raster",
-    domainHint: "gis",
-    notes: ["ESRI ASCII grid header (ncols/nrows). Cell values were not loaded."],
-  };
 }
 
 function sniffGeopackage(ctx: SniffContext): AdapterSniff | null {
@@ -240,7 +178,6 @@ export const recognisedAdapters: CatalogAdapter[] = [
   makeAdapter("las-point-cloud", "las-point-cloud", sniffLasPointCloud, () => ({
     parseErrors: undefined,
   })),
-  makeAdapter("geotiff", "geotiff", sniffGeotiff),
   makeAdapter("geopackage", "geopackage", sniffGeopackage, () => ({
     parseErrors: [
       "GeoPackage is recognised-unsupported. G-AID does not parse GPKG tables, geometries, or CRS in this pack.",
@@ -250,7 +187,6 @@ export const recognisedAdapters: CatalogAdapter[] = [
   makeAdapter("pdf", "pdf", sniffPdf),
   makeAdapter("png", "png", sniffPng),
   makeAdapter("jpeg", "jpeg", sniffJpeg),
-  makeAdapter("esri-ascii-grid", "esri-ascii-grid", sniffEsriAscii, (ctx) => parseAsciiGrid(ctx.peekText)),
   makeAdapter("esri-prj", "esri-prj", sniffPrj, (ctx) => ({
     crs: ctx.peekText.replace(/\s+/g, " ").trim().slice(0, 300),
     headerSummary: headerSummaryFromText(ctx.peekText),

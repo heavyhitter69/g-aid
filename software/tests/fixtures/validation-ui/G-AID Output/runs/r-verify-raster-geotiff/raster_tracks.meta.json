@@ -1,0 +1,7 @@
+{
+  "kind": "gis-raster",
+  "crs_required_for_overlay": true,
+  "silent_reprojection": false,
+  "filename_dem_inference": false,
+  "pixels_loaded": false
+}

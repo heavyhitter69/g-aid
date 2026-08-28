@@ -1,0 +1,45 @@
+{
+  "kind": "gis-raster",
+  "product_name": "G-AID documented raster layer",
+  "layers": [
+    {
+      "source_path": "valid-geotiff/grid.tif",
+      "catalog_id": "rec-gtiff",
+      "crs": "EPSG:32630",
+      "crs_source": "geotiff-geokeys",
+      "crs_confidence": "high",
+      "source_format": "geotiff",
+      "bbox": {
+        "minX": 500000.0,
+        "minY": 6000000.0,
+        "maxX": 500020.0,
+        "maxY": 6000020.0
+      },
+      "geotransform": [
+        500000.0,
+        10.0,
+        0.0,
+        6000020.0,
+        0.0,
+        -10.0
+      ],
+      "nodata": -9999.0,
+      "band_count": 1,
+      "data_type": "float32",
+      "compression": "uncompressed",
+      "layout": "strips",
+      "preview_required": false,
+      "pixels_decodable": true,
+      "pixels_loaded": false,
+      "overview_count": 0,
+      "units": null,
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source raster values. It is not a remote-sensing interpretation.",
+    "Overlay requires documented CRS compatibility. Coordinates were not reprojected."
+  ],
+  "crs_required_for_overlay": true,
+  "silent_reprojection": false
+}

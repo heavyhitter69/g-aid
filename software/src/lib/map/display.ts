@@ -39,7 +39,7 @@ const ADAPTERS: DisplayAdapter[] = [
     viewable: true,
     decoded: true,
     kind: "raster",
-    reason: "Uncompressed G-AID GeoTIFF 1.0 (float32/int32) is decoded. Companion .asc is used when present. Compressed COG/tiles are not decoded.",
+    reason: "Uncompressed Classic TIFF strips (uint8/uint16/int16/int32/float32, band 1) are decoded under a preview limit. Compressed, tiled, and COG pixels are not decoded. Companion .asc is used when present.",
   },
   {
     id: "geojson",
@@ -125,9 +125,13 @@ export function formatIdFromPath(path: string): string {
   return "unknown";
 }
 
-export function isDemAscii(record: { formatId: string; filename?: string; domainHint?: string; relativePath?: string }): boolean {
+export function isDemAscii(record: {
+  formatId: string;
+  elevationDatum?: string;
+  units?: string;
+}): boolean {
   if (record.formatId === "dem-ascii") return true;
-  if (record.formatId !== "esri-ascii-grid") return false;
-  const name = `${record.filename || ""} ${record.relativePath || ""}`.toLowerCase();
-  return record.domainHint === "gis" && /\bdem\b/.test(name);
+  void record.elevationDatum;
+  void record.units;
+  return false;
 }

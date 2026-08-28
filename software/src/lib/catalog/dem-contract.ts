@@ -1,7 +1,10 @@
 /**
  * G-AID DEM ASCII contract (Phase 5B).
- * An ESRI ASCII grid is not a supported terrain source unless EPSG, Units=m,
- * and ElevationDatum are documented in comment lines. G-AID never downloads a DEM.
+ * An ESRI ASCII grid is not a DEM unless an ElevationDatum/VerticalDatum comment
+ * is present. EPSG or Units=m alone is not enough — generic ASCII grids may carry
+ * those without being terrain. Support still requires EPSG, Units=m, and
+ * ElevationDatum. G-AID never downloads a DEM, and a filename containing "dem"
+ * is not a DEM.
  */
 
 import type { CatalogBBox } from "./types.ts";
@@ -136,7 +139,9 @@ export function inspectDemText(text: string): DemContractResult {
     };
   }
 
-  const looksLikeDem = hasContractComment && hasGrid;
+  // Require a vertical/elevation datum comment. EPSG or Units=m alone is
+  // not enough — generic ASCII grids may carry those without being DEMs.
+  const looksLikeDem = Boolean(datumRaw) && hasGrid;
   return {
     looksLikeDem,
     formatId: looksLikeDem ? DEM_ASCII_FORMAT : "esri-ascii-grid",
