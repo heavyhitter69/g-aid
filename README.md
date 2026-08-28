@@ -35,7 +35,7 @@ Electron shell (run from `software/` after the software Next server is up, or us
 npm run dev:electron
 ```
 
-Electron does not treat the software Next origin as an auth base. Packaged and unpackaged online sign-in stay fail-closed until `GAID_AUTH_BASE_URL` is set. For a local full-stack check, run the website and:
+Electron does not treat the software Next origin as an auth base. Packaged and unpackaged online sign-in stay fail-closed until `GAID_AUTH_BASE_URL` is set. For a local full-stack check with an existing Supabase account, see [docs/local-tester.md](docs/local-tester.md). Copy `website/.env.example` and `software/.env.example` to ignored `.env.local` files, then:
 
 ```bash
 GAID_AUTH_BASE_URL=http://127.0.0.1:3000 npm run dev:electron
@@ -54,4 +54,4 @@ npm run test:python
 
 Packaged and production desktop sign-in stay **fail-closed**. `GAID_AUTH_BASE_URL` is required and unset until a public domain and production services exist. The app shows “online sign-in is not configured yet”.
 
-Do not deploy the website, publish installers, or configure production Supabase from this split.
+Do not put service-role keys, encryption keys, passwords, or refresh tokens in Git or the Linux package. Do not deploy the website, publish installers, or configure production Supabase from this split.

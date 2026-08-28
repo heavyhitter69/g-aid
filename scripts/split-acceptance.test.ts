@@ -106,6 +106,28 @@ test("root workspaces expose separate website and software commands", () => {
   assert.equal(pkg.scripts["dev:electron"], "npm run dev:electron -w software");
 });
 
+test("local tester env templates stay secret-free and gitignored .env.local stays ignored", () => {
+  const gitignore = read(".gitignore");
+  assert.match(gitignore, /^\.env\*$/m);
+  assert.match(gitignore, /^!\.env\.example$/m);
+  assert.match(gitignore, /^!\*\*\/\.env\.example$/m);
+  assert.equal(exists("website/.env.example"), true);
+  assert.equal(exists("software/.env.example"), true);
+  assert.equal(exists("docs/local-tester.md"), true);
+  const websiteEnv = read("website/.env.example");
+  const softwareEnv = read("software/.env.example");
+  for (const text of [websiteEnv, softwareEnv]) {
+    assert.match(text, /^NEXT_PUBLIC_SUPABASE_URL=$/m);
+    assert.match(text, /^NEXT_PUBLIC_SUPABASE_ANON_KEY=$/m);
+    assert.equal(text.includes("service_role"), false);
+    assert.equal(/sb_secret_|sb_publishable_|eyJ/.test(text), false);
+    assert.equal(/SUPABASE_SERVICE_ROLE_KEY=\S/.test(text), false);
+    assert.equal(/DESKTOP_AUTH_TOKEN_KEY=\S/.test(text), false);
+  }
+  assert.match(websiteEnv, /^GAID_DESKTOP_AUTH_STORE=memory$/m);
+  assert.match(softwareEnv, /GAID_AUTH_BASE_URL=http:\/\/127\.0\.0\.1:3000/);
+});
+
 if (failed) {
   console.error(`\n${failed} failed`);
   process.exit(1);
