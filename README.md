@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# G-AID
 
-## Getting Started
+Local Electron desktop workspace for geophysical survey files, plus a truthful public website.
 
-First, run the development server:
+This repository is split:
+
+- `website/` — public site, docs, legal, download status, and public authentication UI
+- `software/` — Electron, workspace UI, catalog/DAG, Python kernels, tests, fixtures, and packaging
+- `packages/branding` — product name and logo assets
+- `packages/auth-contract` — client-safe desktop PKCE contract (no server secrets)
+
+## Run separately
+
+Install once from the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Public website (http://127.0.0.1:3000):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev:website
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Desktop workspace Next server (http://127.0.0.1:47821):
 
-## Learn More
+```bash
+npm run dev:software
+```
 
-To learn more about Next.js, take a look at the following resources:
+Electron shell (run from `software/` after the software Next server is up, or use):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev:electron
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Electron does not treat the software Next origin as an auth base. Packaged and unpackaged online sign-in stay fail-closed until `GAID_AUTH_BASE_URL` is set. For a local full-stack check, run the website and:
 
-## Deploy on Vercel
+```bash
+GAID_AUTH_BASE_URL=http://127.0.0.1:3000 npm run dev:electron
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Test and build
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm test
+npm run build:website
+npm run build:software
+npm run test:python
+```
+
+## Desktop online sign-in
+
+Packaged and production desktop sign-in stay **fail-closed**. `GAID_AUTH_BASE_URL` is required and unset until a public domain and production services exist. The app shows “online sign-in is not configured yet”.
+
+Do not deploy the website, publish installers, or configure production Supabase from this split.
