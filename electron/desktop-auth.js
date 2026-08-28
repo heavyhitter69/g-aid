@@ -431,26 +431,8 @@ const SENSITIVE_QUERY_KEYS = new Set([
 
 function redactSensitiveText(value) {
   if (typeof value !== "string" || !value) return value;
-  try {
-    const parsed = new URL(value);
-    let changed = false;
-    for (const key of [...parsed.searchParams.keys()]) {
-      if (SENSITIVE_QUERY_KEYS.has(key) || TOKEN_NAME.test(key)) {
-        parsed.searchParams.set(key, "[redacted]");
-        changed = true;
-      }
-    }
-    if (parsed.hash && parsed.hash !== "#") {
-      parsed.hash = "";
-      changed = true;
-    }
-    return changed || TOKEN_NAME.test(value) ? parsed.toString() : value;
-  } catch {
-    return value.replace(
-      /([?&#](?:code|state|nonce|error_description|code_challenge|code_verifier|redirect_uri|access_token|refresh_token|id_token)=)[^&]*/gi,
-      "$1[redacted]"
-    );
-  }
+  const keys = [...SENSITIVE_QUERY_KEYS].sort((a, b) => b.length - a.length).join("|");
+  return value.replace(new RegExp(`([?&#](?:${keys})=)[^&\\s]*`, "gi"), "$1[redacted]");
 }
 
 module.exports = {
