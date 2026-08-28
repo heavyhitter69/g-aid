@@ -1,0 +1,191 @@
+{
+  "name": "g-aid-software",
+  "version": "0.1.0",
+  "private": true,
+  "description": "G-AID Electron desktop workspace",
+  "author": {
+    "name": "Genie Platforms",
+    "email": "sarkodieemil@gmail.com"
+  },
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 47821",
+    "dev:electron": "electron .",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --no-warnings src/lib/plan-spec.test.ts && node --experimental-strip-types --no-warnings src/lib/workspace-search.test.ts && node --experimental-strip-types --no-warnings src/lib/phase1-integrity.test.ts && node --experimental-strip-types --no-warnings src/lib/catalog.test.ts && node --experimental-strip-types --no-warnings src/lib/phase3-workflow.test.ts && node --experimental-strip-types --no-warnings src/lib/phase4-map.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5-gravity.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5b-gravity-terrain.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5b-ert.test.ts && node --experimental-strip-types --no-warnings src/lib/phase5b-validation.test.ts && node --experimental-strip-types --no-warnings src/lib/phase6-radiometrics.test.ts && node --experimental-strip-types --no-warnings src/lib/phase7-gpr.test.ts && node --experimental-strip-types --no-warnings src/lib/phase8-las.test.ts && node --experimental-strip-types --no-warnings src/lib/phase9-gis.test.ts && node --experimental-strip-types --no-warnings src/lib/phase10-geochem.test.ts && node --experimental-strip-types --no-warnings src/lib/phase11-shapefile.test.ts && node --experimental-strip-types --no-warnings src/lib/desktop-auth.test.ts && node --experimental-strip-types --no-warnings src/lib/electron-package-path.test.ts",
+    "icons": "node scripts/generate-icons.mjs",
+    "dist": "npm run icons && npm run build && electron-builder",
+    "dist:inno": "node scripts/compile-inno.mjs",
+    "dist:win": "npm run icons && npm run build && electron-builder --win dir && npm run dist:inno",
+    "dist:mac": "npm run icons && npm run build && electron-builder --mac",
+    "dist:linux": "npm run icons && npm run build && electron-builder --linux AppImage && node scripts/write-linux-launcher.mjs",
+    "dist:deb": "npm run icons && npm run build && electron-builder --linux deb"
+  },
+  "dependencies": {
+    "@g-aid/auth-contract": "0.1.0",
+    "@g-aid/branding": "0.1.0",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.2",
+    "@tailwindcss/typography": "^0.5.20",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
+    "katex": "^0.18.4",
+    "lucide-react": "^1.16.0",
+    "mammoth": "^1.12.0",
+    "next": "16.2.6",
+    "plotly.js": "^3.5.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "react-plotly.js": "^2.6.0",
+    "reactflow": "^11.11.4",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.6.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/plotly.js": "^3.0.10",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^10.0.0",
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "png-to-ico": "^3.0.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.geophysics.gaid",
+    "productName": "G-AID",
+    "executableName": "G-AID",
+    "copyright": "Copyright \u00a9 Genie Platforms",
+    "compression": "store",
+    "icon": "build/icon.png",
+    "directories": {
+      "output": "dist_desktop",
+      "buildResources": "build"
+    },
+    "files": [
+      "**/*",
+      "build/icon.png",
+      "build/icon.ico",
+      "build/icon.icns",
+      "build/icons/**/*",
+      "!.tmp/**/*",
+      "!**/.tmp/**/*",
+      "!src/**/*.ts",
+      "!src/**/*.tsx",
+      "!.next/cache/**/*",
+      "!.next/dev/**/*",
+      "!.next/standalone/**/*",
+      "!.next/diagnostics/**/*",
+      "!dist_desktop/**/*",
+      "!resources/**/*",
+      "!python/.venv/**/*",
+      "!python/dist/**/*",
+      "!python/tests/**/*",
+      "!python/**/__pycache__/**/*"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "asar": false,
+    "afterPack": "./scripts/after-pack.cjs",
+    "protocols": [
+      {
+        "name": "G-AID",
+        "schemes": [
+          "gaid"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "G-AID",
+      "signAndEditExecutable": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Science",
+      "icon": "build/icons",
+      "executableName": "g-aid",
+      "synopsis": "Geophysics AI desktop workspace",
+      "desktop": {
+        "entry": {
+          "Name": "G-AID",
+          "Comment": "Geophysics AI desktop workspace",
+          "Categories": "Science;Education;",
+          "Icon": "g-aid",
+          "MimeType": "x-scheme-handler/gaid;",
+          "StartupWMClass": "g-aid"
+        }
+      }
+    },
+    "deb": {
+      "packageName": "g-aid",
+      "priority": "optional",
+      "afterInstall": "scripts/linux/after-install.sh",
+      "afterRemove": "scripts/linux/after-remove.sh",
+      "artifactName": "g-aid_${version}_${arch}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "heavyhitter69",
+      "repo": "g-aid"
+    },
+    "extraResources": [
+      {
+        "from": "python/dist/g-aid-engine",
+        "to": "g-aid-engine",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/ai",
+        "to": "ai",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "ollama/Modelfile",
+        "to": "ai/Modelfile"
+      },
+      {
+        "from": "ollama/Modelfile.fast",
+        "to": "ai/Modelfile.fast"
+      }
+    ]
+  }
+}

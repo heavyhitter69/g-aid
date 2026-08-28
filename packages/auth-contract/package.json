@@ -1,0 +1,13 @@
+{
+  "name": "@g-aid/auth-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-safe desktop PKCE contract. No server secrets, no node:crypto, no Supabase.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --no-warnings src/contract.test.ts"
+  }
+}

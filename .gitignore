@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,24 +12,31 @@
 
 # testing
 /coverage
+**/__pycache__/
+**/.pytest_cache/
 
 # next.js
-/.next/
-/out/
+**/.next/
+**/out/
+
+# leftover pre-split working-tree paths (python/tests/build now live under software/)
+/python/
+/tests/
+/build/
 
 # generated icons / wizard bitmaps (keep installer scripts tracked)
-/build/*
-!/build/*.iss
-!/build/*.nsh
-!/build/*.txt
-!/build/icon.png
-!/build/icon.ico
-!/build/icon.icns
-!/build/icons/
-!/build/icons/**
+/software/build/*
+!/software/build/*.iss
+!/software/build/*.nsh
+!/software/build/*.txt
+!/software/build/icon.png
+!/software/build/icon.ico
+!/software/build/icon.icns
+!/software/build/icons/
+!/software/build/icons/**
 
 # electron desktop build output
-/dist_desktop/
+**/dist_desktop/
 
 # misc
 .DS_Store
@@ -53,4 +60,4 @@ next-env.d.ts
 
 # LLM weights — GitHub rejects files over 100MB
 *.gguf
-resources/ai/models/blobs/
+software/resources/ai/models/blobs/

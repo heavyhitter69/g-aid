@@ -1,0 +1,10 @@
+{
+  "name": "@g-aid/branding",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Canonical G-AID name and logo assets. No website copy, legal pages, or science code.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
