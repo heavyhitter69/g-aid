@@ -5,6 +5,7 @@ const { createServer } = require("http");
 const { parse } = require("url");
 const { spawn } = require("child_process");
 const workspaceFs = require("./workspace-fs");
+const desktopAuth = require("./desktop-auth");
 
 const PROTOCOL = "gaid";
 const PRODUCTION_PORT = 47821;
@@ -40,8 +41,9 @@ const windows = [];
 let pendingNewWindows = 0;
 let pythonProcess = null;
 let ollamaProcess = null;
-let authBaseUrl = process.env.GAID_AUTH_URL || "";
-let pendingAuthUrl = null;
+let authBaseUrl = "";
+let pendingAuthSession = null;
+let publicLogin = null;
 let serverPort = PRODUCTION_PORT;
 
 function browserWindowOptions() {
@@ -227,17 +229,63 @@ function getOpenedFilePath(argv = process.argv) {
   );
 }
 
-function sendAuthUrl(url) {
-  if (!url) return;
+function focusMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("gaid-auth", url);
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
-    pendingAuthUrl = null;
-  } else {
-    pendingAuthUrl = url;
   }
+}
+
+function sendAuthSession(session) {
+  if (!session || !session.access_token || !session.refresh_token) return;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("gaid-auth-session", {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+    focusMainWindow();
+    pendingAuthSession = null;
+  } else {
+    pendingAuthSession = {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    };
+  }
+}
+
+function sendAuthError(error) {
+  const payload = {
+    code: (error && error.code) || "auth_error",
+    message: (error && error.message) || "Sign-in could not finish.",
+  };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("gaid-auth-error", payload);
+    focusMainWindow();
+  }
+}
+
+function refreshAuthBaseUrl() {
+  authBaseUrl = desktopAuth.resolveAuthBaseUrl({
+    isPackaged: !dev,
+    envValue: process.env.GAID_AUTH_BASE_URL || "",
+    localDevOrigin: dev && serverPort ? `http://${hostname}:${serverPort}` : "",
+  });
+  return authBaseUrl;
+}
+
+function getPublicLogin() {
+  if (!publicLogin) {
+    publicLogin = desktopAuth.createPublicLoginController({
+      isPackaged: !dev,
+      getEnvAuthBase: () => process.env.GAID_AUTH_BASE_URL || "",
+      getLocalDevOrigin: () => (dev && serverPort ? `http://${hostname}:${serverPort}` : ""),
+      openExternal: (url) => shell.openExternal(url),
+      onSession: (session) => sendAuthSession(session),
+      onError: (error) => sendAuthError(error),
+    });
+  }
+  return publicLogin;
 }
 
 function bundledBinary(dir, name) {
@@ -591,16 +639,6 @@ async function createWindow() {
 
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
-    if (parsedUrl.pathname === "/__gaid/auth") {
-      const access = parsedUrl.query && parsedUrl.query.access_token;
-      const refresh = parsedUrl.query && parsedUrl.query.refresh_token;
-      if (access && refresh) {
-        sendAuthUrl(`http://${hostname}:${serverPort}${req.url}`);
-      }
-      res.writeHead(302, { Location: "/auth/desktop/done" });
-      res.end();
-      return;
-    }
     handle(req, res, parsedUrl);
   });
 
@@ -614,11 +652,14 @@ async function createWindow() {
     }
   }
 
-  if (!authBaseUrl) {
-    authBaseUrl = `http://${hostname}:${serverPort}`;
+  refreshAuthBaseUrl();
+  if (authBaseUrl) {
+    log(`Ready. Public login origin: ${authBaseUrl}`);
+  } else if (!dev) {
+    log("Ready. Online sign-in is not configured yet (GAID_AUTH_BASE_URL is unset).");
+  } else {
+    log("Ready.");
   }
-
-  log(`Ready on ${authBaseUrl}`);
 
   const openedFile = getOpenedFilePath();
   if (openedFile) log("Opened with file/directory:", openedFile);
@@ -630,7 +671,7 @@ async function createWindow() {
   await fadeSplashThenLoad(mainWindow, startUrl);
   mainWindow.show();
   mainWindow.focus();
-  if (pendingAuthUrl) sendAuthUrl(pendingAuthUrl);
+  if (pendingAuthSession) sendAuthSession(pendingAuthSession);
   attachWindowGuards(mainWindow, startUrl);
   setWindowsJumpList();
   await flushPendingWindows();
@@ -646,8 +687,22 @@ ipcMain.handle("open-external", async (_event, url) => {
   await shell.openExternal(url);
 });
 
-ipcMain.handle("get-auth-base-url", () => authBaseUrl);
-ipcMain.handle("get-pending-auth", () => pendingAuthUrl);
+ipcMain.handle("get-auth-base-url", () => {
+  refreshAuthBaseUrl();
+  return authBaseUrl;
+});
+ipcMain.handle("is-public-login-configured", () => {
+  refreshAuthBaseUrl();
+  return Boolean(authBaseUrl);
+});
+ipcMain.handle("start-public-login", async (_event, mode) => {
+  refreshAuthBaseUrl();
+  return getPublicLogin().start(mode === "signup" ? "signup" : "login");
+});
+ipcMain.handle("cancel-public-login", async () => {
+  await getPublicLogin().cancel();
+});
+ipcMain.handle("get-pending-auth-session", () => pendingAuthSession);
 ipcMain.handle("open-aux-window", async (_event, pathname) => {
   await openAuxWindow(pathname);
 });
@@ -796,12 +851,11 @@ if (!gotTheLock) {
   app.quit();
 } else {
   const startupProtocolUrl = collectProtocolUrl(process.argv);
-  if (startupProtocolUrl) pendingAuthUrl = startupProtocolUrl;
 
   app.on("second-instance", (_event, commandLine) => {
     const protocolUrl = collectProtocolUrl(commandLine);
     if (protocolUrl) {
-      sendAuthUrl(protocolUrl);
+      void getPublicLogin().handleIncomingUrl(protocolUrl);
       return;
     }
 
@@ -827,7 +881,7 @@ if (!gotTheLock) {
 
   app.on("open-url", (event, url) => {
     event.preventDefault();
-    sendAuthUrl(url);
+    void getPublicLogin().handleIncomingUrl(url);
   });
 
   app.whenReady().then(async () => {
@@ -835,6 +889,9 @@ if (!gotTheLock) {
     registerLinuxProtocolHandler();
     try {
       await createWindow();
+      if (startupProtocolUrl) {
+        void getPublicLogin().handleIncomingUrl(startupProtocolUrl);
+      }
       startOllamaDaemon();
       startPythonBackend();
     } catch (err) {

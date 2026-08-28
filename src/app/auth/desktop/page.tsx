@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { AuthUnavailableNotice } from "@/components/auth/auth-unavailable-notice";
+import { readDesktopAuthRequest, withDesktopAuthQuery } from "@/lib/desktop-auth/contract";
 
 export default function DesktopAuthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const request = useMemo(() => readDesktopAuthRequest(searchParams), [searchParams]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,9 +24,9 @@ export default function DesktopAuthPage() {
 
   useEffect(() => {
     if (mode === "signup") {
-      router.replace("/signup?desktop=1");
+      router.replace(withDesktopAuthQuery("/signup", request, { desktop: "1" }));
     }
-  }, [mode, router]);
+  }, [mode, request, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +51,11 @@ export default function DesktopAuthPage() {
       return;
     }
 
+    if (!request) {
+      setPasswordError("This sign-in request is incomplete. Return to the G-AID app and try again.");
+      return;
+    }
+
     setLoading(true);
     const supabase = createClient();
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -62,7 +69,7 @@ export default function DesktopAuthPage() {
       return;
     }
 
-    router.push("/auth/desktop/confirm");
+    router.push(withDesktopAuthQuery("/auth/desktop/confirm", request));
   };
 
   if (mode === "signup") {
@@ -88,6 +95,15 @@ export default function DesktopAuthPage() {
             {!hasSupabaseConfig() && (
               <AuthUnavailableNotice title="Desktop sign-in is not configured" />
             )}
+            {hasSupabaseConfig() && !request && (
+              <div
+                data-testid="desktop-auth-incomplete"
+                className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90"
+              >
+                This sign-in request is incomplete. Open G-AID and choose Log In so the app can start a
+                secure browser sign-in.
+              </div>
+            )}
             <Input
               label="Email"
               id="email"
@@ -107,7 +123,7 @@ export default function DesktopAuthPage() {
             <Button
               type="submit"
               className="w-full h-12 rounded-md bg-[#2a2a2a] text-white hover:bg-[#333]"
-              disabled={loading || !hasSupabaseConfig()}
+              disabled={loading || !hasSupabaseConfig() || !request}
             >
               {loading ? "Continuing..." : hasSupabaseConfig() ? "Continue with email" : "Sign-in unavailable"}
             </Button>
@@ -115,7 +131,10 @@ export default function DesktopAuthPage() {
 
           <p className="mt-6 text-center text-sm text-[#888]">
             Don&apos;t have an account?{" "}
-            <Link href="/signup?desktop=1" className="text-white hover:underline">
+            <Link
+              href={withDesktopAuthQuery("/signup", request, { desktop: "1" })}
+              className="text-white hover:underline"
+            >
               Sign up
             </Link>
           </p>

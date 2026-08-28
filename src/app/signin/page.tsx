@@ -17,6 +17,7 @@ import { isDesktop } from "@/lib/desktop";
 import { profileFromUser } from "@/lib/auth-user";
 import { ChevronLeft } from "lucide-react";
 import { AuthUnavailableNotice } from "@/components/auth/auth-unavailable-notice";
+import { PublicLoginUnconfiguredNotice } from "@/components/auth/public-login-unconfigured-notice";
 
 function SignInBody() {
   const router = useRouter();
@@ -38,10 +39,18 @@ function SignInBody() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [desktop, setDesktop] = useState(false);
   const [waitingForBrowser, setWaitingForBrowser] = useState(false);
+  const [publicLoginConfigured, setPublicLoginConfigured] = useState<boolean | null>(null);
+  const [publicLoginError, setPublicLoginError] = useState<string | null>(null);
   const [authConfigured] = useState(() => hasSupabaseConfig());
 
   useEffect(() => {
     setDesktop(isDesktop());
+    if (!window.gaidDesktop) return;
+    window.gaidDesktop.isPublicLoginConfigured().then(setPublicLoginConfigured);
+    return window.gaidDesktop.onAuthError((error) => {
+      setWaitingForBrowser(false);
+      setPublicLoginError(error.message || "Sign-in could not finish.");
+    });
   }, []);
 
   useEffect(() => {
@@ -63,10 +72,17 @@ function SignInBody() {
 
   const openBrowserAuth = async (mode: "login" | "signup") => {
     if (!window.gaidDesktop) return;
+    setPublicLoginError(null);
     setWaitingForBrowser(true);
-    const base = await window.gaidDesktop.getAuthBaseUrl();
-    const path = mode === "signup" ? "/signup?desktop=1" : "/auth/desktop?mode=login";
-    await window.gaidDesktop.openExternal(`${base}${path}`);
+    const result = await window.gaidDesktop.startPublicLogin(mode);
+    if (!result?.started) {
+      setWaitingForBrowser(false);
+      setPublicLoginError(
+        result?.reason === "not_configured"
+          ? "Online sign-in is not configured yet"
+          : "Could not start browser sign-in."
+      );
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -138,16 +154,22 @@ function SignInBody() {
             <p className="mt-10 text-sm text-[#888]">
               Finish signing in in your browser, then return to G-AID.
             </p>
-          ) : !authConfigured ? (
+          ) : publicLoginConfigured === false ? (
             <div className="mt-10">
-              <AuthUnavailableNotice title="Desktop sign-in is not configured" />
+              <PublicLoginUnconfiguredNotice />
             </div>
           ) : (
             <div className="mt-10 space-y-3">
+              {publicLoginError && (
+                <p role="alert" className="text-sm text-red-400">
+                  {publicLoginError}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => openBrowserAuth("login")}
                 className="w-full h-12 rounded-lg bg-[#3b82f6] text-[#111] font-semibold hover:bg-[#60a5fa]"
+                disabled={publicLoginConfigured !== true}
               >
                 Log In
               </button>
@@ -155,6 +177,7 @@ function SignInBody() {
                 type="button"
                 onClick={() => openBrowserAuth("signup")}
                 className="w-full h-12 rounded-lg bg-[#2a2a2a] text-white font-semibold hover:bg-[#333]"
+                disabled={publicLoginConfigured !== true}
               >
                 Sign Up
               </button>

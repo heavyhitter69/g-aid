@@ -1,28 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { desktopHandoffUrl } from "@/lib/desktop";
 import { profileFromUser } from "@/lib/auth-user";
+import {
+  buildCallbackRedirect,
+  callbackContainsSecrets,
+  isAllowedRedirectUri,
+  readDesktopAuthRequest,
+  withDesktopAuthQuery,
+} from "@/lib/desktop-auth/contract";
 
 export default function DesktopConfirmPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const request = useMemo(() => readDesktopAuthRequest(searchParams), [searchParams]);
   const [name, setName] = useState("G-AID user");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [handingOff, setHandingOff] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasSupabaseConfig()) {
-      router.replace("/auth/desktop?mode=login");
+      router.replace(withDesktopAuthQuery("/auth/desktop", request, { mode: "login" }));
       return;
     }
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session?.user) {
-        router.replace("/auth/desktop?mode=login");
+        router.replace(withDesktopAuthQuery("/auth/desktop", request, { mode: "login" }));
         return;
       }
       const profile = profileFromUser(data.session.user);
@@ -30,25 +39,52 @@ export default function DesktopConfirmPage() {
       setEmail(profile.email);
       setLoading(false);
     });
-  }, [router]);
+  }, [request, router]);
 
   const completeHandoff = async () => {
     setHandingOff(true);
-    if (!hasSupabaseConfig()) {
-      router.replace("/auth/desktop?mode=login");
+    setHandoffError(null);
+    if (!request || !isAllowedRedirectUri(request.redirectUri)) {
+      setHandoffError("This sign-in request is incomplete. Return to the G-AID app and try again.");
+      setHandingOff(false);
       return;
     }
-    const supabase = createClient();
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      router.replace("/auth/desktop?mode=login");
+
+    const response = await fetch("/api/auth/desktop/authorize", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        client_id: request.clientId,
+        code_challenge: request.codeChallenge,
+        code_challenge_method: request.codeChallengeMethod,
+        state: request.state,
+        nonce: request.nonce,
+        redirect_uri: request.redirectUri,
+      }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { redirect?: string; error?: string };
+    if (!response.ok || !data.redirect || callbackContainsSecrets(data.redirect)) {
+      setHandoffError("Could not finish desktop sign-in. Return to G-AID and try again.");
+      setHandingOff(false);
       return;
     }
-    window.location.href = desktopHandoffUrl(
-      data.session.access_token,
-      data.session.refresh_token
-    );
+    window.location.assign(data.redirect);
     window.setTimeout(() => router.replace("/auth/desktop/done"), 600);
+  };
+
+  const cancelHandoff = () => {
+    if (request && isAllowedRedirectUri(request.redirectUri)) {
+      window.location.assign(
+        buildCallbackRedirect(request.redirectUri, {
+          error: "access_denied",
+          state: request.state,
+          errorDescription: "The user cancelled sign-in.",
+        })
+      );
+      return;
+    }
+    router.push(withDesktopAuthQuery("/auth/desktop", request, { mode: "login" }));
   };
 
   if (loading) {
@@ -78,10 +114,16 @@ export default function DesktopConfirmPage() {
           </div>
         </div>
 
+        {handoffError && (
+          <p role="alert" className="mt-6 text-sm text-red-400">
+            {handoffError}
+          </p>
+        )}
+
         <div className="mt-8 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push("/auth/desktop?mode=login")}
+            onClick={cancelHandoff}
             className="h-11 px-5 rounded-lg bg-[#2a2a2a] text-white text-sm font-medium hover:bg-[#333]"
           >
             Cancel
@@ -89,7 +131,7 @@ export default function DesktopConfirmPage() {
           <button
             type="button"
             onClick={completeHandoff}
-            disabled={handingOff}
+            disabled={handingOff || !request}
             className="h-11 px-5 rounded-lg bg-[#d4d4d4] text-black text-sm font-semibold hover:bg-white disabled:opacity-60"
           >
             {handingOff ? "Opening G-AID..." : "Sign in"}

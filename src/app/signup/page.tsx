@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,6 +14,7 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { getAgentForDiscipline, DISCIPLINES } from "@/lib/data";
 import type { DisciplineId, UserRole } from "@/types";
 import { AuthUnavailableNotice } from "@/components/auth/auth-unavailable-notice";
+import { readDesktopAuthRequest, withDesktopAuthQuery } from "@/lib/desktop-auth/contract";
 import {
   Waves, Zap, Droplets, Fuel, Pickaxe, Compass, Leaf,
   ArrowRight, CheckCircle2, User, Mail, Lock, ChevronLeft, ChevronRight, AlertCircle,
@@ -51,7 +52,8 @@ export default function SignUpPage() {
 function SignUpBody() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const desktopHandoff = searchParams.get("desktop") === "1";
+  const desktopRequest = useMemo(() => readDesktopAuthRequest(searchParams), [searchParams]);
+  const desktopHandoff = searchParams.get("desktop") === "1" || Boolean(desktopRequest);
   const { setUser, setAuthenticated, setOnboardingStep, setDiscipline, setAgent, patchUser } = useAppStore();
 
   const [phase, setPhase] = useState<1 | 2>(1);
@@ -193,7 +195,11 @@ function SignUpBody() {
         return;
       }
 
-      router.push(desktopHandoff ? "/auth/desktop/confirm" : "/onboarding");
+      router.push(
+        desktopHandoff
+          ? withDesktopAuthQuery("/auth/desktop/confirm", desktopRequest)
+          : "/onboarding"
+      );
     } catch {
       setError("An unexpected error occurred. Please try again.");
       setCreating(false);
@@ -204,7 +210,7 @@ function SignUpBody() {
     <main className="relative min-h-screen">
       {/* Back Button */}
       <Link 
-        href={desktopHandoff ? "/auth/desktop?mode=login" : "/"} 
+        href={desktopHandoff ? withDesktopAuthQuery("/auth/desktop", desktopRequest, { mode: "login" }) : "/"} 
         className="absolute top-6 left-6 z-55 flex items-center justify-center w-10 h-10 rounded-full border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200 group backdrop-blur-sm shadow-lg shadow-black/20"
         title={desktopHandoff ? "Back to desktop sign in" : "Back to Home"}
       >
@@ -393,7 +399,7 @@ function SignUpBody() {
 
                   <p className="mt-6 text-center text-sm text-zinc-600">
                     Already have an account?{" "}
-                    <Link href={desktopHandoff ? "/auth/desktop?mode=login" : "/signin"} className="text-white/80 hover:text-white hover:underline">
+                    <Link href={desktopHandoff ? withDesktopAuthQuery("/auth/desktop", desktopRequest, { mode: "login" }) : "/signin"} className="text-white/80 hover:text-white hover:underline">
                       Sign in
                     </Link>
                   </p>
