@@ -16,7 +16,7 @@ export function peekFile(absPath: string, size: number, maxBytes = PEEK_BYTES): 
   try {
     const buf = Buffer.alloc(Math.min(maxBytes, size));
     const n = fs.readSync(fd, buf, 0, buf.length, 0);
-    return n === buf.length ? buf : buf.subarray(0, n);
+    return Buffer.from(buf.subarray(0, n));
   } finally {
     fs.closeSync(fd);
   }

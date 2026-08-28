@@ -1,6 +1,8 @@
 import { getCapability, isRegisteredCapability } from "./registry.ts";
 import type { CompiledDag, CompiledDagNode, UserCapabilityId } from "./types.ts";
 
+export type { CompiledDag, CompiledDagNode, UserCapabilityId };
+
 /** Full magnetic pipeline order. Compiled DAGs are a subsequence, never extra nodes. */
 export const MAGNETIC_NODE_ORDER = [
   "file_discovery",

@@ -25,56 +25,56 @@ interface InitCheck {
 const INIT_CHECKS: InitCheck[] = [
   {
     id: "db",
-    label: "Connecting dataset engines",
-    subLabel: "Linking seismic, resistivity & potential field repositories",
+    label: "Indexing local files",
+    subLabel: "Cataloging supported survey files on this machine",
     icon: Database,
     delay: 400,
     duration: 1100,
   },
   {
     id: "viz",
-    label: "Initializing visualization systems",
-    subLabel: "3-D subsurface renderer, cross-section builder, and QC dashboard",
+    label: "Preparing map views",
+    subLabel: "2D grids, vectors, sections, and logs — not a 3D voxel engine",
     icon: BarChart3,
     delay: 1800,
     duration: 1200,
   },
   {
     id: "wf",
-    label: "Loading workflow modules",
-    subLabel: "Inversion pipelines, attribute extraction, and audit trail",
+    label: "Loading processing packs",
+    subLabel: "Magnetics, gravity near-zone, ERT ingest, and other Shipment 13 packs",
     icon: GitBranch,
     delay: 3300,
     duration: 1000,
   },
   {
     id: "ai",
-    label: "Calibrating AI agent to your discipline",
-    subLabel: "Specializing neural topology and loading interpretation priors",
+    label: "Checking optional local assistant",
+    subLabel: "Ollama on this machine if installed — no hosted inference",
     icon: Cpu,
     delay: 4600,
     duration: 1400,
   },
   {
     id: "sec",
-    label: "Verifying security & data integrity",
-    subLabel: "End-to-end encryption, provenance chain, and access policies",
+    label: "Keeping data local",
+    subLabel: "Survey files stay in the folder you open",
     icon: Shield,
     delay: 6300,
     duration: 900,
   },
   {
     id: "net",
-    label: "Establishing cloud workspace",
-    subLabel: "Synchronising project files and collaborative session layer",
+    label: "Desktop workspace only",
+    subLabel: "This is not a cloud collaboration session",
     icon: Wifi,
     delay: 7500,
     duration: 1000,
   },
   {
     id: "env",
-    label: "Assembling scientific environment",
-    subLabel: "All modules verified — workspace is ready",
+    label: "Workspace ready",
+    subLabel: "Open a local folder to begin",
     icon: Layers,
     delay: 8800,
     duration: 800,
@@ -184,20 +184,24 @@ export default function OnboardingPage() {
                 Welcome, {user?.fullName?.split(" ")[0] ?? "Explorer"}
               </h1>
               <p className="text-zinc-400 mb-8 max-w-md mx-auto leading-relaxed">
-                <Image src="/g-aid logo.png" alt="G-AID" width={52} height={18} className="inline object-contain align-middle" /> has created a{" "}
-                <span className="text-white font-medium">{disciplineLabel}</span>-specialised
-                AI agent tailored to your workflow. It will guide data interpretation,
-                automate inversions, and surface insights specific to your domain — so you
-                can focus on the science.
+                <Image src="/g-aid logo.png" alt="G-AID" width={52} height={18} className="inline object-contain align-middle" />{" "}
+                is a local desktop workspace
+                {disciplineLabel ? (
+                  <>
+                    {" "}with a {disciplineLabel.toLowerCase()} focus
+                  </>
+                ) : null}
+                . It catalogs supported survey files on this machine. It does not create a cloud
+                workspace or a hosted agent.
               </p>
 
               {/* Feature bullets */}
               <ul className="max-w-xs mx-auto space-y-3 mb-10 text-left">
                 {[
-                  "Discipline-aware anomaly detection",
-                  "Natural-language interpretation reports",
-                  "Automated workflow recommendations",
-                  "Real-time inversion monitoring",
+                  "Local folder catalog",
+                  "Shipment 13 processing packs",
+                  "2D maps and sections",
+                  "Optional local Ollama assistant",
                 ].map((item, i) => (
                   <motion.li
                     key={item}

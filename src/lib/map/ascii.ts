@@ -1,6 +1,8 @@
 import type { RasterGrid } from "./types.ts";
 import { PREVIEW_POLICY, previewNote } from "./preview.ts";
 
+export type { RasterGrid } from "./types.ts";
+
 export interface AsciiCommentMeta {
   units?: string;
   quantity?: string;

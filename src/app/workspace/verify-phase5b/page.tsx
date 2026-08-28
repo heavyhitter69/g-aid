@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GridMapView, parseEsriAscii } from "@/components/workspace/grid-map-view";
+import { GridMapView } from "@/components/workspace/grid-map-view";
+import { parseEsriAscii } from "@/lib/map/ascii";
 import { SectionView } from "@/components/workspace/section-view";
 import { parseSectionCsv } from "@/lib/section/parse";
 import { gravityProductWarnings, NEAR_ZONE_MAP_LABEL } from "@/lib/gravity-product";

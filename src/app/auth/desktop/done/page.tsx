@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { desktopHandoffUrl } from "@/lib/desktop";
 
 export default function DesktopAuthDonePage() {
   const [handoffUrl, setHandoffUrl] = useState("gaid://auth/callback");
 
   useEffect(() => {
+    if (!hasSupabaseConfig()) return;
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { desktopHandoffUrl } from "@/lib/desktop";
 import { profileFromUser } from "@/lib/auth-user";
 
@@ -15,6 +15,10 @@ export default function DesktopConfirmPage() {
   const [handingOff, setHandingOff] = useState(false);
 
   useEffect(() => {
+    if (!hasSupabaseConfig()) {
+      router.replace("/auth/desktop?mode=login");
+      return;
+    }
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session?.user) {
@@ -30,6 +34,10 @@ export default function DesktopConfirmPage() {
 
   const completeHandoff = async () => {
     setHandingOff(true);
+    if (!hasSupabaseConfig()) {
+      router.replace("/auth/desktop?mode=login");
+      return;
+    }
     const supabase = createClient();
     const { data } = await supabase.auth.getSession();
     if (!data.session) {

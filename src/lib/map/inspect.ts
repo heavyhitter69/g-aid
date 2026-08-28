@@ -2,6 +2,8 @@ import { PREVIEW_POLICY } from "./preview.ts";
 import type { CrsInfo, ProfileResult, RasterGrid } from "./types.ts";
 import { inspectRaster } from "./ascii.ts";
 
+export type { CrsInfo, ProfileResult, RasterGrid };
+
 export function sampleProfile(
   grid: RasterGrid,
   a: { x: number; y: number },

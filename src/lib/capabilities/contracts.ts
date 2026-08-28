@@ -832,4 +832,4 @@ export function catalogRecordsForInputs(inputs: BoundInput[], catalog: ProjectCa
     .filter((record): record is CatalogRecord => Boolean(record));
 }
 
-export type { UserCapabilityId };
+export type { UserCapabilityId } from "./types.ts";

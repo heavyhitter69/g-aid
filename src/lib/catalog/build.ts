@@ -20,6 +20,8 @@ import { mergeGravityMappingFromPrevious } from "./gravity-mapping.ts";
 import { mergeRadioMappingFromPrevious } from "./radio-mapping.ts";
 import { mergeVectorRoleFromPrevious } from "./vector-role.ts";
 import { mergeGeochemMappingFromPrevious } from "./geochem-mapping.ts";
+import { catalogInspectionFromShapefile } from "./adapters/shapefile.ts";
+import { inspectShapefilePath } from "./adapters/shapefile-node.ts";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -60,7 +62,7 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
   const filename = path.basename(relativePath);
   const extension = fileExtension(filename);
   const parseErrors: string[] = [];
-  let peek = Buffer.alloc(0);
+  let peek: ReturnType<typeof peekFile> = Buffer.alloc(0);
   try {
     peek = peekFile(absPath, stat.size, extension === "las" || extension === "geojson" ? 65536 : undefined);
   } catch (err) {
@@ -95,8 +97,16 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     companionPrjText,
   };
   const classified = classifyPeek(ctx);
+  if (classified.adapterId === "shapefile") {
+    const inspected = inspectShapefilePath(absPath, siblingNames);
+    classified.inspect = catalogInspectionFromShapefile(inspected, ctx);
+    classified.supportStatus = classified.inspect.supportStatus || classified.supportStatus;
+    if (classified.inspect.parseErrors) {
+      parseErrors.push(...classified.inspect.parseErrors);
+    }
+  }
   if (classified.sniff?.parseErrors) parseErrors.push(...classified.sniff.parseErrors);
-  if (classified.inspect.parseErrors) parseErrors.push(...classified.inspect.parseErrors);
+  if (classified.adapterId !== "shapefile" && classified.inspect.parseErrors) parseErrors.push(...classified.inspect.parseErrors);
 
   let recordCount = classified.inspect.recordCount;
   if (

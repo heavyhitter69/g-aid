@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map as MapIcon } from "lucide-react";
 import { parseEsriAscii, type RasterGrid } from "@/lib/map/ascii";
 
+export { parseEsriAscii };
+export type { RasterGrid };
+
 export type OverlayPolygon =
   | { x: number; y: number }[]
   | { exterior: { x: number; y: number }[]; holes?: { x: number; y: number }[][] };
@@ -146,7 +149,7 @@ function drawMapChrome(
   ctx.fillText(lo.toFixed(0), barX - 10, barY + barH);
 }
 
-function hillshadeAt(grid: AsciiGrid, col: number, row: number, azimuthDeg = 315, altitudeDeg = 45): number {
+function hillshadeAt(grid: RasterGrid, col: number, row: number, azimuthDeg = 315, altitudeDeg = 45): number {
   const z = (c: number, r: number) => {
     if (c < 0 || r < 0 || c >= grid.ncols || r >= grid.nrows) return null;
     const v = grid.values[r * grid.ncols + c];
@@ -169,7 +172,7 @@ function hillshadeAt(grid: AsciiGrid, col: number, row: number, azimuthDeg = 315
   return Math.max(0, Math.min(1, shade));
 }
 
-function contourPolylines(grid: AsciiGrid, lo: number, hi: number, n = 8): { x: number; y: number }[][] {
+function contourPolylines(grid: RasterGrid, lo: number, hi: number, n = 8): { x: number; y: number }[][] {
   const levels: number[] = [];
   for (let i = 1; i < n; i++) levels.push(lo + ((hi - lo) * i) / n);
   const lines: { x: number; y: number }[][] = [];
@@ -248,7 +251,7 @@ export function GridMapView({
   onProfile,
 }: {
   title: string;
-  grid: AsciiGrid | null;
+  grid: RasterGrid | null;
   note?: string;
   overlay?: { x: number; y: number }[];
   overlayLines?: { x: number; y: number }[][];

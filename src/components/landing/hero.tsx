@@ -1,12 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Download } from "lucide-react";
+import { BookOpen, Download } from "lucide-react";
 import { LinkButton } from "@/components/ui/link-button";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import { useAppStore } from "@/store/app-store";
 
 function GlobeViz() {
   return (
@@ -38,7 +34,7 @@ function GlobeViz() {
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
           <div className="font-mono text-xs text-primary/60 mb-2 uppercase tracking-widest">
-            GEOPHYSICS - AGENT ITERATION DOMAIN
+            LOCAL DESKTOP WORKSPACE
           </div>
           <div className="h-24 w-48 mx-auto relative overflow-hidden rounded border border-primary/10 bg-background/40">
             {Array.from({ length: 12 }).map((_, i) => (
@@ -58,28 +54,6 @@ function GlobeViz() {
 }
 
 export function Hero() {
-  const { setCurrentProject, setProjectFiles, setAuthenticated, setUser } = useAppStore();
-  const router = useRouter();
-  const [os, setOs] = useState("Windows");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      if (userAgent.indexOf("win") !== -1) setOs("Windows");
-      else if (userAgent.indexOf("mac") !== -1) setOs("macOS");
-      else if (userAgent.indexOf("linux") !== -1) setOs("Linux");
-    }
-  }, []);
-
-  const handleEnterDemo = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setAuthenticated(false);
-    setUser(null);
-    setCurrentProject(null);
-    setProjectFiles([]);
-    router.push("/workspace");
-  };
-
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16">
       <div className="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
@@ -94,7 +68,7 @@ export function Hero() {
             transition={{ delay: 0.2 }}
             className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-xs font-mono text-white/80 mb-6"
           >
-            GEOPHYSICS - AGENT ITERATION DOMAIN
+            LOCAL DESKTOP GEOPHYSICS WORKSPACE
           </motion.div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
             <motion.span
@@ -103,8 +77,7 @@ export function Hero() {
               transition={{ delay: 0.35 }}
               className="block text-white"
             >
-              Geophysical interpretation and visualization assisted by multi-agent
-              orchestration
+              Survey files, maps, and processing packs on your machine
             </motion.span>
           </h1>
           <motion.p
@@ -113,8 +86,10 @@ export function Hero() {
             transition={{ delay: 0.6 }}
             className="text-lg text-zinc-400 max-w-xl mb-8"
           >
-            Scientific interpretation, visualization, workflow automation, and
-            collaborative analysis for modern geophysics.
+            G-AID is an Electron desktop workspace for geophysical survey data.
+            Shipment 13 covers cataloged magnetics, gravity near-zone work, ERT
+            ingest, radiometrics, GPR, LAS, geochemistry, and GIS vectors. It is
+            not a cloud workspace or a browser demo.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -122,12 +97,12 @@ export function Hero() {
             transition={{ delay: 0.75 }}
             className="flex flex-wrap gap-4"
           >
-            <LinkButton href="/G-AID Setup 0.1.0.exe" size="lg" variant="default" className="gap-2">
-              Download for {os} <Download className="h-4 w-4" />
+            <LinkButton href="/download" size="lg" variant="default" className="gap-2">
+              Desktop app status <Download className="h-4 w-4" />
             </LinkButton>
-            <Button onClick={handleEnterDemo} size="lg" variant="outline">
-              Launch Demo Workspace <ChevronRight className="h-4 w-4" />
-            </Button>
+            <LinkButton href="/docs" size="lg" variant="outline" className="gap-2">
+              Read the docs <BookOpen className="h-4 w-4" />
+            </LinkButton>
           </motion.div>
         </motion.div>
         <motion.div

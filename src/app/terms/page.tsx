@@ -2,7 +2,7 @@ import { LegalLayout } from "@/components/landing/legal-layout";
 
 export const metadata = {
   title: "Terms of Service — G-AID",
-  description: "G-AID Terms of Service: your rights and obligations when using the platform.",
+  description: "Terms for the G-AID public website and local desktop workspace.",
 };
 
 const SECTIONS = [
@@ -10,10 +10,10 @@ const SECTIONS = [
     id: "acceptance",
     heading: "1. Acceptance of Terms",
     body: (
-      <>
-        <p>By accessing or using the G-AID platform (the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service.</p>
-        <p>These Terms apply to all users of the Service, including without limitation users who are browsers, customers, merchants, and contributors of content. We reserve the right to update these Terms at any time, and will notify you of material changes via email or prominent notice within the platform.</p>
-      </>
+      <p>
+        By using this website or the G-AID desktop application, you agree to these Terms. If you
+        do not agree, do not use the software.
+      </p>
     ),
   },
   {
@@ -21,29 +21,36 @@ const SECTIONS = [
     heading: "2. Description of Service",
     body: (
       <>
-        <p>G-AID (Geophysics - Agent Iteration Domain) is an AI-assisted geophysical interpretation platform that provides tools for subsurface data analysis, workflow automation, and multi-agent scientific computing.</p>
-        <p>The Service is provided "as is" and we make no warranties, express or implied, regarding the accuracy of AI-generated interpretations. Users are responsible for validating all outputs against ground-truth data before use in any professional context.</p>
+        <p>
+          G-AID is a local desktop workspace for supported geophysical survey files. The public
+          website describes that software. It is not a hosted interpretation SaaS, a payment
+          product, or a general-availability installer channel until a GitHub Release exists.
+        </p>
+        <p>
+          Outputs are provided as-is. You must validate scientific results before professional use.
+        </p>
       </>
     ),
   },
   {
     id: "accounts",
-    heading: "3. User Accounts",
+    heading: "3. Accounts",
     body: (
-      <>
-        <p>You must create an account to access certain features of the Service. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
-        <p>You agree to provide accurate, current, and complete information during registration and to update such information to keep it accurate, current, and complete. We reserve the right to terminate accounts that contain false or misleading information.</p>
-      </>
+      <p>
+        Optional email/password accounts exist for desktop sign-in when authentication is
+        configured. If it is not configured, account creation is unavailable. Social login is not
+        offered.
+      </p>
     ),
   },
   {
     id: "data",
     heading: "4. Your Data and Content",
     body: (
-      <>
-        <p>You retain all rights to the geophysical datasets, project files, and other content you upload to the Service ("User Content"). By uploading User Content, you grant G-AID a limited, non-exclusive licence to process and store that content solely for the purpose of providing the Service to you.</p>
-        <p>You represent and warrant that you have all necessary rights to upload your User Content and that doing so does not violate any third-party rights or applicable law.</p>
-      </>
+      <p>
+        You retain rights to files on your disks. Opening a folder in G-AID does not grant Genie
+        Platforms a licence to host or resell those files.
+      </p>
     ),
   },
   {
@@ -51,11 +58,9 @@ const SECTIONS = [
     heading: "5. Prohibited Uses",
     body: (
       <ul className="list-disc list-inside space-y-2">
-        <li>Using the Service to process data for which you do not have authorisation</li>
-        <li>Attempting to reverse-engineer or extract the underlying AI models</li>
-        <li>Uploading malicious code, malware, or content designed to disrupt the Service</li>
-        <li>Reselling or sublicensing access to the Service without prior written consent</li>
-        <li>Using the Service to generate content that violates applicable laws or regulations</li>
+        <li>Processing data you are not authorised to use</li>
+        <li>Attempting to disrupt this website or other users&apos; machines</li>
+        <li>Misrepresenting G-AID outputs as certified cloud-hosted results</li>
       </ul>
     ),
   },
@@ -63,41 +68,50 @@ const SECTIONS = [
     id: "ip",
     heading: "6. Intellectual Property",
     body: (
-      <>
-        <p>The Service, including all software, algorithms, workflows, and documentation, is owned by G-AID and protected by intellectual property laws. Nothing in these Terms grants you ownership of any G-AID intellectual property.</p>
-        <p>AI-generated outputs produced by the Service may be used by you for lawful professional purposes. G-AID does not claim ownership over interpretations generated on your behalf.</p>
-      </>
+      <p>
+        The G-AID software and this website are owned by Genie Platforms. These Terms do not
+        transfer ownership of that software to you.
+      </p>
     ),
   },
   {
     id: "termination",
     heading: "7. Termination",
     body: (
-      <p>We may suspend or terminate your access to the Service at our discretion, with or without notice, for conduct that we believe violates these Terms or is harmful to other users, us, or third parties. Upon termination, your right to use the Service ceases immediately. Sections 4, 6, 8, and 9 survive termination.</p>
+      <p>
+        We may stop offering this website or optional accounts. Your local files remain yours.
+      </p>
     ),
   },
   {
     id: "liability",
     heading: "8. Limitation of Liability",
     body: (
-      <>
-        <p>To the maximum extent permitted by applicable law, G-AID shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or goodwill, arising from your use of or inability to use the Service.</p>
-        <p>Our total cumulative liability to you for any claims arising under these Terms shall not exceed the greater of (a) the amounts you paid to us in the twelve months preceding the claim, or (b) USD $100.</p>
-      </>
+      <p>
+        To the maximum extent permitted by law, G-AID and Genie Platforms are not liable for
+        indirect or consequential damages, including professional decisions made from experimental
+        or incomplete processing packs. If a court finds liability, it is limited to USD $100 or
+        the amount you paid us (currently none via this site), whichever is greater.
+      </p>
     ),
   },
   {
     id: "governing-law",
     heading: "9. Governing Law",
     body: (
-      <p>These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which G-AID is incorporated, without regard to its conflict of law provisions. Any disputes shall be resolved by binding arbitration in accordance with the rules of a mutually agreed arbitration body.</p>
+      <p>
+        These Terms are governed by the laws applicable to Genie Platforms, without regard to
+        conflict-of-law rules.
+      </p>
     ),
   },
   {
     id: "contact",
     heading: "10. Contact",
     body: (
-      <p>If you have questions about these Terms, please contact us at <span className="font-mono">legal@g-aid.io</span>.</p>
+      <p>
+        Questions: <span className="font-mono">legal@g-aid.io</span>.
+      </p>
     ),
   },
 ];
@@ -106,8 +120,8 @@ export default function TermsPage() {
   return (
     <LegalLayout
       title="Terms of Service"
-      subtitle="Please read these terms carefully before using the G-AID platform."
-      lastUpdated="May 25, 2026"
+      subtitle="Terms for the public website and the local G-AID desktop workspace."
+      lastUpdated="August 28, 2026"
       sections={SECTIONS}
     />
   );

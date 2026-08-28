@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layers, Loader2 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
-import { GridMapView, parseEsriAscii } from "@/components/workspace/grid-map-view";
+import { GridMapView } from "@/components/workspace/grid-map-view";
+import { parseEsriAscii } from "@/lib/map/ascii";
 import { folderOf } from "@/lib/job-results";
 import { companionAsciiPath } from "@/lib/survey-file-kinds";
 import { compareRunLayers, provenanceLabel } from "@/lib/map/compare";
@@ -562,7 +563,7 @@ export function VisualizationStudio() {
       : []),
     ...(active?.warnings || []),
     "A visual overlay does not prove geological, mineral, or geophysical causation.",
-  ].filter(Boolean);
+  ].filter((warning): warning is string => Boolean(warning));
 
   function moveLayer(id: string, dir: -1 | 1) {
     setLayerOrder((current) => {

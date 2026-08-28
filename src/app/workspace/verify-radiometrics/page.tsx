@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GridMapView, parseEsriAscii } from "@/components/workspace/grid-map-view";
+import { GridMapView } from "@/components/workspace/grid-map-view";
+import { parseEsriAscii } from "@/lib/map/ascii";
 import { TernaryView } from "@/components/workspace/ternary-view";
 import { parseRadioTernaryJson } from "@/lib/radio/ternary";
 import { radioProductWarnings } from "@/lib/radio-product";

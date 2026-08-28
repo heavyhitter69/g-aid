@@ -5,19 +5,8 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { AnimatedBackground } from "@/components/shared/animated-background";
-import { 
-  BookOpen, 
-  Terminal, 
-  Cpu, 
-  Layers, 
-  HelpCircle, 
-  ChevronRight,
-  Code,
-  ArrowLeft
-} from "lucide-react";
+import { BookOpen, Terminal } from "lucide-react";
 import Link from "next/link";
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const DOCS_SECTIONS = [
   {
@@ -27,19 +16,28 @@ const DOCS_SECTIONS = [
       {
         id: "quick-start",
         title: "Quick Start Guide",
-        desc: "Learn how to boot up G-AID, import subsurface datasets, and initiate agentic interpretation models in under five minutes.",
+        desc: "How G-AID actually runs today: a local Electron desktop workspace, not a cloud demo.",
         content: (
           <div className="space-y-4 text-sm leading-relaxed">
             <p>
-              Welcome to the **Geophysics - Agent Iteration Domain (G-AID)**! To begin your first interpretation, you can either launch our cloud-based **Demo Workspace** directly or install G-AID onto your local environment.
+              G-AID is a desktop application (Electron + Next.js + Python). Public
+              installers are not published yet. When they exist, they will appear on the{" "}
+              <Link href="/download" className="text-white underline underline-offset-2">
+                download page
+              </Link>{" "}
+              from a GitHub Release.
             </p>
-            <h4 className="font-bold text-white mt-4">1. Accessing the Workspace</h4>
+            <h4 className="font-bold text-white mt-4">1. Local workspace</h4>
             <p>
-              Click **Launch Demo Workspace** in the top navigation or main landing hero to access our state-of-the-art interactive workspace instantly. You will be authenticated as a guest and equipped with explore-level simulation resources.
+              Open a survey folder on disk. The catalog indexes supported files.
+              This website does not provide a guest cloud workspace or a public browser demo.
             </p>
-            <h4 className="font-bold text-white mt-4">2. Loading Datasets</h4>
+            <h4 className="font-bold text-white mt-4">2. Supported files (Shipment 13)</h4>
             <p>
-              Open the file manager in the left workspace sidebar to import ERT profiles, seismic volumes, or point cloud baseline adjustments. G-AID natively parses standard formats including SegY, GeoTIFF, and XYZ text logs.
+              Magnetics products, gravity grids (near-zone / zoned planar), ERT ingest and
+              pseudosections, radiometrics 1.0, GPR 1.0, LAS 2.0, GEOCHEM 1.0, GeoJSON CRS84,
+              and shapefiles (topology-aware holes). Native SEG-Y volumes and GeoTIFF-as-a-product
+              are not claimed here.
             </p>
           </div>
         ),
@@ -47,16 +45,23 @@ const DOCS_SECTIONS = [
       {
         id: "architecture",
         title: "System Architecture",
-        desc: "An overview of G-AID's double-bounded physical verification framework and dynamic multi-agent system structure.",
+        desc: "What actually runs: local catalog, processing DAG, Python engine, optional Ollama.",
         content: (
           <div className="space-y-4 text-sm leading-relaxed">
-            <p>
-              G-AID implements a **double-bounded physical verification model** to assist human interpreters. Our system comprises three main layers:
-            </p>
+            <p>G-AID is a local stack, not a hosted multi-agent cloud:</p>
             <ul className="list-disc list-inside space-y-2 text-[var(--text-secondary)] pl-2">
-              <li><strong className="text-white">Scientific Agent Layer:</strong> Domain-specific LLM orchestrators initialized with geophysics-focused priors.</li>
-              <li><strong className="text-white">Computation Layer:</strong> Advanced voxel and grid inversion pipelines bound tightly to standard mechanical priors.</li>
-              <li><strong className="text-white">Visualization Layer:</strong> High-performance WebGL-based subsurface and cross-section mapping panels.</li>
+              <li>
+                <strong className="text-white">Desktop shell:</strong> Electron loads the Next.js UI and talks to a local Python engine.
+              </li>
+              <li>
+                <strong className="text-white">Catalog and DAG:</strong> Files on disk are classified and processed by registered pack nodes.
+              </li>
+              <li>
+                <strong className="text-white">Maps:</strong> 2D grids, vectors, logs, radargrams, and sections. Not a 3D WebGL voxel engine.
+              </li>
+              <li>
+                <strong className="text-white">Optional assistant:</strong> Local Ollama on the desktop machine. There is no hosted inference product.
+              </li>
             </ul>
           </div>
         ),
@@ -65,31 +70,36 @@ const DOCS_SECTIONS = [
   },
   {
     id: "core-features",
-    category: "Core Features",
+    category: "Capability packs",
     items: [
       {
         id: "agentic-orchestration",
-        title: "Agentic Orchestration",
-        desc: "Using seven specialized AI agents calibrated with domain-specific priors for collaborative scientific interpretations.",
+        title: "Processing packs",
+        desc: "Shipment 13 packs and their limits — not seven complete cloud agents.",
         content: (
           <div className="space-y-4 text-sm leading-relaxed">
             <p>
-              G-AID features seven pre-loaded, specialized geophysics agents (Seismology, Magnetics, ERT, Geodesy, Geomatics, etc.). 
+              In scope: magnetics; gravity near-zone and zoned planar (Complete Bouguer is not
+              auto-granted); ERT ingest/pseudosection with experimental invert2d; radiometrics 1.0;
+              GPR 1.0; LAS 2.0; GEOCHEM 1.0; GeoJSON CRS84; shapefiles.
             </p>
             <p>
-              Each agent works independently or collaboratively to resolve ambiguities. For example, joint inversions automatically orchestrate ERT and gravity agents to match shared density boundaries.
+              Out of scope: production SEG-Y interpretation, seismology hypocenter location,
+              LiDAR classification, billed cloud workspaces, and hosted model APIs.
             </p>
           </div>
         ),
       },
       {
         id: "3d-visualization",
-        title: "3D Subsurface Visualization",
-        desc: "Harnessing 3D voxel dual renders, point-cloud displays, and interactive cross-section builders for deep analysis.",
+        title: "Visualization",
+        desc: "2D maps and sections in the desktop workspace.",
         content: (
           <div className="space-y-4 text-sm leading-relaxed">
             <p>
-              Render large-scale geological volumes smoothly using our dynamic canvas panel. You can easily toggle point-cloud densities, configure perceptually uniform palettes (Turbo, Seismic, Viridis), or slice deep profiles in real-time.
+              The live UI shows grid maps, vector overlays, ERT pseudosections, GPR radargrams,
+              LAS tracks, and geochem plots. Colour ramps exist for those 2D views. A production
+              3D voxel / point-cloud dual renderer is not shipped.
             </p>
           </div>
         ),
@@ -98,21 +108,27 @@ const DOCS_SECTIONS = [
   },
   {
     id: "troubleshooting",
-    category: "Troubleshooting",
+    category: "Limits",
     items: [
       {
         id: "faq",
         title: "Frequently Asked Questions",
-        desc: "Quick answers to common questions about G-AID usage bounds, data ownership, and desktop installation pipelines.",
+        desc: "Data location, accounts, and what this site will not promise.",
         content: (
           <div className="space-y-4 text-sm leading-relaxed">
-            <h4 className="font-bold text-white">Is my data secure?</h4>
+            <h4 className="font-bold text-white">Where does my data go?</h4>
             <p>
-              Yes. All imported datasets are encrypted using state-of-the-art TLS 1.3 and stored within SOC 2 compliant physical boundaries. G-AID operates under zero-knowledge storage protocols.
+              Survey files stay in the folder you open on disk. This site does not operate a
+              certified cloud object store for customer surveys.
             </p>
-            <h4 className="font-bold text-white mt-4">Why does my agent interpretation timeout?</h4>
+            <h4 className="font-bold text-white mt-4">Can I download an installer?</h4>
             <p>
-              High-resolution 3D joint-inversion models can take up to several minutes to process. Check the activity status log in the workspace bottom bar to track computation queues.
+              Only if a GitHub Release with installer assets exists. Until then the download page
+              shows that installers are unavailable.
+            </p>
+            <h4 className="font-bold text-white mt-4">Is there a browser demo?</h4>
+            <p>
+              No. The desktop workspace route is for the Electron app, not a public guest demo.
             </p>
           </div>
         ),
@@ -121,14 +137,11 @@ const DOCS_SECTIONS = [
   },
 ];
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function DocsPage() {
   const [activeSectionId, setActiveSectionId] = useState("quick-start");
-
-  // Flat array of all items for simple search or lookup
-  const currentItem = DOCS_SECTIONS.flatMap(s => s.items).find(item => item.id === activeSectionId) 
-    || DOCS_SECTIONS[0].items[0];
+  const currentItem =
+    DOCS_SECTIONS.flatMap((s) => s.items).find((item) => item.id === activeSectionId) ||
+    DOCS_SECTIONS[0].items[0];
 
   return (
     <main
@@ -139,7 +152,6 @@ export default function DocsPage() {
       <Navbar />
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 pt-32 pb-24">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -154,15 +166,14 @@ export default function DocsPage() {
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold" style={{ color: "var(--text-primary)" }}>
-            G-AID Knowledge Center
+            G-AID documentation
           </h1>
           <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
-            Explore guides, technical specifications, and system manuals to optimize your agentic geophysics workflows.
+            Honest notes for the Shipment 13 desktop workspace.
           </p>
         </motion.div>
 
         <div className="flex flex-col lg:flex-row gap-12">
-          {/* Sidebar navigation */}
           <motion.aside
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
@@ -186,9 +197,9 @@ export default function DocsPage() {
                           <button
                             onClick={() => setActiveSectionId(item.id)}
                             className="text-[13px] block w-full text-left transition-colors duration-150 py-1"
-                            style={{ 
+                            style={{
                               color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                              fontWeight: isActive ? "600" : "400"
+                              fontWeight: isActive ? "600" : "400",
                             }}
                           >
                             {item.title}
@@ -202,7 +213,6 @@ export default function DocsPage() {
             </div>
           </motion.aside>
 
-          {/* Core content block */}
           <motion.article
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -216,10 +226,7 @@ export default function DocsPage() {
                 borderColor: "var(--border-subtle)",
               }}
             >
-              <h2
-                className="text-2xl font-bold mb-3"
-                style={{ color: "var(--text-primary)" }}
-              >
+              <h2 className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
                 {currentItem.title}
               </h2>
               <p
@@ -229,21 +236,17 @@ export default function DocsPage() {
                 {currentItem.desc}
               </p>
 
-              <div className="prose prose-invert max-w-none text-[14px]">
-                {currentItem.content}
-              </div>
+              <div className="prose prose-invert max-w-none text-[14px]">{currentItem.content}</div>
 
-              {/* Callout box */}
-              <div
-                className="mt-12 rounded-lg border p-4 bg-white/5 border-white/10 flex items-start gap-3"
-              >
+              <div className="mt-12 rounded-lg border p-4 bg-white/5 border-white/10 flex items-start gap-3">
                 <Terminal className="h-5 w-5 text-[#e8613a] shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-xs font-bold text-white mb-1 uppercase tracking-wider font-mono">
-                    Need Developer Support?
+                    Source
                   </h4>
                   <p className="text-xs text-[var(--text-muted)]">
-                    Explore API bounds, developer environments, or joint-inversion pipelines in our developer forum or raise an issue.
+                    Development happens in the public repository. Internal verify routes are for
+                    desktop QA, not public documentation.
                   </p>
                 </div>
               </div>

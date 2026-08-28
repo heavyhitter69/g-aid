@@ -50,87 +50,87 @@ const DISCIPLINE_DETAILS: Record<string, {
   steps: { title: string; desc: string }[];
 }> = {
   exploration: {
-    problem: "Geophysicists historically jump between heavy seismic interpretation suites, separate velocity modeling packages, and Word processors to compile target prospects.",
-    traditionalApps: ["Petrel", "Kingdom", "Excel", "MS Word"],
-    aiProcess: "The Exploration Agent coordinates seismic profile parsing, runs automated horizon picking, drafts structural maps, and lists target coordinates with confidence scores—all in one session.",
-    speedupMultiplier: "14x Faster",
-    keyFeature: "Automated Horizon & Structural Trap Identification",
+    problem: "Exploration teams often keep magnetics and gravity grids in separate tools from maps and QC notes.",
+    traditionalApps: ["Oasis montaj", "Geosoft grids", "QGIS"],
+    aiProcess: "The desktop workspace catalogs local survey files and runs magnetics plus gravity near-zone / zoned planar packs. It does not ingest production SEG-Y or replace a seismic interpretation suite.",
+    speedupMultiplier: "Local files",
+    keyFeature: "Magnetics and gravity grids in one local catalog",
     steps: [
-      { title: "Raw SEGY Ingestion", desc: "No manual formats. Agent parses and aligns coordinates instantly." },
-      { title: "AI Horizon Picking", desc: "Neural networks trace reflectors and identify faults in seconds." },
-      { title: "Prospect Generation", desc: "Agent ranks potential structural traps based on structural geology rules." }
+      { title: "Open a local folder", desc: "The catalog indexes survey files on disk. Nothing is uploaded to a cloud workspace." },
+      { title: "Magnetics pack", desc: "Process magnetic survey products that the catalog recognizes." },
+      { title: "Gravity near-zone", desc: "Near-zone and zoned planar corrections. Complete Bouguer is not auto-granted." }
     ]
   },
   environmental: {
-    problem: "Site investigators bounce between GPR processing tools, contour plotting software, and custom spreadsheets to locate buried hazards and map contaminants.",
-    traditionalApps: ["Radan", "Surfer", "Excel", "QGIS"],
-    aiProcess: "The Environmental Agent processes high-frequency GPR radargrams, filters noise, maps anomaly clusters, and overlays them directly onto GIS maps in real-time.",
-    speedupMultiplier: "8x Faster",
-    keyFeature: "Real-time Hyperbola & Plume Delineation",
+    problem: "Near-surface investigations mix GPR, resistivity, and simple site maps.",
+    traditionalApps: ["GPR viewers", "ERT spreadsheets", "QGIS"],
+    aiProcess: "GPR 1.0 and ERT ingest/pseudosection run locally. invert2d is experimental. This is not an automated UXO or plume-delineation product.",
+    speedupMultiplier: "Ingest first",
+    keyFeature: "GPR radargrams and ERT sections from local files",
     steps: [
-      { title: "Multi-sensor Fusion", desc: "Combine EM, GPR, and resistivity datasets in a single coordinate grid." },
-      { title: "Anomaly Delineation", desc: "Neural hyperbola detection maps buried metallic hazards (UXO) or pipes." },
-      { title: "Interactive Export", desc: "Instant vector overlays ready for engineering site crews." }
+      { title: "GPR 1.0", desc: "Ingest and display radargrams with stated QC limits." },
+      { title: "ERT ingest", desc: "Load resistivity profiles and show pseudosections." },
+      { title: "Experimental invert2d", desc: "2D inversion is labelled experimental, not a production solver." }
     ]
   },
   seismology: {
-    problem: "Seismologists manage custom Python scripts, terminal-based phase pickers, and distinct mapping libraries to analyze event sequences.",
-    traditionalApps: ["SAC", "Seisan", "ObsPy Scripts", "GMT"],
-    aiProcess: "The Seismology Agent automatically monitors incoming waveforms, picks P and S wave arrivals with sub-millisecond precision, and runs joint relocations in the same workspace.",
-    speedupMultiplier: "20x Faster",
-    keyFeature: "Deep Learning Phase Picking & Real-time Location",
+    problem: "Earthquake monitoring needs continuous waveforms, catalogs, and locators.",
+    traditionalApps: ["SAC", "ObsPy", "Seisan"],
+    aiProcess: "G-AID is not a seismology processing suite. Waveform picking, hypocenter location, and tomography are out of scope for Shipment 13.",
+    speedupMultiplier: "Out of scope",
+    keyFeature: "Not a seismology workstation",
     steps: [
-      { title: "Continuous Waveform QC", desc: "Cleans seismic signal streams and flags microseismic anomalies." },
-      { title: "AI Phase Picking", desc: "Applies deep-neural network pickers to achieve high timing precision." },
-      { title: "Joint Relocation", desc: "Runs double-difference location algorithms and updates catalogs instantly." }
+      { title: "What exists", desc: "A local catalog and map workspace for supported survey types." },
+      { title: "What does not", desc: "No continuous waveform pipeline, phase picker, or hypocenter engine." },
+      { title: "If you need that", desc: "Use dedicated seismology tools. G-AID will not pretend to replace them." }
     ]
   },
   hydrogeophysics: {
-    problem: "Groundwater engineers alternate between ERT/TDEM inversion software, hydrogeologic modelers, and report templates to delineate aquifer boundaries.",
-    traditionalApps: ["Res2DInv", "Modflow", "Excel", "AutoCAD"],
-    aiProcess: "The Hydrogeophysical Agent couples electrical and electromagnetic inversions with hydrological constraints, building dynamic aquifer models natively.",
-    speedupMultiplier: "10x Faster",
-    keyFeature: "Coupled Hydro-Geophysical Inversion",
+    problem: "Aquifer work often starts from ERT profiles and well logs, not a full hydro model.",
+    traditionalApps: ["Res2DInv", "LAS viewers", "Excel"],
+    aiProcess: "ERT ingest and LAS 2.0 borehole logs are in scope. Coupled hydrogeologic inversion and TDEM sounding workflows are not.",
+    speedupMultiplier: "Logs + ERT",
+    keyFeature: "ERT sections and LAS borehole tracks locally",
     steps: [
-      { title: "ERT/TDEM Alignment", desc: "Merges shallow ERT profiles with deep TDEM soundings." },
-      { title: "AI-Guided Inversion", desc: "Constrains conductivity thresholds using dynamic fluid-flow bounds." },
-      { title: "Aquifer Boundary Mapping", desc: "Delineates groundwater tables and provides estimated recharge zones." }
+      { title: "ERT profiles", desc: "Ingest resistivity data and view pseudosections." },
+      { title: "LAS 2.0", desc: "Borehole logs with collar mapping when CRS is present." },
+      { title: "Not included", desc: "No Modflow coupling and no production ERT inversion product." }
     ]
   },
   "data-analysis": {
-    problem: "Data scientists write custom filtering algorithms, run heavy inversion code in terminal scripts, and utilize separate libraries for plotting and validation.",
-    traditionalApps: ["MATLAB", "Jupyter/Python", "OriginLab", "PowerPoint"],
-    aiProcess: "The Data Analysis Agent features a unified sandboxed workspace. It applies noise reduction, runs joint inversions, and builds high-quality plots without context switching.",
-    speedupMultiplier: "12x Faster",
-    keyFeature: "AI Sandboxed Inversion & Plotting Engine",
+    problem: "Survey processing is a mix of grids, QC, and maps rather than a generic inversion sandbox.",
+    traditionalApps: ["Python notebooks", "GMT", "Excel"],
+    aiProcess: "The workspace runs a local processing DAG with pack-specific nodes. Joint inversion across physics is not a shipped product.",
+    speedupMultiplier: "Catalog DAG",
+    keyFeature: "Local processing DAG with pack QC",
     steps: [
-      { title: "Signal Denoising", desc: "Applies wavelet and neural filters to isolate authentic geologic signals." },
-      { title: "Joint Inversion", desc: "Simultaneously inverts magnetic, gravity, and resistivity datasets." },
-      { title: "Interactive Plotting", desc: "Generates publication-ready figures and error distributions automatically." }
+      { title: "Catalog", desc: "Discover files and register supported formats." },
+      { title: "Pack nodes", desc: "Run the magnetics, gravity, GPR, LAS, GIS, and geochem nodes that exist." },
+      { title: "Maps", desc: "Preview grids and vectors. This is 2D map UI, not a 3D voxel engine." }
     ]
   },
   geotechnical: {
-    problem: "Geotechnical engineers export shear-wave profiles from MASW tools, overlay boring logs in CAD, and manually evaluate soil stiffness metrics.",
-    traditionalApps: ["SeisImager", "AutoCAD", "Excel", "Geostudio"],
-    aiProcess: "The Geotechnical Agent automates dispersion curve picking on MASW data, integrates standard penetration test (SPT) logs, and generates soil profile reports.",
-    speedupMultiplier: "9x Faster",
-    keyFeature: "Automated Dispersion Curve Picking & Lithology Fusion",
+    problem: "Site investigation files include GPR, resistivity, and simple GIS outlines.",
+    traditionalApps: ["GPR viewers", "CAD", "Excel"],
+    aiProcess: "GPR 1.0, ERT ingest, and shapefile/GeoJSON overlays help organize site files. MASW dispersion picking and SPT fusion are not implemented.",
+    speedupMultiplier: "Site files",
+    keyFeature: "GPR, ERT, and vector overlays for site folders",
     steps: [
-      { title: "MASW Processing", desc: "Extracts dispersion curves automatically from raw seismic records." },
-      { title: "Borehole Data Fusion", desc: "Overlays soil boring logs with shear-wave velocity profiles." },
-      { title: "Foundation Reports", desc: "Computes elastic moduli and flags bedrock depths / void anomalies." }
+      { title: "Open the site folder", desc: "Catalog local files; keep data on disk." },
+      { title: "GPR and ERT", desc: "View radargrams and resistivity sections when the format is supported." },
+      { title: "Vectors", desc: "GeoJSON CRS84 and shapefiles with topology-aware holes." }
     ]
   },
   geomatics: {
-    problem: "Geomatics teams load massive LiDAR point clouds in specialized software, process GPS benchmarks in distinct utilities, and generate contour layers in GIS.",
-    traditionalApps: ["CloudCompare", "Trimble Business Center", "ArcGIS", "Word"],
-    aiProcess: "The Geomatics Agent ingests point clouds, performs automatic vegetation/building classification, and calculates topographic change metrics in the main view.",
-    speedupMultiplier: "15x Faster",
-    keyFeature: "AI Point Cloud Classification & Spatial Change Tracking",
+    problem: "Field programs need simple GIS vectors on maps, not a full remote-sensing stack.",
+    traditionalApps: ["QGIS", "ArcGIS", "shapefile tools"],
+    aiProcess: "GeoJSON CRS84 and shapefile ingest with topology-aware holes. LiDAR classification, GNSS adjustment, and photogrammetry DEMs are not in Shipment 13.",
+    speedupMultiplier: "Vectors",
+    keyFeature: "GeoJSON CRS84 and shapefile overlays",
     steps: [
-      { title: "LiDAR / DEM Processing", desc: "Filters and classifies millions of surface points in seconds." },
-      { title: "Change Detection", desc: "Computes differential terrain grids to track landslides or erosion." },
-      { title: "GIS Layout Integration", desc: "Exports ready-to-use vector shapefiles and high-res layout plans." }
+      { title: "GeoJSON CRS84", desc: "RFC 7946 lon/lat GeoJSON on the map." },
+      { title: "Shapefiles", desc: "Ingest shapefiles and keep polygon holes instead of exterior-only approximations." },
+      { title: "Not included", desc: "No LiDAR point-cloud engine and no photogrammetry DEM pipeline." }
     ]
   }
 };
@@ -153,7 +153,7 @@ export function Disciplines() {
             Geophysical <span className="text-primary">Disciplines</span>
           </h2>
           <p className="text-zinc-400 max-w-2xl mx-auto">
-            Specialized agents and workflows to assist in branches of applied geophysics
+            Application areas. Click a card for what Shipment 13 actually supports — and what it does not.
           </p>
         </motion.div>
         
@@ -280,7 +280,7 @@ export function Disciplines() {
                     })()}
                   </div>
                   <span className={`text-xs uppercase tracking-wider font-mono ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                    Agent Profile
+                    Support snapshot
                   </span>
                 </div>
 
@@ -306,7 +306,7 @@ export function Disciplines() {
 
                 <div>
                   <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
-                    AI Agent In-Loop Steps
+                    What Shipment 13 does
                   </h4>
                   <div className="space-y-3">
                     {(DISCIPLINE_DETAILS[selectedDetail.id]?.steps || []).map((step, idx) => (
@@ -333,7 +333,7 @@ export function Disciplines() {
                 <div>
                   <div className="flex justify-between items-start mb-6">
                     <span className={`text-xs uppercase tracking-wider font-mono ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
-                      Unified Automation
+                      Scope
                     </span>
                     <div 
                       className="px-3 py-1 rounded-full border text-xs font-semibold font-mono shadow-sm"
@@ -343,7 +343,7 @@ export function Disciplines() {
                         backgroundColor: `${selectedDetail.color}10` 
                       }}
                     >
-                      {DISCIPLINE_DETAILS[selectedDetail.id]?.speedupMultiplier || "10x Speedup"}
+                      {DISCIPLINE_DETAILS[selectedDetail.id]?.speedupMultiplier || "See notes"}
                     </div>
                   </div>
 
