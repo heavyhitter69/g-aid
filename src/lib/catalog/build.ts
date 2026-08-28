@@ -19,6 +19,7 @@ import type { SniffContext } from "./adapters/types.ts";
 import { mergeGravityMappingFromPrevious } from "./gravity-mapping.ts";
 import { mergeRadioMappingFromPrevious } from "./radio-mapping.ts";
 import { mergeVectorRoleFromPrevious } from "./vector-role.ts";
+import { mergeGeochemMappingFromPrevious } from "./geochem-mapping.ts";
 import { catalogInspectionFromShapefile } from "./adapters/shapefile.ts";
 import { inspectShapefilePath } from "./adapters/shapefile-node.ts";
 
