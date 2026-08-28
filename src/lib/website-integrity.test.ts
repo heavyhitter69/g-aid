@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -7,6 +8,8 @@ import { spawn } from "node:child_process";
 import { catalogFromGithubRelease, emptyDownloadCatalog, matchPlatformAsset } from "./public-download.ts";
 import { parseEsriAscii } from "./map/ascii.ts";
 import { isUsableSupabaseConfig } from "./supabase/config.ts";
+import { catalogRecordId } from "./catalog/ids.ts";
+import { sha256Utf8Hex } from "./sha256.ts";
 
 let failed = 0;
 function test(name: string, fn: () => void | Promise<void>) {
@@ -83,6 +86,18 @@ await test("client catalog adapters do not import node:fs", () => {
   }
   assert.deepEqual(hits, []);
   assert.equal(fs.existsSync(path.join(root, "src/lib/catalog/adapters/shapefile-node.ts")), true);
+});
+
+await test("catalog ids do not import node:crypto and stay SHA-256 stable", () => {
+  const ids = read("src/lib/catalog/ids.ts");
+  assert.equal(ids.includes("node:crypto"), false);
+  assert.equal(ids.includes("node:fs"), false);
+  assert.equal(sha256Utf8Hex(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  assert.equal(sha256Utf8Hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  const key = "day 1/rover.csv";
+  const node = createHash("sha256").update(key, "utf8").digest("hex");
+  assert.equal(sha256Utf8Hex(key), node);
+  assert.equal(catalogRecordId("DAY 1/rover.csv"), `rec:${node.slice(0, 16)}`);
 });
 
 await test("grid-map-view re-exports parseEsriAscii so workspace compile cannot 500 marketing", () => {

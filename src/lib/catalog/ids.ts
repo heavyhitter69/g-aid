@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { sha256Utf8Hex } from "../sha256.ts";
 
 export function posixRel(rel: string): string {
   return String(rel || "")
@@ -10,7 +10,7 @@ export function posixRel(rel: string): string {
 /** Stable catalog id from the workspace-relative path, not file bytes. */
 export function catalogRecordId(relativePath: string): string {
   const key = posixRel(relativePath).toLowerCase();
-  const digest = createHash("sha256").update(key, "utf8").digest("hex");
+  const digest = sha256Utf8Hex(key);
   return `rec:${digest.slice(0, 16)}`;
 }
 
