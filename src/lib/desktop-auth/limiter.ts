@@ -24,12 +24,19 @@ export interface DesktopAuthLimiter {
 
 export class MemoryDesktopAuthLimiter implements DesktopAuthLimiter {
   private readonly hits = new Map<string, number[]>();
+  private readonly windowMs: number;
+  private readonly max: number;
+  private readonly now: () => number;
 
   constructor(
-    private readonly windowMs = DESKTOP_AUTH_RATE_LIMIT_WINDOW_MS,
-    private readonly max = DESKTOP_AUTH_RATE_LIMIT_MAX,
-    private readonly now: () => number = Date.now
-  ) {}
+    windowMs = DESKTOP_AUTH_RATE_LIMIT_WINDOW_MS,
+    max = DESKTOP_AUTH_RATE_LIMIT_MAX,
+    now: () => number = Date.now
+  ) {
+    this.windowMs = windowMs;
+    this.max = max;
+    this.now = now;
+  }
 
   allow(clientKey: string): DesktopAuthLimitDecision {
     const key = clientKey || "unknown";
