@@ -50,6 +50,12 @@ test("software contains Electron, workspace, catalog, Python, tests, and packagi
   const pkg = JSON.parse(read("software/package.json"));
   assert.equal(pkg.main, "electron/main.js");
   assert.ok(pkg.build);
+  const files: string[] = pkg.build.files ?? [];
+  assert.ok(files.includes("!website/**/*"));
+  assert.ok(files.includes("!tests/**/*"));
+  assert.ok(files.includes("!docs/**/*"));
+  assert.ok(files.includes("!python/tests/**/*"));
+  assert.ok(files.includes("!public/env-gphy.jpg"));
   assert.equal(exists("software/src/app/docs"), false);
   assert.equal(exists("software/src/app/download"), false);
   assert.equal(exists("software/src/components/landing"), false);

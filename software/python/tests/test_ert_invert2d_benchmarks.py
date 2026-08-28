@@ -8,6 +8,11 @@ Self-consistent 2.5-D synthetics (same Dey–Morrison engine as the invert) are
 used only for buried-target geometry, and are labelled as such.
 
 The historical Gaussian half-space kernel's failed two-layer case is preserved.
+
+Pytest collects the parametrized wrappers in this module. The JSON programme is
+also the documented runner:
+
+    python3 python/tests/test_ert_invert2d_benchmarks.py
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ import os
 import sys
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -124,7 +130,7 @@ def test_historical_gaussian_two_layer_failure():
     }
 
 
-def test_homogeneous(array: str, n: float, rng_seed: int):
+def homogeneous_case(array: str, n: float, rng_seed: int):
     rng = np.random.default_rng(rng_seed)
     true_rho = 100.0
     xs = np.linspace(10, 70, 7)
@@ -152,7 +158,7 @@ def test_homogeneous(array: str, n: float, rng_seed: int):
     }
 
 
-def test_two_layer_independent(rho1, rho2, h, name, rng_seed: int):
+def two_layer_independent_case(rho1, rho2, h, name, rng_seed: int):
     rng = np.random.default_rng(rng_seed)
     xs = np.linspace(10, 70, 8)
     spacings = [4.0, 8.0, 12.0, 20.0]
@@ -192,7 +198,7 @@ def test_two_layer_independent(rho1, rho2, h, name, rng_seed: int):
     }
 
 
-def test_buried_target(kind: str, rng_seed: int):
+def buried_target_case(kind: str, rng_seed: int):
     """Self-consistent 2.5-D synthetic: same engine as invert (labelled)."""
     rng = np.random.default_rng(rng_seed)
     xs = np.linspace(10, 70, 7)
@@ -311,6 +317,46 @@ def test_outliers():
     }
 
 
+HOMOGENEOUS_CASES = (
+    ("wenner", 1.0, 7),
+    ("dipole_dipole", 2.0, 9),
+    ("schlumberger", 4.0, 13),
+)
+TWO_LAYER_CASES = (
+    (50.0, 500.0, 8.0, "two_layer_wenner_50_over_500_h8", 11),
+    (50.0, 500.0, 4.0, "two_layer_wenner_50_over_500_h4", 17),
+    (200.0, 40.0, 8.0, "two_layer_wenner_200_over_40_h8", 19),
+)
+BURIED_TARGET_CASES = (
+    ("conductive", 23),
+    ("resistive", 29),
+)
+
+
+@pytest.mark.parametrize("array,n,rng_seed", HOMOGENEOUS_CASES)
+def test_homogeneous(array: str, n: float, rng_seed: int):
+    case = homogeneous_case(array, n, rng_seed)
+    assert case["name"] == f"homogeneous_100ohm_{array}_5pct_noise"
+    assert case["required_for_production"] is True
+    assert case["pass"] is True, case
+
+
+@pytest.mark.parametrize("rho1,rho2,h,name,rng_seed", TWO_LAYER_CASES)
+def test_two_layer_independent(rho1, rho2, h, name, rng_seed: int):
+    case = two_layer_independent_case(rho1, rho2, h, name, rng_seed)
+    assert case["name"] == name
+    assert case["required_for_production"] is True
+    assert case["pass"] is True, case
+
+
+@pytest.mark.parametrize("kind,rng_seed", BURIED_TARGET_CASES)
+def test_buried_target(kind: str, rng_seed: int):
+    case = buried_target_case(kind, rng_seed)
+    assert case["name"] == f"buried_{kind}_block_self_consistent_25d"
+    assert case["required_for_production"] is False
+    assert isinstance(case["pass"], bool)
+
+
 def write_results(cases: list[dict]) -> str:
     os.makedirs(RESULTS_DIR, exist_ok=True)
     path = os.path.abspath(os.path.join(RESULTS_DIR, "ert_invert2d_benchmarks.json"))
@@ -372,15 +418,10 @@ if __name__ == "__main__":
     cases = [
         test_forward_vs_wenner_image_series(),
         test_historical_gaussian_two_layer_failure(),
-        test_homogeneous("wenner", 1.0, 7),
-        test_homogeneous("dipole_dipole", 2.0, 9),
-        test_homogeneous("schlumberger", 4.0, 13),
-        test_two_layer_independent(50.0, 500.0, 8.0, "two_layer_wenner_50_over_500_h8", 11),
-        test_two_layer_independent(50.0, 500.0, 4.0, "two_layer_wenner_50_over_500_h4", 17),
-        test_two_layer_independent(200.0, 40.0, 8.0, "two_layer_wenner_200_over_40_h8", 19),
+        *[homogeneous_case(*row) for row in HOMOGENEOUS_CASES],
+        *[two_layer_independent_case(*row) for row in TWO_LAYER_CASES],
         test_two_layer_oracle_array_coverage(),
-        test_buried_target("conductive", 23),
-        test_buried_target("resistive", 29),
+        *[buried_target_case(*row) for row in BURIED_TARGET_CASES],
         test_jacobian_euler_and_depth_sensitivity(),
         test_outliers(),
     ]

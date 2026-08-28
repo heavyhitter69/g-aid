@@ -17,13 +17,61 @@ function test(name: string, fn: () => void) {
 const root = process.cwd();
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
+const MARKETING_PUBLIC = [
+  "public/data.jpg",
+  "public/env-gphy.jpg",
+  "public/exp-gphy.jpg",
+  "public/geo.jpg",
+  "public/gtech.jpg",
+  "public/hydro.jpg",
+  "public/seis.jpg",
+];
+
+function walkFiles(dir: string, acc: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return acc;
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) walkFiles(full, acc);
+    else acc.push(full);
+  }
+  return acc;
+}
+
+function findUnpackedApp(): string | null {
+  const dist = path.join(root, "dist_desktop");
+  if (!fs.existsSync(dist)) return null;
+  const candidates = [
+    path.join(dist, "linux-unpacked", "resources", "app"),
+    path.join(dist, "linux-unpacked"),
+    path.join(dist, "mac", "G-AID.app", "Contents", "Resources", "app"),
+    path.join(dist, "win-unpacked", "resources", "app"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, "electron", "main.js")) || fs.existsSync(path.join(candidate, "package.json"))) {
+      return candidate;
+    }
+    const nested = path.join(candidate, "resources", "app");
+    if (fs.existsSync(path.join(nested, "electron", "main.js"))) return nested;
+  }
+  return null;
+}
+
 test("Electron main and builder paths stay inside software/", () => {
   assert.equal(pkg.main, "electron/main.js");
   assert.equal(fs.existsSync(path.join(root, "electron/main.js")), true);
   assert.equal(fs.existsSync(path.join(root, "electron/desktop-auth.js")), true);
   assert.equal(fs.existsSync(path.join(root, "electron/preload.js")), true);
   const files: string[] = pkg.build?.files ?? [];
-  assert.equal(files.some((f: string) => f.includes("website/")), false);
+  assert.equal(files.some((f: string) => f.includes("website/") && !f.startsWith("!")), false);
+  assert.ok(files.includes("!website/**/*"));
+  assert.ok(files.includes("!tests/**/*"));
+  assert.ok(files.includes("!docs/**/*"));
+  assert.ok(files.includes("!python/tests/**/*"));
+  assert.ok(files.includes("!src/**/*.ts"));
+  assert.ok(files.includes("!src/**/*.tsx"));
+  for (const asset of MARKETING_PUBLIC) {
+    assert.ok(files.includes(`!${asset}`), asset);
+  }
   const extras = pkg.build?.extraResources ?? [];
   assert.ok(extras.some((e: { from?: string }) => e.from === "python/dist/g-aid-engine"));
   assert.ok(extras.some((e: { from?: string }) => e.from === "resources/ai"));
@@ -40,6 +88,44 @@ test("desktop auth client does not return browser secrets to the renderer", () =
   assert.match(desktopAuth, /return \{ started: true \}/);
   assert.match(desktopAuth, /redactSensitiveText/);
   assert.equal(desktopAuth.includes("g-aid.io"), false);
+});
+
+test("packaged dry-run tree excludes website, marketing, fixtures, and validation evidence", () => {
+  const unpacked = findUnpackedApp();
+  if (!unpacked) {
+    console.log("skip  packaged dry-run tree (dist_desktop unpacked app not present yet)");
+    return;
+  }
+  const rels = walkFiles(unpacked).map((file) => path.relative(unpacked, file).replace(/\\/g, "/"));
+  const joined = rels.join("\n");
+  assert.equal(joined.includes("website/"), false, "packaged tree contains website/");
+  assert.equal(rels.some((rel) => rel.startsWith("tests/")), false, "packaged tree contains tests/");
+  assert.equal(rels.some((rel) => rel.startsWith("docs/")), false, "packaged tree contains docs/");
+  assert.equal(rels.some((rel) => rel.startsWith("python/tests/")), false, "packaged tree contains python/tests/");
+  assert.equal(rels.some((rel) => rel.endsWith(".test.ts")), false, "packaged tree contains *.test.ts");
+  for (const asset of MARKETING_PUBLIC) {
+    assert.equal(rels.includes(asset), false, asset);
+  }
+  assert.ok(fs.existsSync(path.join(unpacked, "electron/main.js")));
+  assert.ok(fs.existsSync(path.join(unpacked, "electron/preload.js")));
+  assert.ok(
+    fs.existsSync(path.join(unpacked, ".next")) || fs.existsSync(path.join(unpacked, ".next/BUILD_ID")),
+    "Next build output missing from packaged app"
+  );
+  assert.ok(
+    fs.existsSync(path.join(unpacked, "public/g-aid logo.png")) ||
+      fs.existsSync(path.join(unpacked, "public/g-aid-logo.png"))
+  );
+  const resourcesRoot = path.resolve(unpacked, "..");
+  const engine = path.join(resourcesRoot, "g-aid-engine");
+  const ai = path.join(resourcesRoot, "ai");
+  assert.ok(fs.existsSync(engine) || fs.existsSync(path.join(unpacked, "python")), "Python engine/resources missing");
+  assert.ok(fs.existsSync(ai) || fs.existsSync(path.join(unpacked, "resources/ai")), "AI extraResources missing");
+  const iconOk =
+    fs.existsSync(path.join(unpacked, "build/icon.png")) ||
+    fs.existsSync(path.join(resourcesRoot, "..", "usr", "share", "icons")) ||
+    walkFiles(path.resolve(unpacked, "..", "..")).some((file) => /icon\.(png|ico|icns)$/i.test(file));
+  assert.ok(iconOk, "packaged icons missing");
 });
 
 if (failed) {

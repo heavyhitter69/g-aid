@@ -86,6 +86,8 @@
       "!**/.tmp/**/*",
       "!src/**/*.ts",
       "!src/**/*.tsx",
+      "!**/*.test.ts",
+      "!**/*.test.js",
       "!.next/cache/**/*",
       "!.next/dev/**/*",
       "!.next/standalone/**/*",
@@ -95,7 +97,18 @@
       "!python/.venv/**/*",
       "!python/dist/**/*",
       "!python/tests/**/*",
-      "!python/**/__pycache__/**/*"
+      "!python/**/__pycache__/**/*",
+      "!tests/**/*",
+      "!docs/**/*",
+      "!website/**/*",
+      "!public/data.jpg",
+      "!public/env-gphy.jpg",
+      "!public/exp-gphy.jpg",
+      "!public/geo.jpg",
+      "!public/gtech.jpg",
+      "!public/hydro.jpg",
+      "!public/seis.jpg",
+      "!public/trademark/**/*"
     ],
     "extraMetadata": {
       "main": "electron/main.js"
