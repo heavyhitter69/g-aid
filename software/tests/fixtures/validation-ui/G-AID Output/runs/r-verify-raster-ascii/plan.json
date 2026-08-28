@@ -1,0 +1,12 @@
+{
+  "runId": "r-verify-raster-ascii",
+  "planHash": "fixture-r-verify-raster-ascii",
+  "intent": "raster",
+  "status": "complete",
+  "capabilities": [
+    "gis.raster_inspect",
+    "gis.raster_view"
+  ],
+  "product": "G-AID documented raster layer",
+  "parameters": {}
+}

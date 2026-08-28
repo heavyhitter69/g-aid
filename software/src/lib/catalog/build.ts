@@ -22,6 +22,8 @@ import { mergeVectorRoleFromPrevious } from "./vector-role.ts";
 import { mergeGeochemMappingFromPrevious } from "./geochem-mapping.ts";
 import { catalogInspectionFromShapefile } from "./adapters/shapefile.ts";
 import { inspectShapefilePath } from "./adapters/shapefile-node.ts";
+import { catalogInspectionFromGeoTiff } from "./adapters/geotiff.ts";
+import { inspectGeoTiffPath } from "./adapters/geotiff-node.ts";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -105,8 +107,18 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
       parseErrors.push(...classified.inspect.parseErrors);
     }
   }
+  if (classified.adapterId === "geotiff") {
+    const inspected = inspectGeoTiffPath(absPath);
+    classified.inspect = catalogInspectionFromGeoTiff(inspected);
+    classified.supportStatus = classified.inspect.supportStatus || classified.supportStatus;
+    if (classified.inspect.parseErrors) {
+      parseErrors.push(...classified.inspect.parseErrors);
+    }
+  }
   if (classified.sniff?.parseErrors) parseErrors.push(...classified.sniff.parseErrors);
-  if (classified.adapterId !== "shapefile" && classified.inspect.parseErrors) parseErrors.push(...classified.inspect.parseErrors);
+  if (classified.adapterId !== "shapefile" && classified.adapterId !== "geotiff" && classified.inspect.parseErrors) {
+    parseErrors.push(...classified.inspect.parseErrors);
+  }
 
   let recordCount = classified.inspect.recordCount;
   if (
@@ -195,6 +207,20 @@ function inspectRecord(absPath: string, relativePath: string, stat: fs.Stats): C
     crsSource: classified.inspect.crsSource,
     axisOrder: classified.inspect.axisOrder,
     coordinateOrder: classified.inspect.coordinateOrder,
+    ncols: classified.inspect.ncols,
+    nrows: classified.inspect.nrows,
+    nodata: classified.inspect.nodata,
+    bandCount: classified.inspect.bandCount,
+    dataType: classified.inspect.dataType,
+    compression: classified.inspect.compression,
+    rasterLayout: classified.inspect.rasterLayout,
+    geotransform: classified.inspect.geotransform,
+    valueMin: classified.inspect.valueMin,
+    valueMax: classified.inspect.valueMax,
+    overviewCount: classified.inspect.overviewCount,
+    previewRequired: classified.inspect.previewRequired,
+    pixelsDecodable: classified.inspect.pixelsDecodable,
+    rasterContract: classified.inspect.rasterContract,
     provenance: {
       method: classified.method,
       adapterId: classified.adapterId || undefined,

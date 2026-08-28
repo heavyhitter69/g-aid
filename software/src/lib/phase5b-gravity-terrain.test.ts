@@ -123,14 +123,14 @@ test("grav.terrain_near_zone is registered; grav.terrain is not; default gravity
   assert.equal(complete.nodes.find((n) => n.id === "grav_gridder")?.dependencies.includes("gravity_terrain"), true);
 });
 
-test("catalog-project gis/dem.asc stays recognised-unsupported esri-ascii-grid", () => {
+test("catalog-project gis/dem.asc is supported esri-ascii-grid for view, not dem-ascii", () => {
   const catalogRoot = path.join(process.cwd(), "tests/fixtures/catalog-project");
   const catalog = buildProjectCatalog(catalogRoot);
   const dem = catalog.records.find((item) => item.relativePath.replace(/\\/g, "/") === "gis/dem.asc");
   assert.ok(dem);
   assert.equal(dem.formatId, "esri-ascii-grid");
   assert.equal(dem.adapterId, "esri-ascii-grid");
-  assert.equal(dem.supportStatus, "recognised-unsupported");
+  assert.equal(dem.supportStatus, "supported");
 });
 
 test("documented DEM ASCII is a supported dem-ascii terrain source", () => {
@@ -177,18 +177,18 @@ test("incompatible DEM CRS blocks near-zone terrain-corrected Bouguer", () => {
   }
 });
 
-test("absent vertical datum blocks near-zone terrain-corrected Bouguer", () => {
+test("absent vertical datum is not a DEM and blocks near-zone terrain-corrected Bouguer", () => {
   const root = tmpCopy();
   try {
     const catalog = buildProjectCatalog(root);
     const dem = byPath(catalog.records, "missing-datum-dem/dem.asc");
-    assert.equal(dem.adapterId, "dem-ascii");
-    assert.notEqual(dem.supportStatus, "supported");
-    assert.ok(dem.parseErrors?.some((err) => /ElevationDatum|vertical datum/i.test(err)));
+    assert.equal(dem.formatId, "esri-ascii-grid");
+    assert.equal(dem.adapterId, "esri-ascii-grid");
+    assert.notEqual(dem.formatId, "dem-ascii");
     const inputs = collectPlanInputs(null, "missing-datum-dem", catalog);
     const check = validatePlan(terrainPlan(root, { targetFolder: "missing-datum-dem", inputs }), catalog);
     assert.equal(check.ok, false);
-    assert.equal(check.blockers.some((issue) => issue.code === "dem_no_vertical_datum"), true);
+    assert.equal(check.blockers.some((issue) => issue.code === "no_dem"), true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -349,6 +349,9 @@ test("near-zone terrain-corrected grids are labelled separately from simple Boug
 test("inspectDemText requires documented CRS, metres, and vertical datum", () => {
   const inspected = inspectDemText("ncols 2\nnrows 2\nxllcorner 0\nyllcorner 0\ncellsize 10\n1 2\n3 4\n");
   assert.equal(inspected.looksLikeDem, false);
+  const crsOnly = inspectDemText("/ EPSG=32630\n/ Units=m\nncols 2\nnrows 2\nxllcorner 0\nyllcorner 0\ncellsize 10\n1 2\n3 4\n");
+  assert.equal(crsOnly.looksLikeDem, false);
+  assert.equal(crsOnly.formatId, "esri-ascii-grid");
   const ready = inspectDemText("/ EPSG=32630\n/ Units=m\n/ ElevationDatum=orthometric\nncols 2\nnrows 2\nxllcorner 0\nyllcorner 0\ncellsize 10\n1 2\n3 4\n");
   assert.equal(ready.looksLikeDem, true);
   assert.equal(ready.epsg, 32630);

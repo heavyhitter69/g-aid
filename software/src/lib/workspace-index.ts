@@ -104,6 +104,7 @@ export type AnalysisIntent =
   | "gpr"
   | "borehole"
   | "gis"
+  | "raster"
   | "geochemistry";
 
 export function splitUserAndContext(message: string): { userText: string; context: string } {
@@ -143,6 +144,13 @@ export function detectAnalysisIntent(message: string): AnalysisIntent | null {
     );
   if (!otherSurvey && gisTokens && (wantsWork || /\bspatial overlap\b|\bvector ingest\b|\bvector overlay\b/.test(m))) {
     return "gis";
+  }
+  const rasterTokens =
+    /\b(geotiff|geo-?tiff|\.tiff?\b|\bcog\b|ascii[\s-]?grid|esri ascii|raster overlay|raster inspect|terrain (?:view|layer)|dem ascii)\b/.test(
+      m
+    );
+  if (!otherSurvey && rasterTokens && (wantsWork || /\braster overlay\b|\bterrain (?:view|layer)\b/.test(m))) {
+    return "raster";
   }
   const diurnal =
     /\bdiurnal\b/.test(m) ||

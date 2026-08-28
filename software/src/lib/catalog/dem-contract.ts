@@ -1,7 +1,10 @@
 /**
  * G-AID DEM ASCII contract (Phase 5B).
- * An ESRI ASCII grid is not a supported terrain source unless EPSG, Units=m,
- * and ElevationDatum are documented in comment lines. G-AID never downloads a DEM.
+ * An ESRI ASCII grid is not a DEM unless an ElevationDatum/VerticalDatum comment
+ * is present. EPSG or Units=m alone is not enough — generic ASCII grids may carry
+ * those without being terrain. Support still requires EPSG, Units=m, and
+ * ElevationDatum. G-AID never downloads a DEM, and a filename containing "dem"
+ * is not a DEM.
  */
 
 import type { CatalogBBox } from "./types.ts";
@@ -25,6 +28,7 @@ export interface DemContractResult {
   nrows?: number;
   errors: string[];
   warnings: string[];
+  nodata?: number;
 }
 
 const COMMENT_RE =
@@ -46,13 +50,14 @@ function parseAsciiHeader(text: string): {
   cellsize?: number;
   xll?: number;
   yll?: number;
+  nodata?: number;
 } {
   const map: Record<string, number> = {};
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || /^[/#;]/.test(trimmed)) continue;
     const match = trimmed.match(
-      /^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize)\s+([-+0-9.eE]+)/i
+      /^(ncols|nrows|xllcorner|yllcorner|xllcenter|yllcenter|cellsize|nodata_value)\s+([-+0-9.eE]+)/i
     );
     if (!match) {
       if (Object.keys(map).length) break;
@@ -71,6 +76,7 @@ function parseAsciiHeader(text: string): {
     cellsize: cell,
     xll,
     yll,
+    nodata: map.nodata_value,
   };
 }
 
@@ -136,7 +142,9 @@ export function inspectDemText(text: string): DemContractResult {
     };
   }
 
-  const looksLikeDem = hasContractComment && hasGrid;
+  // Require a vertical/elevation datum comment. EPSG or Units=m alone is
+  // not enough — generic ASCII grids may carry those without being DEMs.
+  const looksLikeDem = Boolean(datumRaw) && hasGrid;
   return {
     looksLikeDem,
     formatId: looksLikeDem ? DEM_ASCII_FORMAT : "esri-ascii-grid",
@@ -148,6 +156,7 @@ export function inspectDemText(text: string): DemContractResult {
     cellSizeM: Number.isFinite(header.cellsize) ? header.cellsize : undefined,
     ncols: header.ncols,
     nrows: header.nrows,
+    nodata: Number.isFinite(header.nodata) ? header.nodata : undefined,
     errors: looksLikeDem ? errors : [],
     warnings,
   };

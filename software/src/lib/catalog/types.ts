@@ -184,9 +184,23 @@ export interface CatalogRecord {
   encoding?: string;
   encodingSource?: "cpg" | "undeclared-cp1252";
   crsConfidence?: "high" | "medium" | "none";
-  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj" | "geotiff-geokeys";
   axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
+  ncols?: number;
+  nrows?: number;
+  nodata?: number;
+  bandCount?: number;
+  dataType?: string;
+  compression?: string;
+  rasterLayout?: string;
+  geotransform?: [number, number, number, number, number, number] | number[];
+  valueMin?: number;
+  valueMax?: number;
+  overviewCount?: number;
+  previewRequired?: boolean;
+  pixelsDecodable?: boolean;
+  rasterContract?: string;
   provenance: CatalogProvenance;
 }
 

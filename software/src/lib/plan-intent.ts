@@ -64,6 +64,7 @@ export function intentToSteps(
   if (intent === "gpr") next.gpr = true;
   if (intent === "borehole") next.borehole = true;
   if (intent === "gis") next.gisVector = true;
+  if (intent === "raster") next.gisRaster = true;
   if (intent === "geochemistry") next.geochem = true;
 
   const mag =
@@ -94,7 +95,7 @@ export function inferIntentFromFiles(
 ): AnalysisIntent | "none" {
   if (detected) return detected;
   const m = message.toLowerCase();
-  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay|geochem|assays?|soil samples?|stream[\s-]?sediments?)\b/.test(m)) {
+  if (/\b(bouguer|free[\s-]?air|gravity|mgal|ert|resistivity|seismic|segy|gpr|radiometr|borehole|well[\s-]?log|\blas\b|geojson|shapefile|geopackage|vector overlay|geochem|assays?|soil samples?|stream[\s-]?sediments?|geotiff|ascii grid|raster overlay)\b/.test(m)) {
     return detectAnalysisIntent(message) || "none";
   }
   void index;
@@ -166,6 +167,15 @@ export function collectPlanInputs(
       crsSource: record.crsSource,
       axisOrder: record.axisOrder,
       coordinateOrder: record.coordinateOrder,
+      ncols: record.ncols,
+      nrows: record.nrows,
+      nodata: record.nodata,
+      bandCount: record.bandCount,
+      dataType: record.dataType,
+      compression: record.compression,
+      rasterLayout: record.rasterLayout,
+      previewRequired: record.previewRequired,
+      pixelsDecodable: record.pixelsDecodable,
     }));
   }
   void index;

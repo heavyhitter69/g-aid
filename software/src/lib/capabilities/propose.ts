@@ -48,6 +48,11 @@ export const GIS_DEFAULT: UserCapabilityId[] = [
   "gis.interpret",
 ];
 
+export const RASTER_DEFAULT: UserCapabilityId[] = [
+  "gis.raster_inspect",
+  "gis.raster_view",
+];
+
 export const GEOCHEM_DEFAULT: UserCapabilityId[] = [
   "geochem.ingest",
   "geochem.qc",
@@ -71,6 +76,7 @@ export function stepKeyFromCapability(id: UserCapabilityId): string {
   if (id.startsWith("rad.")) return "radiometrics";
   if (id.startsWith("gpr.")) return "gpr";
   if (id.startsWith("borehole.")) return "borehole";
+  if (id === "gis.raster_inspect" || id === "gis.raster_view" || id === "gis.terrain_view") return "gisRaster";
   if (id.startsWith("gis.")) return "gisVector";
   if (id.startsWith("geochem.")) return "geochem";
   const found = Object.entries(STEP_TO_CAPABILITY).find(([, value]) => value === id);
@@ -144,6 +150,11 @@ export function capabilitiesFromSteps(steps: Record<string, boolean>): UserCapab
       if (!ids.includes(id)) ids.push(id);
     }
   }
+  if (steps.gisRaster) {
+    for (const id of RASTER_DEFAULT) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+  }
   if (steps.geochem) {
     for (const id of GEOCHEM_DEFAULT) {
       if (!ids.includes(id)) ids.push(id);
@@ -166,6 +177,7 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
   steps.gpr = false;
   steps.borehole = false;
   steps.gisVector = false;
+  steps.gisRaster = false;
   steps.geochem = false;
   for (const id of ids) {
     if (!isRegisteredCapability(id)) continue;
@@ -214,6 +226,10 @@ export function stepsFromCapabilities(ids: string[]): Record<string, boolean> {
     }
     if (id.startsWith("borehole.")) {
       steps.borehole = true;
+      continue;
+    }
+    if (id === "gis.raster_inspect" || id === "gis.raster_view" || id === "gis.terrain_view") {
+      steps.gisRaster = true;
       continue;
     }
     if (id.startsWith("gis.")) {
@@ -363,6 +379,18 @@ export function proposeCapabilitiesFromMessage(message: string, previous: UserCa
     if (/\bexport\b/.test(m)) next.add("gis.export_vector");
   }
 
+  const rasterDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(raster|geotiff|ascii grid)\b/.test(m);
+  const rasterAsk =
+    !otherSurvey &&
+    (/\bgeotiff\b|\bgeo-?tiff\b|\.tiff?\b|\bcog\b/.test(m) ||
+      /\bascii[\s-]?grid\b|\besri ascii\b/.test(m) ||
+      /\braster (layer|overlay|inspect|view)\b/.test(m) ||
+      /\bterrain (view|layer)\b|\bview the dem\b/.test(m));
+  if (rasterAsk && !rasterDeny) {
+    for (const id of RASTER_DEFAULT) next.add(id);
+    if (/\bterrain (view|layer)\b|\bview the dem\b|\bdem ascii\b/.test(m)) next.add("gis.terrain_view");
+  }
+
   const geochemDeny = /\b(skip|omit|without|exclude|disable|drop|no|don't|dont|do not)\b.{0,40}\b(geochem|assays?|soil samples?)\b/.test(m);
   const geochemAsk =
     /\b(geochem|geochemical|assays?|soil samples?|stream[\s-]?sediments?|rock[\s-]?chips?|rock samples?)\b/.test(m) &&
@@ -415,5 +443,16 @@ export function unregisteredProposal(message: string): string | undefined {
   }
   if (/\bjoint inversion\b/.test(m)) return "joint-inversion";
   if (/\b3d\s+(ert|invers)/.test(m) || /\bert\s+3d\b/.test(m)) return "ert-3d";
+  if (
+    /\b(hillshade|slope map|aspect map|spectral index|\bndvi\b|\bndwi\b|raster algebra|map algebra)\b/.test(m)
+  ) {
+    return "gis.raster_process";
+  }
+  if (/\breproject\b/.test(m) && /\b(raster|geotiff|dem|grid|cog)\b/.test(m)) {
+    return "gis.reproject_raster";
+  }
+  if (/\b(lidar|point[\s-]?cloud|\blaz\b)\b/.test(m) && /\b(raster|dem|grid)\b/.test(m)) {
+    return "gis.lidar";
+  }
   return undefined;
 }

@@ -7,6 +7,7 @@ import { crsFromCatalog, crsFromPrj } from "./crs.ts";
 import { gravityProductWarnings, isNearZoneTerrainPath } from "../gravity-product.ts";
 import { gisLayerHeading, gisProductWarnings } from "../gis-product.ts";
 import { geochemLayerHeading, geochemProductWarnings } from "../geochem-product.ts";
+import { rasterLayerHeading, rasterProductWarnings } from "../raster-product.ts";
 
 export type { MapLayerSpec, RunArtifact };
 
@@ -38,13 +39,14 @@ export function mapValueUnits(path: string, formatId?: string, recorded?: string
   if (!unitsUnknown(recorded)) return recorded!.trim();
   const n = posix(path).toLowerCase();
   if (isRadiometricMapPath(path, formatId)) return recorded?.trim() || "unknown";
-  if (formatId === "dem-ascii" || /\bdem\b/.test(n)) return "m";
+  if (formatId === "dem-ascii") return "m";
+  if (/near_zone_terrain_corrected_bouguer|bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
+  if (formatId === "geotiff" || formatId === "esri-ascii-grid") return recorded?.trim() || "unknown";
   if (formatId === "geojson" || formatId === "shapefile" || n.endsWith(".geojson") || n.endsWith(".shp")) {
     if (/gravity|bouguer|free_air|free-air/.test(n)) return "mGal";
     if (/geochem_points/.test(n)) return recorded?.trim() || "assay-units";
     return "coordinate";
   }
-  if (/near_zone_terrain_corrected_bouguer|bouguer|free_air|free-air|gravity_/.test(n)) return "mGal";
   return "nT";
 }
 
@@ -67,15 +69,19 @@ function originFor(path: string, displayStatus: MapLayerSpec["displayStatus"]): 
 export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec {
   const adapter = displayAdapterFor(record.formatId);
   const dem = isDemAscii(record);
-  const formatId = dem ? "dem-ascii" : record.formatId;
+  const formatId = record.formatId;
   let viewable = Boolean(adapter?.viewable);
   let decoded = Boolean(adapter?.decoded);
   if (record.formatId === "shapefile" && record.supportStatus !== "supported") {
     viewable = false;
     decoded = false;
   }
+  if (record.formatId === "geotiff" && record.pixelsDecodable === false) {
+    decoded = false;
+  }
   let displayStatus: MapLayerSpec["displayStatus"] = "not-viewable";
-  if (viewable && decoded) displayStatus = "viewable";
+  if (viewable && decoded && record.previewRequired) displayStatus = "preview";
+  else if (viewable && decoded) displayStatus = "viewable";
   else if (viewable) displayStatus = "recognised-not-decoded";
   else if (adapter && !adapter.decoded) displayStatus = "recognised-not-decoded";
   else if (record.formatId === "shapefile") displayStatus = "recognised-not-decoded";
@@ -115,13 +121,30 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
           axisOrder: record.axisOrder,
         })
       : undefined;
+  const rasterWarnings =
+    record.mediaClass === "raster" && (record.formatId === "geotiff" || record.formatId === "esri-ascii-grid" || record.formatId === "dem-ascii")
+      ? rasterProductWarnings({
+          path: record.relativePath,
+          formatId: record.formatId,
+          crs: record.crs,
+          crsSource: record.crsSource,
+          nodata: record.nodata,
+          nodataPresent: record.nodata != null,
+          compression: record.compression,
+          rasterLayout: record.rasterLayout,
+          pixelsDecodable: record.pixelsDecodable,
+          previewRequired: record.previewRequired,
+          bandCount: record.bandCount,
+          terrain: dem,
+        })
+      : undefined;
   const label =
     record.adapterId === "geochem-csv" || record.adapterId === "geochem-xyz"
       ? `${geochemLayerHeading(record.geochemMapping?.elements?.[0]?.symbol, record.units)} — ${record.filename}`
       : record.formatId === "geojson" || record.formatId === "shapefile"
       ? `${gisLayerHeading(record.vectorRole?.role, record.vectorRole?.reviewed)} — ${record.filename}`
-      : dem
-        ? `DEM ${record.filename}`
+      : record.mediaClass === "raster"
+        ? `${rasterLayerHeading({ terrain: dem, formatId: record.formatId, preview: record.previewRequired })} — ${record.filename}`
         : record.filename;
   return {
     id: record.id,
@@ -137,11 +160,21 @@ export function layerSpecFromCatalogRecord(record: CatalogRecord): MapLayerSpec 
     bbox: record.bbox,
     units: mapValueUnits(record.relativePath, formatId, record.units),
     reason: adapter?.reason,
-    representation: decoded && viewable ? "full" : "undecoded",
-    warnings: geochemWarnings || vectorWarnings,
+    representation: decoded && viewable ? (record.previewRequired ? "preview" : "full") : "undecoded",
+    warnings: geochemWarnings || vectorWarnings || rasterWarnings,
     vectorRole: record.vectorRole,
     attributeNames: record.attributeNames,
     geometryTypes: record.geometryTypes,
+    nodata: record.nodata,
+    bandCount: record.bandCount,
+    dataType: record.dataType,
+    compression: record.compression,
+    rasterLayout: record.rasterLayout,
+    overviewCount: record.overviewCount,
+    previewRequired: record.previewRequired,
+    pixelsDecodable: record.pixelsDecodable,
+    valueMin: record.valueMin,
+    valueMax: record.valueMax,
   };
 }
 

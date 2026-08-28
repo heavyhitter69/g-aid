@@ -1,0 +1,15 @@
+{
+  "node_id": "raster_inspect",
+  "formula": "Documented raster inspect (metadata only)",
+  "parameters": {
+    "n": 1
+  },
+  "inputs": [
+    "compressed/grid.tif"
+  ],
+  "outputs": [
+    "/workspace/software/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-raster-compressed/raster_canonical.json",
+    "/workspace/software/tests/fixtures/validation-ui/G-AID Output/runs/r-verify-raster-compressed/raster_inspect_qc.json"
+  ],
+  "created_at": "2026-08-28T17:44:49.358754Z"
+}

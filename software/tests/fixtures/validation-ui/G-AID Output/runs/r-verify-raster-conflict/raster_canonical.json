@@ -1,0 +1,105 @@
+{
+  "kind": "gis-raster",
+  "layers": [
+    {
+      "looks_like_tiff": true,
+      "is_bigtiff": false,
+      "endian": "LE",
+      "width": 2,
+      "height": 2,
+      "band_count": 1,
+      "bits_per_sample": 32,
+      "sample_format": 3,
+      "data_type": "float32",
+      "compression": "uncompressed",
+      "compression_code": 1,
+      "layout": "strips",
+      "overview_count": 0,
+      "cog_like": false,
+      "geotransform": [
+        500000.0,
+        10.0,
+        0.0,
+        6000020.0,
+        0.0,
+        -10.0
+      ],
+      "bbox": {
+        "minX": 500000.0,
+        "minY": 6000000.0,
+        "maxX": 500020.0,
+        "maxY": 6000020.0
+      },
+      "cell_size": 10.0,
+      "crs": "EPSG:32630",
+      "crs_epsg": 32630,
+      "crs_confidence": "high",
+      "crs_source": "geotiff-geokeys",
+      "nodata": -9999.0,
+      "pixels_loaded": false,
+      "pixels_decodable": true,
+      "preview_required": false,
+      "raster_contract": "geotiff-classic",
+      "source_format": "geotiff",
+      "support_status": "supported",
+      "reprojected": false,
+      "errors": [],
+      "notes": [
+        "Pixel values were not loaded during catalog inspect."
+      ],
+      "checksum_strategy": "file",
+      "source_path": "crs-conflict/utm.tif",
+      "size": 308,
+      "catalog_id": "rec-utm",
+      "checksum": "rec-utm",
+      "filename_dem_inference": false
+    },
+    {
+      "looks_like_ascii": true,
+      "width": 2,
+      "height": 2,
+      "band_count": 1,
+      "data_type": "ascii-float",
+      "compression": "uncompressed",
+      "layout": "ascii",
+      "geotransform": [
+        18.0,
+        0.01,
+        0.0,
+        -32.98,
+        0.0,
+        -0.01
+      ],
+      "bbox": {
+        "minX": 18.0,
+        "minY": -33.0,
+        "maxX": 18.02,
+        "maxY": -32.98
+      },
+      "cell_size": 0.01,
+      "crs": "EPSG:4326",
+      "crs_epsg": 4326,
+      "crs_confidence": "high",
+      "crs_source": "epsg-comment",
+      "units": null,
+      "nodata": -9999.0,
+      "pixels_loaded": false,
+      "pixels_decodable": true,
+      "preview_required": false,
+      "raster_contract": "esri-ascii",
+      "source_format": "esri-ascii-grid",
+      "support_status": "supported",
+      "reprojected": false,
+      "errors": [],
+      "notes": [
+        "ESRI ASCII grid. Cell values were not fully loaded into the catalog.",
+        "A filename containing 'dem' does not make this a DEM."
+      ],
+      "source_path": "crs-conflict/other.asc",
+      "size": 100,
+      "filename_dem_inference": false,
+      "catalog_id": "rec-4326",
+      "checksum": "rec-4326"
+    }
+  ]
+}

@@ -48,6 +48,18 @@ function demInspect(ctx: { peekText: string }): CatalogInspection {
     parseErrors: errors.length ? errors : undefined,
     supportStatus: ready ? "supported" : "recognised-unsupported",
     elevationDatum: inspected.elevationDatum,
+    ncols: inspected.ncols,
+    nrows: inspected.nrows,
+    nodata: inspected.nodata,
+    bandCount: 1,
+    dataType: "ascii-float",
+    compression: "uncompressed",
+    rasterLayout: "ascii",
+    previewRequired: false,
+    pixelsDecodable: true,
+    rasterContract: ready ? "dem-ascii" : "esri-ascii",
+    crsConfidence: inspected.crs ? "high" : "none",
+    crsSource: inspected.crs ? "epsg-comment" : undefined,
   };
 }
 

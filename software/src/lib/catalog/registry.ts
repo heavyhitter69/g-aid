@@ -2,6 +2,8 @@ import { magarrowAdapter } from "./adapters/magarrow.ts";
 import { gsm19Adapter } from "./adapters/gsm19.ts";
 import { gravityCsvAdapter, gravityXyzAdapter } from "./adapters/gravity.ts";
 import { demAsciiAdapter } from "./adapters/dem.ts";
+import { geotiffAdapter } from "./adapters/geotiff.ts";
+import { asciiGridAdapter } from "./adapters/ascii-grid.ts";
 import { ertCsvAdapter, ertDatAdapter } from "./adapters/ert.ts";
 import { radiometricCsvAdapter, radiometricSpectrumAdapter, radiometricXyzAdapter } from "./adapters/radio.ts";
 import { gprCsvAdapter, gprDztAdapter } from "./adapters/gpr.ts";
@@ -30,6 +32,8 @@ const adapters: CatalogAdapter[] = [
   shapefileAdapter,
   geochemXyzAdapter,
   geochemCsvAdapter,
+  geotiffAdapter,
+  asciiGridAdapter,
   ...recognisedAdapters,
 ];
 

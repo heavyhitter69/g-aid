@@ -1,6 +1,7 @@
 import type { CrsInfo, RasterGrid } from "./types.ts";
 import { PREVIEW_POLICY, previewNote } from "./preview.ts";
 import { crsFromEpsg } from "./crs.ts";
+import { inspectTiffBuffer } from "../catalog/raster-contract.ts";
 
 function subsampleGrid(grid: RasterGrid): RasterGrid {
   const stepX = Math.max(1, Math.ceil(grid.ncols / PREVIEW_POLICY.maxGridDimension));
@@ -52,86 +53,72 @@ function gridToAscii(grid: RasterGrid): string {
   return lines.join("\n");
 }
 
-function readEpsgFromGeoKeys(buf: Buffer, offset: number, count: number): number | undefined {
-  if (offset + 8 > buf.length) return undefined;
-  const nKeys = buf.readUInt16LE(offset + 6);
-  const usable = Math.min(nKeys, Math.floor((count - 4) / 4));
-  for (let i = 0; i < usable; i++) {
-    const o = offset + 8 + i * 8;
-    if (o + 8 > buf.length) break;
-    const id = buf.readUInt16LE(o);
-    const value = buf.readUInt16LE(o + 6);
-    if (id === 3072 || id === 2048) return value;
+function readSample(
+  buf: Buffer,
+  offset: number,
+  bits: number,
+  sampleFormat: number,
+  endian: "LE" | "BE"
+): number {
+  if (bits === 8) {
+    const v = buf[offset];
+    return sampleFormat === 2 ? (v << 24) >> 24 : v;
   }
-  return undefined;
+  if (bits === 16) {
+    const v = endian === "LE" ? buf.readUInt16LE(offset) : buf.readUInt16BE(offset);
+    return sampleFormat === 2 ? (v << 16) >> 16 : v;
+  }
+  if (bits === 32 && sampleFormat === 3) {
+    return endian === "LE" ? buf.readFloatLE(offset) : buf.readFloatBE(offset);
+  }
+  if (bits === 32 && sampleFormat === 2) {
+    return endian === "LE" ? buf.readInt32LE(offset) : buf.readInt32BE(offset);
+  }
+  throw new Error("unsupported sample");
 }
 
 /**
- * Decode uncompressed little-endian G-AID GeoTIFF 1.0 (float32 or int32).
- * Compressed COGs, tiled TIFFs, and BigTIFF are not decoded.
+ * Decode uncompressed Classic TIFF strips (uint8/uint16/int16/int32/float32).
+ * Band 1 only when SamplesPerPixel > 1. Compressed, tiled, BigTIFF, and huge
+ * rasters return null — catalog inspect still holds metadata and extent.
  */
 export function parseGaidGeoTiff(buf: Buffer): GeoTiffDecode | null {
-  if (buf.length < 8) return null;
-  if (buf.toString("ascii", 0, 2) !== "II" || buf.readUInt16LE(2) !== 42) return null;
-  const ifd = buf.readUInt32LE(4);
-  if (ifd + 2 > buf.length) return null;
-  const n = buf.readUInt16LE(ifd);
-  const tags: Record<number, { typ: number; count: number; val: number }> = {};
-  for (let i = 0; i < n; i++) {
-    const o = ifd + 2 + i * 12;
-    if (o + 12 > buf.length) return null;
-    tags[buf.readUInt16LE(o)] = {
-      typ: buf.readUInt16LE(o + 2),
-      count: buf.readUInt32LE(o + 4),
-      val: buf.readUInt32LE(o + 8),
-    };
-  }
-  const nx = tags[256]?.val;
-  const ny = tags[257]?.val;
-  const strip = tags[273]?.val;
-  const compression = tags[259]?.val ?? 1;
-  const fmt = tags[339]?.val ?? 3;
-  if (compression !== 1) return null;
-  if (!nx || !ny || strip == null) return null;
-  if (nx > PREVIEW_POLICY.maxGridDimension * 8 || ny > PREVIEW_POLICY.maxGridDimension * 8) return null;
-  let dx = 1;
-  let xmin = 0;
-  let ymax = ny;
-  if (tags[33550]?.typ === 12) dx = buf.readDoubleLE(tags[33550].val);
-  if (tags[33922]?.typ === 12) {
-    xmin = buf.readDoubleLE(tags[33922].val + 24);
-    ymax = buf.readDoubleLE(tags[33922].val + 32);
-  }
-  let nodata = -99999;
-  if (tags[42113]) {
-    nodata = parseFloat(buf.toString("ascii", tags[42113].val, tags[42113].val + tags[42113].count)) || -99999;
-  }
-  let epsg: number | undefined;
-  if (tags[34735]) {
-    epsg = readEpsgFromGeoKeys(buf, tags[34735].val, tags[34735].count);
-  }
+  const inspected = inspectTiffBuffer(buf);
+  if (!inspected.pixelsDecodable || !inspected.width || !inspected.height) return null;
+  if (inspected.stripOffset == null) return null;
+  const nx = inspected.width;
+  const ny = inspected.height;
+  const bits = inspected.bitsPerSample || 32;
+  const fmt = inspected.sampleFormat || 3;
+  const samples = inspected.bandCount || 1;
+  const endian = inspected.endian || "LE";
+  const bytes = bits / 8;
+  const stride = bytes * samples;
+  const needed = nx * ny * stride;
+  if (inspected.stripOffset + needed > buf.length) return null;
   const values = new Float64Array(nx * ny);
   try {
-    if (fmt === 3) {
-      for (let i = 0; i < nx * ny; i++) values[i] = buf.readFloatLE(strip + i * 4);
-    } else if (fmt === 2) {
-      for (let i = 0; i < nx * ny; i++) values[i] = buf.readInt32LE(strip + i * 4);
-    } else {
-      return null;
+    for (let i = 0; i < nx * ny; i++) {
+      values[i] = readSample(buf, inspected.stripOffset + i * stride, bits, fmt, endian);
     }
   } catch {
     return null;
   }
+  const gt = inspected.geotransform;
+  const dx = Math.abs(gt?.pixelWidth || 1);
+  const xmin = gt?.originX ?? 0;
+  const ymax = gt?.originY ?? ny * dx;
   const yll = ymax - dx * ny;
+  const epsg = inspected.crs?.startsWith("EPSG:") ? Number(inspected.crs.slice(5)) : undefined;
   let grid: RasterGrid = {
     ncols: nx,
     nrows: ny,
     xllcorner: xmin,
     yllcorner: yll,
     cellsize: dx,
-    nodata,
+    nodata: inspected.nodata ?? -99999,
     values,
-    units: epsg === 4326 ? "degrees" : "metres",
+    units: inspected.units || (epsg === 4326 ? "degrees" : "metres"),
   };
   grid = subsampleGrid(grid);
   return {
@@ -151,12 +138,30 @@ export function encodeGaidGeoTiff(options: {
   nodata?: number;
   values: ArrayLike<number>;
   epsg?: number;
+  samples?: number;
+  compression?: number;
+  tiled?: boolean;
+  extraOverviewIfd?: boolean;
+  omitCrs?: boolean;
+  dummyPixels?: boolean;
 }): Buffer {
   const { ncols, nrows, xmin, ymax, dx } = options;
   const nodata = options.nodata ?? -9999;
-  const raw = Buffer.alloc(ncols * nrows * 4);
-  for (let i = 0; i < ncols * nrows; i++) raw.writeFloatLE(Number(options.values[i] ?? nodata), i * 4);
-  const nTags = 14;
+  const samples = Math.max(1, options.samples ?? 1);
+  const compression = options.compression ?? 1;
+  const tiled = Boolean(options.tiled);
+  const writePixels = !options.dummyPixels && compression === 1 && !tiled;
+  const raw = writePixels ? Buffer.alloc(ncols * nrows * 4 * samples) : Buffer.alloc(16, 0);
+  if (writePixels) {
+    for (let i = 0; i < ncols * nrows; i++) {
+      const v = Number(options.values[i] ?? nodata);
+      for (let s = 0; s < samples; s++) {
+        raw.writeFloatLE(s === 0 ? v : 0, (i * samples + s) * 4);
+      }
+    }
+  }
+  const includeCrs = !options.omitCrs;
+  const nTags = includeCrs ? 14 : 13;
   const ifdStart = 8;
   const extraStart = ifdStart + 2 + nTags * 12 + 4;
   const extras: Buffer[] = [];
@@ -198,7 +203,7 @@ export function encodeGaidGeoTiff(options: {
   const nodataAscii = Buffer.from(`${nodata}\0`, "ascii");
   const offScale = add(pixelScale);
   const offTie = add(tie);
-  const offGeo = add(geokeys);
+  const offGeo = includeCrs ? add(geokeys) : 0;
   const offNodata = add(nodataAscii);
   const strip = extraStart + extraLen;
 
@@ -227,20 +232,21 @@ export function encodeGaidGeoTiff(options: {
     b.writeUInt32LE(off, 8);
     return b;
   };
+  const layoutTags = tiled
+    ? [tagLong(322, Math.min(ncols, 16)), tagLong(323, Math.min(nrows, 16)), tagLong(324, strip)]
+    : [tagLong(273, strip), tagLong(278, nrows), tagLong(279, raw.length)];
   const entries = [
     tagLong(256, ncols),
     tagLong(257, nrows),
     tagShort(258, 32),
-    tagShort(259, 1),
+    tagShort(259, compression),
     tagShort(262, 1),
-    tagLong(273, strip),
-    tagShort(277, 1),
-    tagLong(278, nrows),
-    tagLong(279, raw.length),
+    ...layoutTags,
+    tagShort(277, samples),
     tagShort(339, 3),
     tagOff(33550, 12, 3, offScale),
     tagOff(33922, 12, 6, offTie),
-    tagOff(34735, 3, 16, offGeo),
+    ...(includeCrs ? [tagOff(34735, 3, 16, offGeo)] : []),
     tagOff(42113, 2, nodataAscii.length, offNodata),
   ];
   const header = Buffer.alloc(8);
@@ -250,7 +256,22 @@ export function encodeGaidGeoTiff(options: {
   const count = Buffer.alloc(2);
   count.writeUInt16LE(entries.length, 0);
   const next = Buffer.alloc(4);
-  return Buffer.concat([header, count, ...entries, next, ...extras, raw]);
+  const extrasAndRawLen = extras.reduce((n, b) => n + b.length, 0) + raw.length;
+  const overviewOffset = 8 + 2 + entries.length * 12 + 4 + extrasAndRawLen;
+  if (options.extraOverviewIfd) next.writeUInt32LE(overviewOffset, 0);
+  const body = Buffer.concat([header, count, ...entries, next, ...extras, raw]);
+  if (!options.extraOverviewIfd) return body;
+  const overviewIfd = Buffer.alloc(2 + 4 * 12 + 4);
+  overviewIfd.writeUInt16LE(4, 0);
+  const ovTags = [
+    tagLong(256, Math.max(1, Math.floor(ncols / 2))),
+    tagLong(257, Math.max(1, Math.floor(nrows / 2))),
+    tagLong(322, 16),
+    tagLong(323, 16),
+  ];
+  ovTags.forEach((tag, i) => tag.copy(overviewIfd, 2 + i * 12));
+  next.writeUInt32LE(body.length, 0);
+  return Buffer.concat([header, count, ...entries, next, ...extras, raw, overviewIfd]);
 }
 
 export function companionAsciiPath(path: string): string {

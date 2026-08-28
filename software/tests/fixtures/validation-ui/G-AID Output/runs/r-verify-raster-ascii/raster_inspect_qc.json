@@ -1,0 +1,61 @@
+{
+  "product_name": "G-AID documented raster layer",
+  "format": "gis-raster",
+  "layers": [
+    {
+      "looks_like_ascii": true,
+      "width": 3,
+      "height": 2,
+      "band_count": 1,
+      "data_type": "ascii-float",
+      "compression": "uncompressed",
+      "layout": "ascii",
+      "geotransform": [
+        500000.0,
+        10.0,
+        0.0,
+        6000020.0,
+        0.0,
+        -10.0
+      ],
+      "bbox": {
+        "minX": 500000.0,
+        "minY": 6000000.0,
+        "maxX": 500030.0,
+        "maxY": 6000020.0
+      },
+      "cell_size": 10.0,
+      "crs": "EPSG:32630",
+      "crs_epsg": 32630,
+      "crs_confidence": "high",
+      "crs_source": "epsg-comment",
+      "units": "m",
+      "nodata": -9999.0,
+      "pixels_loaded": false,
+      "pixels_decodable": true,
+      "preview_required": false,
+      "raster_contract": "esri-ascii",
+      "source_format": "esri-ascii-grid",
+      "support_status": "supported",
+      "reprojected": false,
+      "errors": [],
+      "notes": [
+        "ESRI ASCII grid. Cell values were not fully loaded into the catalog.",
+        "A filename containing 'dem' does not make this a DEM."
+      ],
+      "source_path": "ascii-valid/grid.asc",
+      "size": 123,
+      "filename_dem_inference": false,
+      "catalog_id": "rec-ascii",
+      "checksum": "rec-ascii"
+    }
+  ],
+  "n_layers": 1,
+  "reprojected": false,
+  "pixels_loaded": false,
+  "hillshade": false,
+  "slope": false,
+  "spectral_indices": false,
+  "raster_algebra": false,
+  "filename_dem_inference": false
+}

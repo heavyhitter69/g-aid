@@ -1,0 +1,45 @@
+{
+  "kind": "gis-raster",
+  "product_name": "G-AID documented raster layer",
+  "layers": [
+    {
+      "source_path": "dem-valid/dem.asc",
+      "catalog_id": "rec-dem",
+      "crs": "EPSG:32630",
+      "crs_source": "epsg-comment",
+      "crs_confidence": "high",
+      "source_format": "dem-ascii",
+      "bbox": {
+        "minX": 500000.0,
+        "minY": 6000000.0,
+        "maxX": 500075.0,
+        "maxY": 6000050.0
+      },
+      "geotransform": [
+        500000.0,
+        25.0,
+        0.0,
+        6000050.0,
+        0.0,
+        -25.0
+      ],
+      "nodata": -9999.0,
+      "band_count": 1,
+      "data_type": "ascii-float",
+      "compression": "uncompressed",
+      "layout": "ascii",
+      "preview_required": false,
+      "pixels_decodable": true,
+      "pixels_loaded": false,
+      "overview_count": null,
+      "units": "m",
+      "origin": "source"
+    }
+  ],
+  "warnings": [
+    "This layer is source raster values. It is not a remote-sensing interpretation.",
+    "Overlay requires documented CRS compatibility. Coordinates were not reprojected."
+  ],
+  "crs_required_for_overlay": true,
+  "silent_reprojection": false
+}

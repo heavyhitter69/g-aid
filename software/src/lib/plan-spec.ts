@@ -26,6 +26,7 @@ import { RADIO_STATEMENTS } from "./radio-product.ts";
 import { GPR_STATEMENTS, GPR_MIGRATION_BENCHMARK_PASSED, DEFAULT_DEWOW_WINDOW, DEFAULT_FILTER_ORDER, DEFAULT_SEC_POWER, gprFrozenNyquistLine } from "./gpr-product.ts";
 import { BOREHOLE_STATEMENTS } from "./borehole-product.ts";
 import { GIS_STATEMENTS } from "./gis-product.ts";
+import { RASTER_STATEMENTS } from "./raster-product.ts";
 import { GEOCHEM_STATEMENTS } from "./geochem-product.ts";
 
 export type PlanStatus = "draft" | "approved" | "executing" | "failed" | "complete";
@@ -52,6 +53,7 @@ export type PlanSteps = {
   gpr: boolean;
   borehole: boolean;
   gisVector: boolean;
+  gisRaster: boolean;
   geochem: boolean;
 };
 
@@ -77,6 +79,7 @@ export const EMPTY_STEPS: PlanSteps = {
   gpr: false,
   borehole: false,
   gisVector: false,
+  gisRaster: false,
   geochem: false,
 };
 
@@ -180,9 +183,18 @@ export interface PlanInput {
     source: "user-assigned" | "unassigned";
   };
   geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
-  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj" | "geotiff-geokeys";
   axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
+  ncols?: number;
+  nrows?: number;
+  nodata?: number;
+  bandCount?: number;
+  dataType?: string;
+  compression?: string;
+  rasterLayout?: string;
+  previewRequired?: boolean;
+  pixelsDecodable?: boolean;
 }
 
 export interface AgentPlan {
@@ -342,6 +354,7 @@ export const STEP_KEYS = [
   "gpr",
   "borehole",
   "gisVector",
+  "gisRaster",
   "geochem",
 ] as const satisfies readonly (keyof PlanSteps)[];
 
@@ -398,6 +411,8 @@ export const BOREHOLE_STEP_KEYS = ["borehole"] as const satisfies readonly StepK
 
 export const GIS_STEP_KEYS = ["gisVector"] as const satisfies readonly StepKey[];
 
+export const GIS_RASTER_STEP_KEYS = ["gisRaster"] as const satisfies readonly StepKey[];
+
 export const GEOCHEM_STEP_KEYS = ["geochem"] as const satisfies readonly StepKey[];
 
 export const UNSUPPORTED_STEP_KEYS = ["seismic"] as const satisfies readonly StepKey[];
@@ -424,6 +439,7 @@ export const STEP_NODE_IDS: Record<StepKey, string[]> = {
   gpr: ["gpr_ingest", "gpr_process", "gpr_interpret"],
   borehole: ["las_ingest", "borehole_view", "borehole_interpret"],
   gisVector: ["vector_ingest", "vector_view", "vector_interpret"],
+  gisRaster: ["raster_inspect", "raster_view"],
   geochem: ["geochem_ingest", "geochem_qc", "geochem_map_points", "geochem_summary", "geochem_interpret"],
 };
 
@@ -455,6 +471,10 @@ export function gisVectorStepsEnabled(steps: PlanSteps): boolean {
   return GIS_STEP_KEYS.some((key) => steps[key]);
 }
 
+export function gisRasterStepsEnabled(steps: PlanSteps): boolean {
+  return GIS_RASTER_STEP_KEYS.some((key) => steps[key]);
+}
+
 export function geochemStepsEnabled(steps: PlanSteps): boolean {
   return GEOCHEM_STEP_KEYS.some((key) => steps[key]);
 }
@@ -477,7 +497,8 @@ const STEP_FALLBACK: { key: StepKey; re: RegExp }[] = [
   { key: "rtp", re: /\brtp\b|reduction to (the )?pole|\bto the pole\b/i },
   { key: "derivatives", re: /\banalytic signal\b|\btilt\b|\bcontinuation\b|\bmagmap\b/i },
   { key: "lineaments", re: /\blineament/i },
-  { key: "gis", re: /\bgeotiff\b|\bgis export\b|\bflight.?path\.geojson\b|\bwrite (?:the )?geojson\b/i },
+  { key: "gisRaster", re: /\bgeotiff\b|\bgeo-?tiff\b|\bcog\b|\besri ascii\b|\bascii[\s-]?grid\b|\braster overlay\b|\braster inspect\b|\bterrain (?:view|layer)\b|\bview the dem\b/i },
+  { key: "gis", re: /\bgis export\b|\bflight.?path\.geojson\b|\bwrite (?:the )?geojson\b/i },
   { key: "gravity", re: /\bbouguer\b|\bfree[ -]?air\b|\blatitude\b/i },
   { key: "farZoneTerrain", re: /\bfar[\s-]?zone\s+terrain/i },
   { key: "intermediateZoneTerrain", re: /\bintermediate[\s-]?zone\s+terrain|\bhayford|\bbowie|\b166\.?7\s*km|\b167\s*km/i },
@@ -564,6 +585,8 @@ function workLine(key: StepKey, targetFolder: string, baseReference: string): st
       return "Ingest CWLS LAS 2.0 WRAP.NO, view measured-depth logs, and write evidence-bound interpretation limits (not lithology or a well path)";
     case "gisVector":
       return "Ingest documented GeoJSON vectors, display source geometry, and write evidence-bound interpretation limits (not geology proof or mineral targets)";
+    case "gisRaster":
+      return "Inspect and display documented GeoTIFF/ASCII rasters (metadata-first; no silent reprojection, hillshade, or raster algebra)";
     case "geochem":
       return "Ingest G-AID GEOCHEM 1.0 assays, QC censored below-detection values, map sample points, and write evidence-bound interpretation limits (not ore or drill targets)";
   }
@@ -650,6 +673,11 @@ export function renderImplementationPlan(opts: {
       if (!notes.includes(line)) notes.push(line);
     }
   }
+  if (gisRasterStepsEnabled(opts.steps)) {
+    for (const line of RASTER_STATEMENTS) {
+      if (!notes.includes(line)) notes.push(line);
+    }
+  }
   if (geochemStepsEnabled(opts.steps)) {
     for (const line of GEOCHEM_STATEMENTS) {
       if (!notes.includes(line)) notes.push(line);
@@ -675,8 +703,11 @@ export function renderImplementationPlan(opts: {
   const gprInputs = (opts.inputs || []).some((item) => item.adapterId === "gpr-csv");
   const lasInputs = (opts.inputs || []).some((item) => item.adapterId === "las-well");
   const gisInputs = (opts.inputs || []).some((item) => item.adapterId === "geojson" || item.adapterId === "shapefile");
+  const rasterInputs = (opts.inputs || []).some(
+    (item) => item.adapterId === "geotiff" || item.adapterId === "esri-ascii-grid" || item.adapterId === "dem-ascii"
+  );
   const geochemInputs = (opts.inputs || []).some((item) => item.adapterId === "geochem-csv" || item.adapterId === "geochem-xyz");
-  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs, gisInputs, geochemInputs].filter(Boolean).length;
+  const mixedCount = [magInputs, gravInputs, ertInputs, radioInputs, gprInputs, lasInputs, gisInputs, rasterInputs, geochemInputs].filter(Boolean).length;
   const mixed = mixedCount > 1;
   const field = [
     typeof opts.inclination === "number" ? `Inclination: ${opts.inclination}°` : "",
@@ -1123,6 +1154,12 @@ export function applyChatPatches(plan: AgentPlan, message: string): AgentPlan {
                   ? "Accepted GeoJSON export. Shapefile/GeoPackage writers are not implemented."
                 : id === "gis.interpret"
                   ? "Accepted evidence-bound GIS interpretation limits. Mineral targets, prospectivity, resources, and drill recommendations are not established from overlays."
+                : id === "gis.raster_inspect"
+                  ? "Accepted raster inspect (metadata-first). Compressed/tiled/COG pixels and BigTIFF stay undecoded. Full rasters are not loaded into the model."
+                : id === "gis.raster_view"
+                  ? "Accepted source raster viewing with preview limits. Overlay requires documented CRS compatibility. No silent reprojection."
+                : id === "gis.terrain_view"
+                  ? "Accepted terrain viewing of documented DEM ASCII only. Hillshade, slope, aspect, and terrain correction are not applied. Filename DEM labels are ignored."
                 : id === "geochem.ingest"
                   ? "Accepted G-AID GEOCHEM 1.0 ingest. An arbitrary CSV with Fe/Cu/Au columns is not geochemistry. Below-detection stays censored."
                 : id === "geochem.qc"
@@ -1244,6 +1281,11 @@ export function normalizePlan(plan: AgentPlan): AgentPlan {
   if (gisVectorStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps) || boreholeStepsEnabled(steps))) {
     notes.push(
       "Vector layers may display with magnetic, gravity, ERT, radiometric, GPR, or borehole maps. Spatial overlap is geometric coincidence, not a joint geological or mineral interpretation."
+    );
+  }
+  if (gisRasterStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps) || boreholeStepsEnabled(steps) || gisVectorStepsEnabled(steps))) {
+    notes.push(
+      "Raster layers may display with other maps only when CRS compatibility is documented. Overlay is not a joint interpretation. Coordinates were not reprojected."
     );
   }
   if (geochemStepsEnabled(steps) && (magneticStepsEnabled(steps) || gravityStepsEnabled(steps) || ertStepsEnabled(steps) || radiometricsStepsEnabled(steps) || gprStepsEnabled(steps) || boreholeStepsEnabled(steps) || gisVectorStepsEnabled(steps))) {
@@ -1392,7 +1434,7 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
     });
   }
 
-  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps) && !gisVectorStepsEnabled(plan.steps) && !geochemStepsEnabled(plan.steps)) {
+  if (unsupportedStepsEnabled(plan.steps) && !magneticStepsEnabled(plan.steps) && !gravityStepsEnabled(plan.steps) && !ertStepsEnabled(plan.steps) && !radiometricsStepsEnabled(plan.steps) && !gprStepsEnabled(plan.steps) && !boreholeStepsEnabled(plan.steps) && !gisVectorStepsEnabled(plan.steps) && !gisRasterStepsEnabled(plan.steps) && !geochemStepsEnabled(plan.steps)) {
     blockers.push({
       level: "blocker",
       code: "unsupported_method",
@@ -1537,6 +1579,33 @@ export function validatePlan(plan: AgentPlan, catalog?: ProjectCatalog | null): 
         code: "no_geojson_files",
         message:
           "GIS vector processing needs a supported geojson or shapefile catalog record. An incomplete shapefile sidecar set or GeoPackage is not a processing input.",
+      });
+    }
+  }
+
+  if (gisRasterStepsEnabled(plan.steps)) {
+    const rasterFiles = inputs.filter(
+      (item) =>
+        item.adapterId === "geotiff" ||
+        item.adapterId === "esri-ascii-grid" ||
+        item.adapterId === "dem-ascii" ||
+        item.kind === "geotiff" ||
+        item.kind === "esri-ascii-grid" ||
+        item.kind === "dem-ascii"
+    );
+    if (inputs.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_raster_files",
+        message:
+          "Raster inspect/view needs a supported GeoTIFF, ESRI ASCII grid, or documented DEM ASCII catalog record. I will not take the first .tif by extension.",
+      });
+    } else if (rasterFiles.length === 0) {
+      blockers.push({
+        level: "blocker",
+        code: "no_raster_files",
+        message:
+          "Raster inspect/view needs a supported geotiff, esri-ascii-grid, or dem-ascii catalog record. Compressed/undecoded files may inspect but pixels stay unloaded.",
       });
     }
   }

@@ -45,6 +45,15 @@ export {
   GEOJSON_ADAPTER_ID,
 } from "./geojson-contract.ts";
 export { inspectShapefilePath } from "./adapters/shapefile-node.ts";
+export { inspectGeoTiffPath } from "./adapters/geotiff-node.ts";
+export {
+  inspectTiffBuffer,
+  inspectAsciiGridText,
+  geotiffReadyForSupport,
+  asciiGridReadyForSupport,
+  GEOTIFF_ADAPTER_ID,
+  ASCII_GRID_ADAPTER_ID,
+} from "./raster-contract.ts";
 export { shapefileReadyForSupport, SHAPEFILE_ADAPTER_ID } from "./shapefile-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";

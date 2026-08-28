@@ -1,0 +1,6 @@
+{
+  "kind": "gis-terrain",
+  "filename_dem_inference": false,
+  "skipped": true,
+  "reason": "dem-filename-only/dem.asc is esri-ascii-grid, not dem-ascii."
+}

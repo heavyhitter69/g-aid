@@ -195,10 +195,10 @@ test("catalog GeoJSON and DEM records follow implemented display support", () =>
   const demRecord = byRel(catalog.records, "gis/dem.asc");
   const demLayer = selectLayerById(layers, demRecord.id);
   assert.ok(demLayer);
-  assert.equal(demLayer.formatId, "dem-ascii");
+  assert.equal(demLayer.formatId, "esri-ascii-grid");
   assert.equal(demLayer.displayStatus, "viewable");
   assert.equal(demLayer.origin, "source");
-  assert.equal(demLayer.supportStatus, "recognised-unsupported");
+  assert.equal(demLayer.supportStatus, "supported");
   const demText = fs.readFileSync(path.join(root, "gis", "dem.asc"), "utf8");
   const demGrid = decodeRasterLayer({ formatId: demLayer.formatId, text: demText });
   assert.ok(demGrid);
