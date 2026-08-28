@@ -49,13 +49,7 @@ npm run dev:website
 
 The public website must be at `http://127.0.0.1:3000`.
 
-In a second terminal:
-
-```bash
-npm run dev:software
-```
-
-In a third terminal, point Electron at the **website**, not port 47821:
+In a second terminal, point Electron at the **website**, not port 47821. Unpackaged Electron starts its own software Next server; do not also run `npm run dev:software` in parallel (it will hold the `.next` lock).
 
 ```bash
 cd software
