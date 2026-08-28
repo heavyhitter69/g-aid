@@ -162,12 +162,40 @@ await test("placeholder Supabase is unconfigured and sign-in surfaces that state
   const signin = read("src/app/signin/page.tsx");
   assert.match(signin, /AuthUnavailableNotice/);
   assert.match(signin, /hasSupabaseConfig/);
+  assert.match(signin, /PublicLoginUnconfiguredNotice/);
+  assert.match(signin, /startPublicLogin/);
   assert.equal(signin.includes("Google"), false);
   assert.equal(/GitHub/.test(signin), false);
   const signup = read("src/app/signup/page.tsx");
   assert.match(signup, /AuthUnavailableNotice/);
   const notice = read("src/components/auth/auth-unavailable-notice.tsx");
   assert.match(notice, /data-testid="auth-unavailable"/);
+  const unconfigured = read("src/components/auth/public-login-unconfigured-notice.tsx");
+  assert.match(unconfigured, /data-testid="public-login-unconfigured"/);
+  assert.match(unconfigured, /Online sign-in is not configured yet/);
+  assert.equal(unconfigured.includes("Google"), true);
+  assert.equal(/GitHub/.test(unconfigured), true);
+});
+
+await test("desktop auth no longer puts tokens in callback URLs", () => {
+  const desktop = read("src/lib/desktop.ts");
+  assert.equal(desktop.includes("access_token"), false);
+  assert.equal(desktop.includes("desktopHandoffUrl"), false);
+  const confirm = read("src/app/auth/desktop/confirm/page.tsx");
+  assert.equal(confirm.includes("access_token"), false);
+  assert.match(confirm, /callbackRedirectMatchesAttempt/);
+  assert.match(confirm, /\/api\/auth\/desktop\/authorize/);
+  const schema = read("supabase-schema.sql");
+  assert.match(schema, /force row level security/i);
+  assert.match(schema, /revoke all on table public\.desktop_auth_codes/i);
+  const done = read("src/app/auth/desktop/done/page.tsx");
+  assert.equal(done.includes("access_token"), false);
+  assert.equal(done.includes("g-aid.io"), false);
+  const main = read("electron/main.js");
+  assert.equal(main.includes("__gaid/auth"), false);
+  assert.match(main, /GAID_AUTH_BASE_URL/);
+  assert.equal(main.includes("g-aid.io"), false);
+  assert.equal(read("src/app/auth/desktop/page.tsx").includes("Google"), false);
 });
 
 await test("marketing copy does not include unsupported product claims", () => {

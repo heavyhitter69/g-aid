@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { useAppStore } from "@/store/app-store";
-import { isDesktop, parseGaidAuthUrl } from "@/lib/desktop";
+import { isDesktop } from "@/lib/desktop";
 import { profileFromUser } from "@/lib/auth-user";
 
 const MARKETING_OR_AUTH = new Set(["/", "/signin", "/signup", "/onboarding"]);
@@ -12,7 +12,7 @@ const MARKETING_OR_AUTH = new Set(["/", "/signin", "/signup", "/onboarding"]);
 export function DesktopSessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const appliedUrl = useRef<string | null>(null);
+  const appliedSession = useRef<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const setAuthenticated = useAppStore((s) => s.setAuthenticated);
   const setUser = useAppStore((s) => s.setUser);
@@ -70,19 +70,19 @@ export function DesktopSessionProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!isDesktop() || !window.gaidDesktop) return;
 
-    const applyAuthUrl = async (url: string | null) => {
-      if (!url || appliedUrl.current === url) return;
-      const tokens = parseGaidAuthUrl(url);
-      if (!tokens || !hasSupabaseConfig()) return;
-      appliedUrl.current = url;
+    const applySession = async (session: { access_token: string; refresh_token: string } | null) => {
+      if (!session?.access_token || !session?.refresh_token || !hasSupabaseConfig()) return;
+      const key = `${session.access_token}:${session.refresh_token}`;
+      if (appliedSession.current === key) return;
+      appliedSession.current = key;
 
       const supabase = createClient();
       const { data, error } = await supabase.auth.setSession({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
       });
       if (error || !data.user) {
-        appliedUrl.current = null;
+        appliedSession.current = null;
         return;
       }
 
@@ -92,8 +92,8 @@ export function DesktopSessionProvider({ children }: { children: React.ReactNode
       router.replace(done ? "/workspace" : "/onboarding");
     };
 
-    window.gaidDesktop.getPendingAuthUrl().then(applyAuthUrl);
-    return window.gaidDesktop.onAuthCallback(applyAuthUrl);
+    window.gaidDesktop.getPendingAuthSession().then(applySession);
+    return window.gaidDesktop.onAuthSession(applySession);
   }, [router, setAuthenticated, setUser]);
 
   useEffect(() => {

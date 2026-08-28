@@ -106,3 +106,24 @@ create policy "Users delete own files"
     bucket_id = 'geophysics-files' and
     auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- 5. Desktop public-login authorization codes (PKCE, single-use, ~2 minutes)
+-- Service role only: RLS is enabled with no anon/authenticated policies.
+create table if not exists public.desktop_auth_codes (
+  id                     uuid primary key default gen_random_uuid(),
+  code_hash              text not null unique,
+  code_challenge         text not null,
+  code_challenge_method  text not null check (code_challenge_method = 'S256'),
+  state_hash             text not null,
+  nonce_hash             text not null,
+  redirect_uri           text not null,
+  user_id                uuid not null references auth.users(id) on delete cascade,
+  access_token_enc       text not null,
+  refresh_token_enc      text not null,
+  expires_at             timestamptz not null,
+  used_at                timestamptz,
+  created_at             timestamptz default now()
+);
+alter table public.desktop_auth_codes enable row level security;
+alter table public.desktop_auth_codes force row level security;
+revoke all on table public.desktop_auth_codes from public, anon, authenticated;

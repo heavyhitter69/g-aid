@@ -1,6 +1,14 @@
 export {};
 
-type GaidAuthCallback = (url: string) => void;
+type GaidAuthSession = {
+  access_token: string;
+  refresh_token: string;
+};
+
+type GaidAuthError = {
+  code: string;
+  message: string;
+};
 
 interface GaidWorkspaceIndexFile {
   relativePath: string;
@@ -22,7 +30,10 @@ declare global {
     isDesktop: true;
     openExternal: (url: string) => Promise<void>;
     getAuthBaseUrl: () => Promise<string>;
-    getPendingAuthUrl: () => Promise<string | null>;
+    isPublicLoginConfigured: () => Promise<boolean>;
+    startPublicLogin: (mode?: "login" | "signup") => Promise<{ started: boolean; reason?: string }>;
+    cancelPublicLogin: () => Promise<void>;
+    getPendingAuthSession: () => Promise<GaidAuthSession | null>;
     openAuxWindow: (pathname: string) => Promise<void>;
     openNewWindow: () => Promise<void>;
     pickFolder: (options?: { title?: string }) => Promise<string | null>;
@@ -72,7 +83,8 @@ declare global {
     showItemInFolder: (root: string, relativePath?: string) => Promise<void>;
     openPath: (root: string, relativePath?: string) => Promise<void>;
     dismissBootCover: () => void;
-    onAuthCallback: (callback: GaidAuthCallback) => () => void;
+    onAuthSession: (callback: (session: GaidAuthSession) => void) => () => void;
+    onAuthError: (callback: (error: GaidAuthError) => void) => () => void;
   }
 
   interface Window {

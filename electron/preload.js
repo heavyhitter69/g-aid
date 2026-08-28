@@ -41,7 +41,10 @@ contextBridge.exposeInMainWorld("gaidDesktop", {
   isDesktop: true,
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   getAuthBaseUrl: () => ipcRenderer.invoke("get-auth-base-url"),
-  getPendingAuthUrl: () => ipcRenderer.invoke("get-pending-auth"),
+  isPublicLoginConfigured: () => ipcRenderer.invoke("is-public-login-configured"),
+  startPublicLogin: (mode) => ipcRenderer.invoke("start-public-login", mode || "login"),
+  cancelPublicLogin: () => ipcRenderer.invoke("cancel-public-login"),
+  getPendingAuthSession: () => ipcRenderer.invoke("get-pending-auth-session"),
   openAuxWindow: (pathname) => ipcRenderer.invoke("open-aux-window", pathname),
   openNewWindow: () => ipcRenderer.invoke("open-new-window"),
   pickFolder: (options) => ipcRenderer.invoke("pick-folder", options || {}),
@@ -71,9 +74,14 @@ contextBridge.exposeInMainWorld("gaidDesktop", {
     openPath: (root, relativePath) =>
       ipcRenderer.invoke("open-path", root, relativePath || ""),
   dismissBootCover: () => dismissBootCover(),
-  onAuthCallback: (callback) => {
-    const listener = (_event, url) => callback(url);
-    ipcRenderer.on("gaid-auth", listener);
-    return () => ipcRenderer.removeListener("gaid-auth", listener);
+  onAuthSession: (callback) => {
+    const listener = (_event, session) => callback(session);
+    ipcRenderer.on("gaid-auth-session", listener);
+    return () => ipcRenderer.removeListener("gaid-auth-session", listener);
+  },
+  onAuthError: (callback) => {
+    const listener = (_event, error) => callback(error);
+    ipcRenderer.on("gaid-auth-error", listener);
+    return () => ipcRenderer.removeListener("gaid-auth-error", listener);
   },
 });
