@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import http from "node:http";
+import net from "node:net";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { catalogFromGithubRelease, emptyDownloadCatalog, matchPlatformAsset } from "./public-download.ts";
@@ -206,21 +207,67 @@ function get(url: string): Promise<{ status: number; body: string }> {
   });
 }
 
+function pidCwd(pid: number): string | null {
+  try {
+    return fs.realpathSync(`/proc/${pid}/cwd`);
+  } catch {
+    return null;
+  }
+}
+
+function killPid(pid: number) {
+  if (!pid || pid === process.pid) return;
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    /* already gone */
+  }
+}
+
 function stopExistingDevServer() {
   const lockPath = path.join(root, ".next/dev/lock");
-  if (!fs.existsSync(lockPath)) return;
-  try {
-    const lock = JSON.parse(fs.readFileSync(lockPath, "utf8")) as { pid?: number };
-    if (lock.pid && lock.pid !== process.pid) {
-      try {
-        process.kill(lock.pid, "SIGTERM");
-      } catch {
-        /* already gone */
-      }
+  if (fs.existsSync(lockPath)) {
+    try {
+      const lock = JSON.parse(fs.readFileSync(lockPath, "utf8")) as { pid?: number };
+      if (lock.pid) killPid(lock.pid);
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
   }
+  const rootReal = fs.realpathSync(root);
+  for (const name of fs.readdirSync("/proc")) {
+    if (!/^\d+$/.test(name)) continue;
+    const pid = Number(name);
+    const commPath = `/proc/${pid}/comm`;
+    let comm = "";
+    try {
+      comm = fs.readFileSync(commPath, "utf8").trim();
+    } catch {
+      continue;
+    }
+    if (!comm.startsWith("next-server")) {
+      let cmdline = "";
+      try {
+        cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8");
+      } catch {
+        continue;
+      }
+      if (!cmdline.includes("next/dist/bin/next")) continue;
+    }
+    if (pidCwd(pid) === rootReal) killPid(pid);
+  }
+}
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      server.close((err) => (err ? reject(err) : resolve(port)));
+    });
+    server.on("error", reject);
+  });
 }
 
 function waitForChildReady(readyHint: () => string, timeoutMs: number): Promise<void> {
@@ -243,8 +290,8 @@ function waitForChildReady(readyHint: () => string, timeoutMs: number): Promise<
 
 await test("visiting /workspace does not 500 /, /download, or /api/download", async () => {
   stopExistingDevServer();
-  await new Promise((r) => setTimeout(r, 800));
-  const port = 3055;
+  await new Promise((r) => setTimeout(r, 1200));
+  const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const nextBin = path.join(root, "node_modules/next/dist/bin/next");
   const child = spawn(process.execPath, [nextBin, "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
