@@ -127,6 +127,30 @@ function normalizePath(pathname: string): string {
   return pathname || "/";
 }
 
+function redirectBase(url: URL): string {
+  if (url.protocol === "gaid:") {
+    return `gaid://${url.hostname}${normalizePath(url.pathname)}`;
+  }
+  return `${url.protocol}//${url.host}${normalizePath(url.pathname)}`;
+}
+
+export function callbackRedirectMatchesAttempt(
+  redirect: string,
+  expectedRedirectUri: string,
+  expectedState: string
+): boolean {
+  if (!redirect || !expectedRedirectUri || !expectedState) return false;
+  if (callbackContainsSecrets(redirect) || callbackContainsSecrets(expectedRedirectUri)) return false;
+  if (!isAllowedRedirectUri(expectedRedirectUri)) return false;
+  const parsed = parseDesktopAuthCallback(redirect);
+  if (!parsed.ok || parsed.state !== expectedState) return false;
+  try {
+    return redirectBase(new URL(redirect)) === redirectBase(new URL(expectedRedirectUri));
+  } catch {
+    return false;
+  }
+}
+
 export function parseDesktopAuthCallback(url: string): DesktopAuthCallback {
   if (!url || TOKEN_NAME.test(url)) {
     return { ok: false, reason: "tokens_in_url" };

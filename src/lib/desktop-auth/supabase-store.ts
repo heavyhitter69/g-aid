@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isUsableSupabaseConfig } from "../supabase/config.ts";
 import type { ConsumeResult, DesktopAuthCodeRecord, DesktopAuthStore } from "./store.ts";

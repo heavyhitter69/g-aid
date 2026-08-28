@@ -1,13 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { exchangeDesktopToken } from "@/lib/desktop-auth/flow";
-import { desktopAuthStoreConfigured, getDesktopAuthRuntime } from "@/lib/desktop-auth/runtime";
+import {
+  desktopAuthClientKey,
+  desktopAuthStoreConfigured,
+  exchangeDesktopToken,
+  getDesktopAuthLimiter,
+  getDesktopAuthRuntime,
+} from "@/lib/desktop-auth/server";
 
 export async function POST(request: NextRequest) {
+  const decision = getDesktopAuthLimiter().allow(desktopAuthClientKey(request.headers));
+  if (!decision.allowed) {
+    if (decision.status === 503) {
+      return NextResponse.json({ error: decision.error }, { status: 503 });
+    }
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(decision.retryAfterSec) } }
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
   }
 
   if (!desktopAuthStoreConfigured()) {

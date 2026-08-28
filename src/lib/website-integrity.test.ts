@@ -183,7 +183,11 @@ await test("desktop auth no longer puts tokens in callback URLs", () => {
   assert.equal(desktop.includes("desktopHandoffUrl"), false);
   const confirm = read("src/app/auth/desktop/confirm/page.tsx");
   assert.equal(confirm.includes("access_token"), false);
+  assert.match(confirm, /callbackRedirectMatchesAttempt/);
   assert.match(confirm, /\/api\/auth\/desktop\/authorize/);
+  const schema = read("supabase-schema.sql");
+  assert.match(schema, /force row level security/i);
+  assert.match(schema, /revoke all on table public\.desktop_auth_codes/i);
   const done = read("src/app/auth/desktop/done/page.tsx");
   assert.equal(done.includes("access_token"), false);
   assert.equal(done.includes("g-aid.io"), false);

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { isUsableSupabaseConfig } from "../supabase/config.ts";
 import { createDesktopAuthCrypto, desktopAuthTokenKey, type DesktopAuthCrypto } from "./crypto.ts";
 import { createSupabaseDesktopAuthStore } from "./supabase-store.ts";

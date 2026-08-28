@@ -7,7 +7,7 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { profileFromUser } from "@/lib/auth-user";
 import {
   buildCallbackRedirect,
-  callbackContainsSecrets,
+  callbackRedirectMatchesAttempt,
   isAllowedRedirectUri,
   readDesktopAuthRequest,
   withDesktopAuthQuery,
@@ -64,7 +64,11 @@ export default function DesktopConfirmPage() {
       }),
     });
     const data = (await response.json().catch(() => ({}))) as { redirect?: string; error?: string };
-    if (!response.ok || !data.redirect || callbackContainsSecrets(data.redirect)) {
+    if (
+      !response.ok ||
+      !data.redirect ||
+      !callbackRedirectMatchesAttempt(data.redirect, request.redirectUri, request.state)
+    ) {
       setHandoffError("Could not finish desktop sign-in. Return to G-AID and try again.");
       setHandingOff(false);
       return;

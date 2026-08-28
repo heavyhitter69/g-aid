@@ -42,7 +42,7 @@ let pendingNewWindows = 0;
 let pythonProcess = null;
 let ollamaProcess = null;
 let authBaseUrl = "";
-let pendingAuthSession = null;
+let pendingAuthSession = desktopAuth.createPendingSessionHolder();
 let publicLogin = null;
 let serverPort = PRODUCTION_PORT;
 
@@ -184,17 +184,17 @@ function logPath() {
 function log(...args) {
   const text = args
     .map((value) => {
-      if (value instanceof Error) return value.stack || value.message;
-      if (typeof value === "string") return value;
+      if (value instanceof Error) return desktopAuth.redactSensitiveText(value.stack || value.message);
+      if (typeof value === "string") return desktopAuth.redactSensitiveText(value);
       try {
-        return JSON.stringify(value);
+        return desktopAuth.redactSensitiveText(JSON.stringify(value));
       } catch {
-        return String(value);
+        return desktopAuth.redactSensitiveText(String(value));
       }
     })
     .join(" ");
   const line = `[${new Date().toISOString()}] ${text}\n`;
-  console.log(...args);
+  console.log(text);
   try {
     fs.appendFileSync(logPath(), line);
   } catch {
@@ -239,18 +239,13 @@ function focusMainWindow() {
 
 function sendAuthSession(session) {
   if (!session || !session.access_token || !session.refresh_token) return;
+  pendingAuthSession.set(session);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("gaid-auth-session", {
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     });
     focusMainWindow();
-    pendingAuthSession = null;
-  } else {
-    pendingAuthSession = {
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    };
   }
 }
 
@@ -263,6 +258,21 @@ function sendAuthError(error) {
     mainWindow.webContents.send("gaid-auth-error", payload);
     focusMainWindow();
   }
+}
+
+function isAllowedDesktopAuthIpc(event) {
+  return desktopAuth.isAllowedDesktopAuthIpcSender(event, {
+    windows,
+    fromWebContents: (contents) => BrowserWindow.fromWebContents(contents),
+    localOrigin: serverPort ? `http://${hostname}:${serverPort}` : "",
+  });
+}
+
+function publicLoginResult(result) {
+  return {
+    started: Boolean(result && result.started),
+    reason: result && result.reason ? String(result.reason) : undefined,
+  };
 }
 
 function refreshAuthBaseUrl() {
@@ -671,7 +681,10 @@ async function createWindow() {
   await fadeSplashThenLoad(mainWindow, startUrl);
   mainWindow.show();
   mainWindow.focus();
-  if (pendingAuthSession) sendAuthSession(pendingAuthSession);
+  const pending = pendingAuthSession.peek();
+  if (pending && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("gaid-auth-session", pending);
+  }
   attachWindowGuards(mainWindow, startUrl);
   setWindowsJumpList();
   await flushPendingWindows();
@@ -687,22 +700,29 @@ ipcMain.handle("open-external", async (_event, url) => {
   await shell.openExternal(url);
 });
 
-ipcMain.handle("get-auth-base-url", () => {
+ipcMain.handle("get-auth-base-url", (event) => {
+  if (!isAllowedDesktopAuthIpc(event)) return "";
   refreshAuthBaseUrl();
   return authBaseUrl;
 });
-ipcMain.handle("is-public-login-configured", () => {
+ipcMain.handle("is-public-login-configured", (event) => {
+  if (!isAllowedDesktopAuthIpc(event)) return false;
   refreshAuthBaseUrl();
   return Boolean(authBaseUrl);
 });
-ipcMain.handle("start-public-login", async (_event, mode) => {
+ipcMain.handle("start-public-login", async (event, mode) => {
+  if (!isAllowedDesktopAuthIpc(event)) return { started: false, reason: "invalid_sender" };
   refreshAuthBaseUrl();
-  return getPublicLogin().start(mode === "signup" ? "signup" : "login");
+  return publicLoginResult(await getPublicLogin().start(mode === "signup" ? "signup" : "login"));
 });
-ipcMain.handle("cancel-public-login", async () => {
+ipcMain.handle("cancel-public-login", async (event) => {
+  if (!isAllowedDesktopAuthIpc(event)) return;
   await getPublicLogin().cancel();
 });
-ipcMain.handle("get-pending-auth-session", () => pendingAuthSession);
+ipcMain.handle("get-pending-auth-session", (event) => {
+  if (!isAllowedDesktopAuthIpc(event)) return null;
+  return pendingAuthSession.take();
+});
 ipcMain.handle("open-aux-window", async (_event, pathname) => {
   await openAuxWindow(pathname);
 });

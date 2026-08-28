@@ -125,3 +125,5 @@ create table if not exists public.desktop_auth_codes (
   created_at             timestamptz default now()
 );
 alter table public.desktop_auth_codes enable row level security;
+alter table public.desktop_auth_codes force row level security;
+revoke all on table public.desktop_auth_codes from public, anon, authenticated;

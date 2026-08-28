@@ -1,6 +1,5 @@
 import {
   DESKTOP_AUTH_TTL_MS,
-  DESKTOP_CODE_CHALLENGE_METHOD,
   buildCallbackRedirect,
   validateAuthorizeInput,
 } from "./contract.ts";
@@ -50,7 +49,7 @@ export async function authorizeDesktop(
   const record = {
     codeHash: crypto.hash(code),
     codeChallenge: input.codeChallenge,
-    codeChallengeMethod: DESKTOP_CODE_CHALLENGE_METHOD,
+    codeChallengeMethod: "S256" as const,
     stateHash: crypto.hash(input.state),
     nonceHash: crypto.hash(input.nonce),
     redirectUri: input.redirectUri,
@@ -81,7 +80,7 @@ export async function exchangeDesktopToken(
   now = Date.now()
 ): Promise<ExchangeDesktopResult> {
   if (!input.code || !input.codeVerifier || !input.redirectUri || !input.nonce) {
-    return { ok: false, error: "invalid_request", status: 400 };
+    return { ok: false, error: "invalid_grant", status: 400 };
   }
 
   const codeHash = crypto.hash(input.code);
@@ -93,8 +92,8 @@ export async function exchangeDesktopToken(
   }
 
   if (!record) return { ok: false, error: "invalid_grant", status: 400 };
-  if (record.usedAt != null) return { ok: false, error: "already_used", status: 400 };
-  if (record.expiresAt <= now) return { ok: false, error: "expired", status: 400 };
+  if (record.usedAt != null) return { ok: false, error: "invalid_grant", status: 400 };
+  if (record.expiresAt <= now) return { ok: false, error: "invalid_grant", status: 400 };
 
   const challenge = crypto.pkceChallenge(input.codeVerifier);
   if (challenge !== record.codeChallenge) {
@@ -113,11 +112,8 @@ export async function exchangeDesktopToken(
   } catch {
     return { ok: false, error: "server_error", status: 500 };
   }
-  if (consumed.status === "already_used") {
-    return { ok: false, error: "already_used", status: 400 };
-  }
   if (consumed.status !== "ok") {
-    return { ok: false, error: consumed.status === "expired" ? "expired" : "invalid_grant", status: 400 };
+    return { ok: false, error: "invalid_grant", status: 400 };
   }
 
   try {

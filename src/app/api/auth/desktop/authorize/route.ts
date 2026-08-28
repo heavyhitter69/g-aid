@@ -1,10 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isUsableSupabaseConfig } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { authorizeDesktop, cancelDesktopRedirect } from "@/lib/desktop-auth/flow";
-import { desktopAuthStoreConfigured, getDesktopAuthRuntime } from "@/lib/desktop-auth/runtime";
+import {
+  authorizeDesktop,
+  cancelDesktopRedirect,
+  desktopAuthClientKey,
+  desktopAuthStoreConfigured,
+  getDesktopAuthLimiter,
+  getDesktopAuthRuntime,
+} from "@/lib/desktop-auth/server";
+
+function rateLimitResponse(request: NextRequest) {
+  const decision = getDesktopAuthLimiter().allow(desktopAuthClientKey(request.headers));
+  if (decision.allowed) return null;
+  if (decision.status === 503) {
+    return NextResponse.json({ error: decision.error }, { status: 503 });
+  }
+  return NextResponse.json(
+    { error: "rate_limited" },
+    { status: 429, headers: { "Retry-After": String(decision.retryAfterSec) } }
+  );
+}
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimitResponse(request);
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;

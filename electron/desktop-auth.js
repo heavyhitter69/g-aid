@@ -342,13 +342,115 @@ function createPublicLoginController(options) {
         }, TTL_MS),
       };
       await openExternal(browserUrl);
-      return { started: true, redirectUri, browserUrl };
+      return { started: true };
     },
     cancel,
     handleIncomingUrl(url) {
       return handleCallback(url);
     },
   };
+}
+
+function defaultPort(protocol) {
+  if (protocol === "https:") return "443";
+  if (protocol === "http:") return "80";
+  return "";
+}
+
+function originKey(url) {
+  return `${url.protocol}//${url.hostname}:${url.port || defaultPort(url.protocol)}`;
+}
+
+function isAllowedRendererFrameUrl(url, localOrigin) {
+  if (!url || typeof url !== "string") return false;
+  if (url === "about:blank" || url.startsWith("data:")) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password) return false;
+    if (localOrigin) {
+      const expected = new URL(localOrigin);
+      return originKey(parsed) === originKey(expected);
+    }
+    return isLoopbackHostname(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedDesktopAuthIpcSender(event, options) {
+  if (!event || !event.sender) return false;
+  const sender = event.sender;
+  if (typeof sender.isDestroyed === "function" && sender.isDestroyed()) return false;
+  const windows = (options && options.windows) || [];
+  const fromWebContents = options && options.fromWebContents;
+  if (typeof fromWebContents !== "function") return false;
+  const win = fromWebContents(sender);
+  if (!win) return false;
+  if (typeof win.isDestroyed === "function" && win.isDestroyed()) return false;
+  if (windows.indexOf(win) < 0) return false;
+  const frameUrl =
+    (event.senderFrame && event.senderFrame.url) ||
+    (typeof sender.getURL === "function" ? sender.getURL() : "");
+  return isAllowedRendererFrameUrl(frameUrl, (options && options.localOrigin) || "");
+}
+
+function createPendingSessionHolder() {
+  let session = null;
+  return {
+    set(next) {
+      if (!next || !next.access_token || !next.refresh_token) {
+        session = null;
+        return;
+      }
+      session = { access_token: next.access_token, refresh_token: next.refresh_token };
+    },
+    take() {
+      const current = session;
+      session = null;
+      return current;
+    },
+    peek() {
+      return session;
+    },
+  };
+}
+
+const SENSITIVE_QUERY_KEYS = new Set([
+  "code",
+  "state",
+  "nonce",
+  "error_description",
+  "code_challenge",
+  "code_verifier",
+  "redirect_uri",
+  "access_token",
+  "refresh_token",
+  "id_token",
+]);
+
+function redactSensitiveText(value) {
+  if (typeof value !== "string" || !value) return value;
+  try {
+    const parsed = new URL(value);
+    let changed = false;
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (SENSITIVE_QUERY_KEYS.has(key) || TOKEN_NAME.test(key)) {
+        parsed.searchParams.set(key, "[redacted]");
+        changed = true;
+      }
+    }
+    if (parsed.hash && parsed.hash !== "#") {
+      parsed.hash = "";
+      changed = true;
+    }
+    return changed || TOKEN_NAME.test(value) ? parsed.toString() : value;
+  } catch {
+    return value.replace(
+      /([?&#](?:code|state|nonce|error_description|code_challenge|code_verifier|redirect_uri|access_token|refresh_token|id_token)=)[^&]*/gi,
+      "$1[redacted]"
+    );
+  }
 }
 
 module.exports = {
@@ -365,4 +467,8 @@ module.exports = {
   buildBrowserAuthUrl,
   startLoopbackServer,
   createPublicLoginController,
+  isAllowedRendererFrameUrl,
+  isAllowedDesktopAuthIpcSender,
+  createPendingSessionHolder,
+  redactSensitiveText,
 };
