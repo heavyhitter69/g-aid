@@ -226,7 +226,7 @@ export interface BoundInput {
     source: "user-assigned" | "unassigned";
   };
   geojsonContract?: "rfc7946" | "legacy-geojson" | "g-aid-custom-import";
-  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj";
+  crsSource?: "rfc7946" | "legacy-crs" | "companion-prj" | "epsg-comment" | "user-confirmed" | "shapefile-prj" | "geotiff-geokeys";
   axisOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
   coordinateOrder?: "lon-lat" | "lat-lon" | "east-north" | "unknown";
 }
