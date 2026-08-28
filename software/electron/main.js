@@ -867,6 +867,8 @@ function registerLinuxProtocolHandler() {
   }
 }
 
+const gotTheLock = app.requestSingleInstanceLock();
+
 if (!gotTheLock) {
   app.quit();
 } else {

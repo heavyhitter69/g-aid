@@ -78,6 +78,7 @@ test("Electron main and builder paths stay inside software/", () => {
   const main = fs.readFileSync(path.join(root, "electron/main.js"), "utf8");
   assert.match(main, /dir: app\.getAppPath\(\)/);
   assert.match(main, /GAID_AUTH_BASE_URL/);
+  assert.match(main, /requestSingleInstanceLock/);
   assert.equal(main.includes("g-aid.io"), false);
   assert.match(main, /pendingAuthSession\.take/);
   assert.match(main, /isAllowedDesktopAuthIpc/);
