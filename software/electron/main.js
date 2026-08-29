@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog, nativeImage } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { createServer } = require("http");
@@ -75,6 +75,25 @@ function browserWindowOptions() {
   };
 }
 
+function applyWindowIcon(win) {
+  const file = iconPath();
+  if (!file || !win || win.isDestroyed()) return;
+  try {
+    const image = nativeImage.createFromPath(file);
+    if (!image.isEmpty()) {
+      win.setIcon(image);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    win.setIcon(file);
+  } catch {
+    /* Linux/Wayland can ignore a missing icon and keep the Electron gear. */
+  }
+}
+
 function wantsNewWindow(argv = process.argv) {
   return argv.some((arg) => arg === "--new-window");
 }
@@ -126,6 +145,7 @@ async function openWorkspaceWindow({ pathname, openPath, splash = false, fresh }
     fresh ??
     (!openPath && !(typeof pathname === "string" && /[?&]conversation=/.test(pathname)));
   const win = new BrowserWindow(browserWindowOptions());
+  applyWindowIcon(win);
   registerWindow(win);
   const url = workspaceUrl(pathname, openPath, { fresh: useFresh });
   log("Opening window:", url);
@@ -495,12 +515,14 @@ function whichOnPath(name) {
 function iconPath() {
   const names =
     process.platform === "win32"
-      ? ["icon.ico", "icon.png", "icons/512x512.png"]
+      ? ["icon.ico", "app-icon.png", "icon.png", "icons/512x512.png"]
       : process.platform === "darwin"
-        ? ["icon.icns", "icons/512x512.png", "icon.png"]
-        : ["icons/512x512.png", "icons/256x256.png", "icon.png"];
+        ? ["icon.icns", "app-icon.png", "icons/512x512.png", "icon.png"]
+        : ["app-icon.png", "icons/512x512.png", "icons/256x256.png", "icon.png"];
   const dirs = [
+    path.join(__dirname, "..", "public"),
     path.join(__dirname, "..", "build"),
+    path.join(app.getAppPath(), "public"),
     path.join(app.getAppPath(), "build"),
     path.join(process.resourcesPath, "app", "build"),
     path.join(process.resourcesPath, "build"),
@@ -633,6 +655,7 @@ function splashHtml() {
 
 async function createWindow() {
   mainWindow = new BrowserWindow(browserWindowOptions());
+  applyWindowIcon(mainWindow);
   registerWindow(mainWindow);
 
   await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml())}`);

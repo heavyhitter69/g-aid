@@ -83,6 +83,20 @@ test("Electron main and builder paths stay inside software/", () => {
   assert.equal(main.includes("g-aid.io"), false);
   assert.match(main, /pendingAuthSession\.take/);
   assert.match(main, /isAllowedDesktopAuthIpc/);
+  assert.match(main, /applyWindowIcon/);
+  assert.match(main, /app-icon\.png/);
+});
+
+test("welcome onboarding uses the G-AID logo and product name, not a brain mark", () => {
+  const page = fs.readFileSync(path.join(root, "src/app/onboarding/page.tsx"), "utf8");
+  assert.equal(page.includes("Brain"), false);
+  assert.equal(page.includes("Sparkles"), false);
+  assert.match(page, /PRODUCT_NAME/);
+  assert.match(page, /<Logo /);
+  assert.match(page, /\{PRODUCT_NAME\} is a local desktop workspace/);
+  const layout = fs.readFileSync(path.join(root, "src/app/layout.tsx"), "utf8");
+  assert.match(layout, /APP_ICON_PUBLIC_PATH/);
+  assert.equal(layout.includes('"/icon.png"'), false);
 });
 
 test("desktop auth client does not return browser secrets to the renderer", () => {
