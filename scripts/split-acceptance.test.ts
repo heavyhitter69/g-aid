@@ -128,6 +128,15 @@ test("local tester env templates stay secret-free and gitignored .env.local stay
   assert.match(softwareEnv, /GAID_AUTH_BASE_URL=http:\/\/127\.0\.0\.1:3000/);
 });
 
+test("local tester env check script never prints secret values", () => {
+  const script = read("scripts/check-local-tester-env.mjs");
+  assert.match(script, /Never prints values/);
+  assert.equal(script.includes("console.log(value)"), false);
+  assert.equal(script.includes("console.log(loaded"), false);
+  const pkg = JSON.parse(read("package.json"));
+  assert.equal(pkg.scripts["check:local-tester"], "node scripts/check-local-tester-env.mjs");
+});
+
 if (failed) {
   console.error(`\n${failed} failed`);
   process.exit(1);

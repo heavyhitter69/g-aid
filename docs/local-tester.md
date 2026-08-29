@@ -30,6 +30,20 @@ Do **not** put any of these in Git, `software/.env.local`, or a Linux package:
 
 `.env.local` is gitignored. `.env.example` is tracked and must stay empty of real keys.
 
+If the login page still says sign-in is unavailable after you filled the values, you are almost certainly editing a different file than the website process reads, or the website was started before the save. From the repo root:
+
+```bash
+npm run check:local-tester
+```
+
+That command prints lengths and yes/no only — never keys. Then restart `npm run dev:website` and:
+
+```bash
+curl -s http://127.0.0.1:3000/api/auth/status
+```
+
+You want `{"configured":true}` before the button can say **Continue with email**.
+
 ## 2. Supabase URL allowlist (local only)
 
 In Auth → URL configuration, for this tester only:
@@ -96,8 +110,9 @@ Do not `chown`/`chmod` `node_modules/electron/dist/chrome-sandbox` for this test
 | Callback contains tokens | Stop; that is not this PKCE flow |
 | Workspace still redirects to `/signin` | Desktop did not receive or apply the session (software env still placeholder, or token exchange failed) |
 | `chrome-sandbox` / SUID / SIGTRAP on Linux | Chromium sandbox helper is not root-owned. Use `dev:electron` from this branch, or pass `-- --no-sandbox` |
+| Website: “Desktop sign-in is not configured” after filling env | Values are in the wrong file, the website was not restarted, or the URL is not `https://…`. The website reads **`website/.env.local` only** — not repo-root `.env.local` and not `software/.env.local`. Run `npm run check:local-tester`, then `curl -s http://127.0.0.1:3000/api/auth/status`. |
 
-Restart `dev:website` and `dev:electron` after changing `.env.local`. `NEXT_PUBLIC_*` values are read at process start.
+Restart `dev:website` and `dev:electron` after changing `.env.local`. `NEXT_PUBLIC_*` values are read at process start. Confirm the website terminal prints `[g-aid] website auth project: configured`.
 
 ## 6. Out of scope
 
