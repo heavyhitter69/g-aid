@@ -10,7 +10,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 47821",
-    "dev:electron": "electron .",
+    "dev:electron": "electron . --no-sandbox",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",

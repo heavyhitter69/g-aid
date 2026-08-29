@@ -57,6 +57,7 @@ function findUnpackedApp(): string | null {
 }
 
 test("Electron main and builder paths stay inside software/", () => {
+  assert.match(pkg.scripts["dev:electron"], /--no-sandbox/);
   assert.equal(pkg.main, "electron/main.js");
   assert.equal(fs.existsSync(path.join(root, "electron/main.js")), true);
   assert.equal(fs.existsSync(path.join(root, "electron/desktop-auth.js")), true);

@@ -56,6 +56,15 @@ cd software
 GAID_AUTH_BASE_URL=http://127.0.0.1:3000 npm run dev:electron
 ```
 
+On Linux, unpackaged Electron ships `chrome-sandbox` without a root SUID bit. Chromium aborts before G-AID can disable the sandbox from JavaScript. `dev:electron` therefore passes `--no-sandbox`, matching `launch-g-aid.sh`. If you are still on an older checkout, run:
+
+```bash
+cd software
+GAID_AUTH_BASE_URL=http://127.0.0.1:3000 npm run dev:electron -- --no-sandbox
+```
+
+Do not `chown`/`chmod` `node_modules/electron/dist/chrome-sandbox` for this tester. Leave `dev:website` running in the other terminal.
+
 ## 4. Sign in with the existing account
 
 1. In G-AID, open Log In (not a guest/continue path).
@@ -86,8 +95,9 @@ GAID_AUTH_BASE_URL=http://127.0.0.1:3000 npm run dev:electron
 | Sign-in rejected | Wrong project, wrong password, or unconfirmed user |
 | Callback contains tokens | Stop; that is not this PKCE flow |
 | Workspace still redirects to `/signin` | Desktop did not receive or apply the session (software env still placeholder, or token exchange failed) |
+| `chrome-sandbox` / SUID / SIGTRAP on Linux | Chromium sandbox helper is not root-owned. Use `dev:electron` from this branch, or pass `-- --no-sandbox` |
 
-Restart `dev:website` and `dev:software` after changing `.env.local`. `NEXT_PUBLIC_*` values are read at process start.
+Restart `dev:website` and `dev:electron` after changing `.env.local`. `NEXT_PUBLIC_*` values are read at process start.
 
 ## 6. Out of scope
 

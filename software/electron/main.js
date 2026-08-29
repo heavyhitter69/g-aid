@@ -16,6 +16,10 @@ app.setName("G-AID");
 app.setAppUserModelId("com.geophysics.gaid");
 
 if (process.platform === "linux") {
+  // npm Electron ships chrome-sandbox without root/SUID. Chromium then aborts
+  // in C++ before this file runs, so appendSwitch is too late. `dev:electron`
+  // and launch-g-aid.sh pass --no-sandbox on argv. This is a fallback when the
+  // helper is already missing (packaged Linux after-pack removes it).
   try {
     const helper = path.join(path.dirname(process.execPath), "chrome-sandbox");
     const st = fs.statSync(helper);
