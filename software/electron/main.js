@@ -124,6 +124,12 @@ function attachWindowGuards(win, fallbackUrl) {
       if (win && !win.isDestroyed() && fallbackUrl) win.loadURL(fallbackUrl);
     }, 800);
   });
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && input.key === "F12") {
+      win.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 }
 
 function workspaceUrl(pathname, openPath, extra = {}) {
@@ -716,7 +722,7 @@ async function createWindow() {
   setWindowsJumpList();
   await flushPendingWindows();
 
-  if (dev) {
+  if (process.env.GAID_OPEN_DEVTOOLS === "1") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 }

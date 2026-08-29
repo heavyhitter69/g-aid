@@ -85,6 +85,16 @@ test("Electron main and builder paths stay inside software/", () => {
   assert.match(main, /isAllowedDesktopAuthIpc/);
   assert.match(main, /applyWindowIcon/);
   assert.match(main, /app-icon\.png/);
+  assert.match(main, /GAID_OPEN_DEVTOOLS/);
+  assert.match(main, /toggleDevTools/);
+  assert.equal(main.includes('if (dev) {\n    mainWindow.webContents.openDevTools'), false);
+});
+
+test("workspace Settings tab renders SettingsView instead of the dashboard default", () => {
+  const page = fs.readFileSync(path.join(root, "src/app/workspace/page.tsx"), "utf8");
+  assert.match(page, /SettingsView/);
+  assert.match(page, /case "settings":/);
+  assert.equal(page.includes('from "@/components/workspace/settings-view"'), true);
 });
 
 test("welcome onboarding uses the G-AID logo and product name, not a brain mark", () => {
