@@ -28,7 +28,12 @@ Do **not** put any of these in Git, `software/.env.local`, or a Linux package:
 - refresh tokens
 - database passwords
 
-`.env.local` is gitignored. `.env.example` is tracked and must stay empty of real keys.
+`.env.local` is gitignored. `.env.example` is tracked and must stay empty of real keys. Filling `website/.env.example` does not configure the login form. If you already pasted values into the example, copy them into the ignored file and restore the template:
+
+```bash
+cp website/.env.example website/.env.local
+git checkout -- website/.env.example
+```
 
 If the login page still says sign-in is unavailable after you filled the values, you are almost certainly editing a different file than the website process reads, or the website was started before the save. From the repo root:
 

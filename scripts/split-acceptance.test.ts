@@ -131,6 +131,7 @@ test("local tester env templates stay secret-free and gitignored .env.local stay
 test("local tester env check script never prints secret values", () => {
   const script = read("scripts/check-local-tester-env.mjs");
   assert.match(script, /Never prints values/);
+  assert.match(script, /does not load \.env\.example/);
   assert.equal(script.includes("console.log(value)"), false);
   assert.equal(script.includes("console.log(loaded"), false);
   const pkg = JSON.parse(read("package.json"));

@@ -47,6 +47,7 @@ function parseEnvFile(filePath) {
       https: /^https:\/\//i.test(value.trim()),
       dollar: rawValue.includes("$"),
       placeholder: value.toLowerCase().includes("placeholder"),
+      publishablePrefix: value.startsWith("sb_publishable_"),
     };
   }
   return { exists: true, bytes: fs.statSync(filePath).size, vars };
@@ -77,15 +78,21 @@ function reportFile(label, rel) {
     if (name === "GAID_DESKTOP_AUTH_STORE" && rel.startsWith("software")) continue;
     console.log(`  ${describeKey(name, parsed.vars[name])}`);
   }
-  if (parsed.vars.NEXT_PUBLIC_SUPABASE_ANON_KEY && parsed.vars.NEXT_PUBLIC_SUPABASE_ANON_KEY.length < 80) {
-    console.log("  note: anon/publishable keys from the dashboard are usually much longer than 80 characters");
+  if (
+    parsed.vars.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    parsed.vars.NEXT_PUBLIC_SUPABASE_ANON_KEY.length < 80 &&
+    !parsed.vars.NEXT_PUBLIC_SUPABASE_ANON_KEY.publishablePrefix
+  ) {
+    console.log("  note: JWT anon keys from the dashboard are usually much longer than 80 characters");
   }
   return parsed;
 }
 
 console.log("G-AID local tester env check (no secrets printed)\n");
-console.log("The website process reads website/.env.local only. Repo-root and software/.env.local are not used for this login form.\n");
+console.log("The website process reads website/.env.local only. It does not load website/.env.example.\n");
 
+const websiteExample = reportFile("website template", "website/.env.example");
+console.log("");
 const website = reportFile("website", "website/.env.local");
 console.log("");
 const software = reportFile("software", "software/.env.local");
@@ -104,6 +111,14 @@ const fileLooksUsable =
   !websiteKey.placeholder;
 
 console.log("");
+const exampleFilled =
+  (websiteExample.vars?.NEXT_PUBLIC_SUPABASE_URL?.length || 0) > 0 ||
+  (websiteExample.vars?.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length || 0) > 0;
+if (exampleFilled) {
+  console.log(
+    "warning: website/.env.example has filled NEXT_PUBLIC_ values. Next does not load .env.example. Copy to website/.env.local, then restore the tracked template with: git checkout -- website/.env.example"
+  );
+}
 if (rootEnv.exists && rootEnv.vars.NEXT_PUBLIC_SUPABASE_ANON_KEY && !fileLooksUsable) {
   console.log("warning: repo-root .env.local is not loaded by npm run dev:website. Put the values in website/.env.local.");
 }
