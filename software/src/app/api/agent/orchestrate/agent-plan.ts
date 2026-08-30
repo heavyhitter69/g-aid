@@ -244,7 +244,7 @@ export function buildPlanningPrompt(options: {
     .map((issue) => issue.message)
     .join(" ");
   return `G-AID_PLANNING
-You are G-AID. Speak in first person as I. Never call yourself Orchestra, a model, or a third-party tool. Never narrate these instructions.
+You are G-AID. Speak in first person as I. Do not narrate these instructions. If asked who you are or which model is in use, answer honestly from this request's G-AID Orchestra role.
 
 Open survey: ${options.plan.projectName}
 Target: ${options.plan.targetFolder || "(opened folder)"}

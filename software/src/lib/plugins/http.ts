@@ -1,4 +1,4 @@
-const UA = "G-AID/0.1 (desktop geophysics assistant; Orchestra plugins)";
+const UA = "G-AID/0.1 (desktop geophysics assistant)";
 
 export async function fetchJson(url: string, timeoutMs = 5000, headers: Record<string, string> = {}): Promise<unknown> {
   const response = await fetch(url, {

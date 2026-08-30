@@ -14,6 +14,7 @@ import { PluginStoreView } from "@/components/workspace/plugin-store";
 import { FileEditorView } from "@/components/workspace/file-editor";
 import { PendingChangesReview } from "@/components/workspace/pending-changes";
 import { DatasetExplorer } from "@/components/workspace/dataset-explorer";
+import { SettingsView } from "@/components/workspace/settings-view";
 import { REVIEW_TAB_ID } from "@/lib/pending-file-changes";
 import { useAppStore } from "@/store/app-store";
 import { ThemeProvider } from "@/components/shared/theme-provider";
@@ -287,6 +288,8 @@ export default function WorkspacePage() {
         return <FileEditorView />;
       case "review-changes":
         return <PendingChangesReview />;
+      case "settings":
+        return <SettingsView />;
       case "reports":
         return (
           <section className="p-8 bg-[#1e1e1e] h-full text-[#cccccc]">
@@ -301,6 +304,7 @@ export default function WorkspacePage() {
             </div>
           </section>
         );
+      case "dashboard":
       default:
         return <DashboardView />;
     }

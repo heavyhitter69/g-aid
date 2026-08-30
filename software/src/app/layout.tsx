@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { DesktopSessionProvider } from "@/components/shared/desktop-session";
+import { APP_ICON_PUBLIC_PATH, FAVICON_PUBLIC_PATH, PRODUCT_DESCRIPTION, PRODUCT_NAME } from "@g-aid/branding";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,10 +16,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "G-AID",
-  description: "Local desktop workspace for geophysical survey files",
+  title: PRODUCT_NAME,
+  description: PRODUCT_DESCRIPTION,
   icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/icon.png" }],
+    icon: [{ url: FAVICON_PUBLIC_PATH }, { url: APP_ICON_PUBLIC_PATH }],
   },
 };
 

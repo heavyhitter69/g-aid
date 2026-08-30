@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedBackground } from "@/components/shared/animated-background";
+import { Logo } from "@/components/shared/logo";
 import { useAppStore } from "@/store/app-store";
+import { PRODUCT_NAME } from "@g-aid/branding";
 import {
-  Brain, CheckCircle2, Loader2, Database, BarChart3, GitBranch,
-  Cpu, Shield, Wifi, Layers, ArrowRight, Sparkles, ChevronRight,
+  CheckCircle2, Loader2, Database, BarChart3, GitBranch,
+  Cpu, Shield, Wifi, Layers, ChevronRight,
 } from "lucide-react";
 
 // ─── Cinematic init sequence ────────────────────────────────────────────────
@@ -161,21 +162,9 @@ export default function OnboardingPage() {
               transition={{ duration: 0.45 }}
               className="glass-panel rounded-2xl border border-white/10 p-10 text-center shadow-2xl"
             >
-              {/* Pulsing icon */}
-              <motion.div
-                className="inline-flex h-20 w-20 items-center justify-center rounded-full border border-white/20 mb-6 relative"
-                animate={{
-                  boxShadow: [
-                    "0 0 0px rgba(255,255,255,0)",
-                    "0 0 48px rgba(255,255,255,0.15)",
-                    "0 0 0px rgba(255,255,255,0)",
-                  ],
-                }}
-                transition={{ duration: 2.5, repeat: Infinity }}
-              >
-                <Brain className="h-9 w-9 text-white" />
-                <Sparkles className="absolute top-1 right-1 w-4 h-4 text-white/40" />
-              </motion.div>
+              <div className="flex justify-center mb-6">
+                <Logo size="lg" disableLink className="pointer-events-none" />
+              </div>
 
               <p className="font-mono text-xs text-white/30 uppercase tracking-[0.3em] mb-3">
                 Account Created
@@ -184,8 +173,7 @@ export default function OnboardingPage() {
                 Welcome, {user?.fullName?.split(" ")[0] ?? "Explorer"}
               </h1>
               <p className="text-zinc-400 mb-8 max-w-md mx-auto leading-relaxed">
-                <Image src="/g-aid logo.png" alt="G-AID" width={52} height={18} className="inline object-contain align-middle" />{" "}
-                is a local desktop workspace
+                {PRODUCT_NAME} is a local desktop workspace
                 {disciplineLabel ? (
                   <>
                     {" "}with a {disciplineLabel.toLowerCase()} focus

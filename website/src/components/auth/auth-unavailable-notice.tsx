@@ -13,6 +13,13 @@ export function AuthUnavailableNotice({
         This environment has no usable authentication project. Email and password forms are disabled
         instead of returning a generic error. Google and GitHub login are not offered.
       </p>
+      {process.env.NODE_ENV === "development" ? (
+        <p className="mt-2 text-amber-100/70">
+          Local tester: put the Project URL and anon key in <code>website/.env.local</code>, not the
+          repo root or <code>software/.env.local</code>. Restart <code>npm run dev:website</code>,
+          then run <code>npm run check:local-tester</code>.
+        </p>
+      ) : null}
     </div>
   );
 }

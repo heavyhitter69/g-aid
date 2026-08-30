@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { conversationTitleFromText, isPlaceholderTopic } from "@/lib/conversation-title";
+import { ORCHESTRA_FAST_ALIAS } from "@/lib/model-role";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const prompt = `Write a short conversation title of 3 to 7 words for this chat. Reply with the title only. No quotes, no punctuation, no explanation.\n\nUser: ${message}\nAssistant: ${reply || "(pending)"}`;
 
   const payload = {
-    model: "g-aid-orchestra-fast",
+    model: ORCHESTRA_FAST_ALIAS,
     messages: [{ role: "user", content: prompt }],
     stream: false,
     think: false,
@@ -50,17 +51,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       signal: AbortSignal.timeout(12000),
     });
 
-    if (response.status === 400 || response.status === 404) {
+    if (response.status === 400) {
       const { think, ...withoutThink } = payload;
       void think;
-      const fallback = {
-        ...withoutThink,
-        model: response.status === 404 ? "deepseek-r1:8b" : withoutThink.model,
-      };
       response = await fetch("http://127.0.0.1:11434/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fallback),
+        body: JSON.stringify(withoutThink),
         signal: AbortSignal.timeout(12000),
       });
     }

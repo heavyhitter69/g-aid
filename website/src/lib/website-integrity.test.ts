@@ -101,6 +101,15 @@ await test("download page shows unavailable copy until a release exists", () => 
 
 await test("placeholder Supabase is unconfigured and sign-in surfaces that state", () => {
   assert.equal(isUsableSupabaseConfig("https://placeholder.supabase.co", "eyJplaceholder"), false);
+  assert.equal(
+    isUsableSupabaseConfig(" https://abcd.supabase.co ", "  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.real  "),
+    true
+  );
+  const layout = read("src/app/layout.tsx");
+  assert.match(layout, /SupabaseBrowserEnv/);
+  const status = read("src/app/api/auth/status/route.ts");
+  assert.match(status, /configured:/);
+  assert.equal(/eyJ|sb_secret_|sb_publishable_/.test(status), false);
   const signin = read("src/app/signin/page.tsx");
   assert.match(signin, /AuthUnavailableNotice/);
   assert.equal(signin.includes("Google"), false);
@@ -210,6 +219,11 @@ await test("website has no workspace routes and public pages compile without sof
     assert.notEqual(workspace.status, 200);
     const api = await get(`${base}/api/download?platform=win`);
     assert.ok(api.status === 404 || api.status === 200 || api.status === 302);
+    const authStatus = await get(`${base}/api/auth/status`);
+    assert.equal(authStatus.status, 200, authStatus.body.slice(0, 400));
+    const parsed = JSON.parse(authStatus.body);
+    assert.equal(typeof parsed.configured, "boolean");
+    assert.deepEqual(Object.keys(parsed).sort(), ["configured"]);
   } finally {
     child.kill("SIGTERM");
     await new Promise((r) => setTimeout(r, 800));

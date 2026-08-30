@@ -1,4 +1,4 @@
-const UA = "G-AID/0.1 (desktop geophysics assistant; local Orchestra web plugin)";
+const UA = "G-AID/0.1 (desktop geophysics assistant)";
 const MAX_NOTES = 1500;
 
 export function shouldLookupWeb(text: string): boolean {

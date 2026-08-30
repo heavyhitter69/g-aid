@@ -1,1 +1,4 @@
-FROM C:/Users/sarko/Documents/g-aid/g-aid/resources/ai/qwen2.5-3b-instruct-q4_k_m.gguf
+# Unused. Live aliases are created from ollama/Modelfile and Modelfile.fast
+# (g-aid-orchestra ← deepseek-r1:8b, g-aid-orchestra-fast ← qwen2.5:3b).
+# This Windows GGUF path is not on the packaged or unpackaged chat path.
+FROM qwen2.5:3b

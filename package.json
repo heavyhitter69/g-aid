@@ -17,6 +17,7 @@
     "build:website": "npm run build -w website",
     "build:software": "npm run build -w software",
     "test": "npm run test -w @g-aid/auth-contract && npm run test -w website && npm run test -w software && npm run test:split",
+    "check:local-tester": "node scripts/check-local-tester-env.mjs",
     "test:split": "node --experimental-strip-types --no-warnings scripts/split-acceptance.test.ts",
     "test:python": "python3 -m pytest software/python/tests -q"
   }

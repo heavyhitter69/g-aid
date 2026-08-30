@@ -1,9 +1,9 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog, nativeImage } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { createServer } = require("http");
 const { parse } = require("url");
-const { spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 const workspaceFs = require("./workspace-fs");
 const desktopAuth = require("./desktop-auth");
 
@@ -16,6 +16,10 @@ app.setName("G-AID");
 app.setAppUserModelId("com.geophysics.gaid");
 
 if (process.platform === "linux") {
+  // npm Electron ships chrome-sandbox without root/SUID. Chromium then aborts
+  // in C++ before this file runs, so appendSwitch is too late. `dev:electron`
+  // and launch-g-aid.sh pass --no-sandbox on argv. This is a fallback when the
+  // helper is already missing (packaged Linux after-pack removes it).
   try {
     const helper = path.join(path.dirname(process.execPath), "chrome-sandbox");
     const st = fs.statSync(helper);
@@ -71,6 +75,25 @@ function browserWindowOptions() {
   };
 }
 
+function applyWindowIcon(win) {
+  const file = iconPath();
+  if (!file || !win || win.isDestroyed()) return;
+  try {
+    const image = nativeImage.createFromPath(file);
+    if (!image.isEmpty()) {
+      win.setIcon(image);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    win.setIcon(file);
+  } catch {
+    /* Linux/Wayland can ignore a missing icon and keep the Electron gear. */
+  }
+}
+
 function wantsNewWindow(argv = process.argv) {
   return argv.some((arg) => arg === "--new-window");
 }
@@ -101,6 +124,12 @@ function attachWindowGuards(win, fallbackUrl) {
       if (win && !win.isDestroyed() && fallbackUrl) win.loadURL(fallbackUrl);
     }, 800);
   });
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && input.key === "F12") {
+      win.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 }
 
 function workspaceUrl(pathname, openPath, extra = {}) {
@@ -122,6 +151,7 @@ async function openWorkspaceWindow({ pathname, openPath, splash = false, fresh }
     fresh ??
     (!openPath && !(typeof pathname === "string" && /[?&]conversation=/.test(pathname)));
   const win = new BrowserWindow(browserWindowOptions());
+  applyWindowIcon(win);
   registerWindow(win);
   const url = workspaceUrl(pathname, openPath, { fresh: useFresh });
   log("Opening window:", url);
@@ -403,30 +433,59 @@ function ollamaEnv() {
   };
 }
 
+function ollamaHasAlias(ollamaPath, env, alias) {
+  try {
+    const out = execFileSync(ollamaPath, ["list"], {
+      env: { ...process.env, ...env },
+      encoding: "utf8",
+      timeout: 8000,
+      windowsHide: true,
+    });
+    return String(out)
+      .split(/\r?\n/)
+      .some((line) => {
+        const name = line.split(/\s+/)[0] || "";
+        return name === alias || name === `${alias}:latest` || name.startsWith(`${alias}:`);
+      });
+  } catch {
+    return false;
+  }
+}
+
 function ensureFastOrchestra() {
   const ollamaPath = resolveOllamaPath();
   const modelfile = orchestraFastModelfilePath();
   if (!ollamaPath || !fs.existsSync(ollamaPath) || !modelfile) {
-    log("Orchestra Fast model or Modelfile missing");
+    log("G-AID Orchestra Fast model or Modelfile missing");
     return;
   }
-  spawnHidden(ollamaPath, ["create", "g-aid-orchestra-fast", "-f", modelfile], ollamaEnv());
+  const env = ollamaEnv();
+  if (ollamaHasAlias(ollamaPath, env, "g-aid-orchestra-fast")) {
+    log("g-aid-orchestra-fast alias already present; leaving existing local alias unchanged");
+    return;
+  }
+  spawnHidden(ollamaPath, ["create", "g-aid-orchestra-fast", "-f", modelfile], env);
 }
 
 function ensureOrchestraModel() {
   const modelfile = orchestraModelfilePath();
   if (!modelfile) {
-    log("Orchestra Modelfile missing");
+    log("G-AID Orchestra Modelfile missing");
     return;
   }
   const ollamaDir = path.join(process.resourcesPath, "ai");
   const ollamaPath = resolveOllamaPath();
   if (!ollamaPath || !fs.existsSync(ollamaPath)) return;
-  spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], {
+  const env = {
     OLLAMA_MODELS: path.join(ollamaDir, "models"),
     OLLAMA_HOST: "127.0.0.1:11434",
     OLLAMA_LIBRARY_PATH: ollamaDir,
-  });
+  };
+  if (ollamaHasAlias(ollamaPath, env, "g-aid-orchestra")) {
+    log("g-aid-orchestra alias already present; leaving existing local alias unchanged");
+    return;
+  }
+  spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], env);
 }
 
 function listenOnPort(server, port) {
@@ -491,12 +550,14 @@ function whichOnPath(name) {
 function iconPath() {
   const names =
     process.platform === "win32"
-      ? ["icon.ico", "icon.png", "icons/512x512.png"]
+      ? ["icon.ico", "app-icon.png", "icon.png", "icons/512x512.png"]
       : process.platform === "darwin"
-        ? ["icon.icns", "icons/512x512.png", "icon.png"]
-        : ["icons/512x512.png", "icons/256x256.png", "icon.png"];
+        ? ["icon.icns", "app-icon.png", "icons/512x512.png", "icon.png"]
+        : ["app-icon.png", "icons/512x512.png", "icons/256x256.png", "icon.png"];
   const dirs = [
+    path.join(__dirname, "..", "public"),
     path.join(__dirname, "..", "build"),
+    path.join(app.getAppPath(), "public"),
     path.join(app.getAppPath(), "build"),
     path.join(process.resourcesPath, "app", "build"),
     path.join(process.resourcesPath, "build"),
@@ -629,6 +690,7 @@ function splashHtml() {
 
 async function createWindow() {
   mainWindow = new BrowserWindow(browserWindowOptions());
+  applyWindowIcon(mainWindow);
   registerWindow(mainWindow);
 
   await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml())}`);
@@ -689,7 +751,7 @@ async function createWindow() {
   setWindowsJumpList();
   await flushPendingWindows();
 
-  if (dev) {
+  if (process.env.GAID_OPEN_DEVTOOLS === "1") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 }
@@ -866,6 +928,8 @@ function registerLinuxProtocolHandler() {
     log("Linux protocol handler skipped", err);
   }
 }
+
+const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   app.quit();

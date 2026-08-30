@@ -57,6 +57,7 @@ function findUnpackedApp(): string | null {
 }
 
 test("Electron main and builder paths stay inside software/", () => {
+  assert.match(pkg.scripts["dev:electron"], /--no-sandbox/);
   assert.equal(pkg.main, "electron/main.js");
   assert.equal(fs.existsSync(path.join(root, "electron/main.js")), true);
   assert.equal(fs.existsSync(path.join(root, "electron/desktop-auth.js")), true);
@@ -78,9 +79,36 @@ test("Electron main and builder paths stay inside software/", () => {
   const main = fs.readFileSync(path.join(root, "electron/main.js"), "utf8");
   assert.match(main, /dir: app\.getAppPath\(\)/);
   assert.match(main, /GAID_AUTH_BASE_URL/);
+  assert.match(main, /requestSingleInstanceLock/);
   assert.equal(main.includes("g-aid.io"), false);
   assert.match(main, /pendingAuthSession\.take/);
   assert.match(main, /isAllowedDesktopAuthIpc/);
+  assert.match(main, /const gotTheLock = app\.requestSingleInstanceLock\(\)/);
+  assert.match(main, /if \(!gotTheLock\) \{\s*app\.quit\(\);/s);
+  assert.match(main, /applyWindowIcon/);
+  assert.match(main, /app-icon\.png/);
+  assert.match(main, /GAID_OPEN_DEVTOOLS/);
+  assert.match(main, /toggleDevTools/);
+  assert.equal(main.includes('if (dev) {\n    mainWindow.webContents.openDevTools'), false);
+});
+
+test("workspace Settings tab renders SettingsView instead of the dashboard default", () => {
+  const page = fs.readFileSync(path.join(root, "src/app/workspace/page.tsx"), "utf8");
+  assert.match(page, /SettingsView/);
+  assert.match(page, /case "settings":/);
+  assert.equal(page.includes('from "@/components/workspace/settings-view"'), true);
+});
+
+test("welcome onboarding uses the G-AID logo and product name, not a brain mark", () => {
+  const page = fs.readFileSync(path.join(root, "src/app/onboarding/page.tsx"), "utf8");
+  assert.equal(page.includes("Brain"), false);
+  assert.equal(page.includes("Sparkles"), false);
+  assert.match(page, /PRODUCT_NAME/);
+  assert.match(page, /<Logo /);
+  assert.match(page, /\{PRODUCT_NAME\} is a local desktop workspace/);
+  const layout = fs.readFileSync(path.join(root, "src/app/layout.tsx"), "utf8");
+  assert.match(layout, /APP_ICON_PUBLIC_PATH/);
+  assert.equal(layout.includes('"/icon.png"'), false);
 });
 
 test("desktop auth client does not return browser secrets to the renderer", () => {
