@@ -227,20 +227,6 @@ function splitExecutionNarrative(text: string): { intro: string; outro: string }
   return { intro: text.trim(), outro: "" };
 }
 
-const THOUGHT_ECHO = /you are g-aid|never say you are|if asked who you are|system prompt|ground truth workspace|do not paste|implementation plan tab/i;
-
-function cleanDisplayedThought(text: string): string {
-  return text
-    .replace(/<\/?(?:think|思考)>/gi, "")
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      return trimmed && !THOUGHT_ECHO.test(trimmed);
-    })
-    .join("\n")
-    .trim();
-}
-
 // ─── Streaming markdown renderer ──────────────────────────────────────────────
 
 const DONE_REMARK_PLUGINS = [remarkGfm, remarkMath];
@@ -423,43 +409,18 @@ function InterruptCard({
   );
 }
 
-function ThoughtDisclosure({ duration, thought, isThinking }: { duration: number; thought?: string; isThinking?: boolean }) {
-  const [open, setOpen] = useState(Boolean(isThinking));
-  const thoughtRef = useRef<HTMLDivElement>(null);
-  const revealedThought = useSmoothReveal(thought || "", Boolean(isThinking));
-
-  useEffect(() => {
-    if (isThinking) setOpen(true);
-  }, [isThinking]);
-
-  useEffect(() => {
-    if (!open || !thoughtRef.current) return;
-    thoughtRef.current.scrollTop = thoughtRef.current.scrollHeight;
-  }, [revealedThought, open, isThinking]);
-
-  const formatTime = (secs: number) => {
-    const safe = Math.max(1, secs || 0);
-    if (safe < 60) return `${safe}s`;
-    const m = Math.floor(safe / 60);
-    const s = safe % 60;
-    if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
-    const h = Math.floor(m / 60);
-    const remM = m % 60;
-    return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
-  };
-
+function ReasoningSummary({ lines }: { lines: string[] }) {
+  const [open, setOpen] = useState(true);
+  const visible = lines.map((line) => line.trim()).filter(Boolean);
+  if (!visible.length) return null;
   return (
     <div className="mb-2">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((value) => !value)}
         className="flex items-center gap-1 text-[13px] text-[#c8c8c8] hover:text-white transition-colors"
       >
-        {isThinking ? (
-          <span className="gaid-thinking-shimmer font-medium select-none">Thinking</span>
-        ) : (
-          <span>Thought for {formatTime(duration)}</span>
-        )}
+        <span className="font-medium">Reasoning summary</span>
         {open ? (
           <ChevronDown className="w-3.5 h-3.5 shrink-0" />
         ) : (
@@ -467,23 +428,12 @@ function ThoughtDisclosure({ duration, thought, isThinking }: { duration: number
         )}
       </button>
       {open && (
-        <div
-          ref={thoughtRef}
-          className="mt-3 ml-2 text-[13px] text-[#a0a0a0] leading-relaxed border-l-2 border-[#333] pl-3 max-h-[240px] overflow-y-auto scrollbar-thin"
-        >
-          {revealedThought.includes("[1/") ? (
-            <ul className="list-disc space-y-1 pl-4">
-              {revealedThought.split('\n').filter(Boolean).map((line, i) => {
-                const cleanLine = line.replace(/^\[\d+\/\d+\]\s*/, '');
-                return <li key={i}>{cleanLine}</li>;
-              })}
-            </ul>
-          ) : (
-            <div className="whitespace-pre-wrap font-mono text-[12px] opacity-80">
-              {revealedThought}
-              {isThinking ? <span className="gaid-stream-caret" aria-hidden /> : null}
-            </div>
-          )}
+        <div className="mt-3 ml-2 text-[13px] text-[#a0a0a0] leading-relaxed border-l-2 border-[#333] pl-3">
+          <ul className="list-disc space-y-1 pl-4">
+            {visible.map((line, index) => (
+              <li key={`${index}-${line}`}>{line}</li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -569,7 +519,7 @@ function InputBox({
             <button
               onClick={() => { setModelDropdownOpen(!modelDropdownOpen); setDropdownOpen(false); }}
               className="flex items-center gap-1 text-[9px] text-[#858585] px-1 hover:text-[#cccccc] transition-colors"
-              title="Orchestra speed"
+              title="G-AID Orchestra"
             >
               <span className="truncate max-w-[140px]">{pickerLabel(orchestraChoice, previewSpeed)}</span>
               <ChevronDown className="h-2.5 w-2.5" />
@@ -836,8 +786,6 @@ export function AIPanel() {
     const sendGen = sendGenRef.current + 1;
     sendGenRef.current = sendGen;
 
-    let actualThinkingStart: number | undefined;
-    let thinkingDurationRecorded: number | undefined;
     let preamble: StreamPreamble | null = null;
     let streamError: string | null = null;
 
@@ -977,7 +925,6 @@ export function AIPanel() {
       agentStore.setStreaming(true);
 
       const reader = response.body.getReader();
-      let thought = ""; // internal reasoning shown in thought disclosure
 
       // ── Byte-scan state machine ──────────────────────────────────────────
       // Protocol: \x00{json}\n  |  text tokens (no per-token marker)  |  \n\x02{json}\n
@@ -1023,9 +970,8 @@ let activityId: string | null = null;
                 if (!activityId) {
                   activityId = agentStore.appendActivity({
                     actorId: preamble.agentId,
-                    description: preamble.rulesMatched.length > 0
-                      ? `${preamble.rulesMatched.length} rule${preamble.rulesMatched.length > 1 ? "s" : ""} matched, ${preamble.capabilityTrace.length} capabilit${preamble.capabilityTrace.length === 1 ? "y" : "ies"}`
-                      : "Processing query…",
+                    description: (preamble.reasoningSummary && preamble.reasoningSummary[0])
+                      || "G-AID is reviewing the workspace",
                     status: "running",
                     relatedToolId: null,
                     conversationId: convId,
@@ -1051,30 +997,16 @@ let activityId: string | null = null;
                 armStall(tokenStallMs);
               }
 
-              if (actualThinkingStart === undefined) {
-                if (accumulatedText.includes("<think>") || accumulatedText.includes("<思考>")) {
-                  actualThinkingStart = Date.now();
-                }
-              }
-
-              if (thinkingDurationRecorded === undefined && actualThinkingStart !== undefined) {
-                if (accumulatedText.includes("</think>") || accumulatedText.includes("</思考>")) {
-                  thinkingDurationRecorded = Math.round((Date.now() - actualThinkingStart) / 1000);
-                }
-              }
-
               const now = Date.now();
-              const firstThinkChunk = actualThinkingStart !== undefined && lastTextUpdate === 0;
-              if (firstThinkChunk || now - lastTextUpdate > 16) {
+              if (now - lastTextUpdate > 16) {
                 lastTextUpdate = now;
-                const snap = accumulatedText;
-                const pSnap = preamble;
-                updateMessageInConversation(convId, agentMsgId, { 
-                  text: snap, 
-                  preamble: pSnap, 
+                const snap = accumulatedText
+                  .replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/gi, "")
+                  .replace(/<think>[\s\S]*$|<思考>[\s\S]*$/gi, "");
+                updateMessageInConversation(convId, agentMsgId, {
+                  text: snap,
+                  preamble,
                   isStreaming: true,
-                  thinkingStartedAt: actualThinkingStart,
-                  thinkingDuration: thinkingDurationRecorded
                 });
               }
             }
@@ -1112,9 +1044,6 @@ let activityId: string | null = null;
                  if (epilogue.implementationPlanContent) {
                    useAppStore.getState().setFileContent(TEMP_PLAN_ID, epilogue.implementationPlanContent);
                  }
-                 if (epilogue.thought) {
-                   thought = epilogue.thought;
-                 }
                  if (epilogue.projectFilesUpdates && Array.isArray(epilogue.projectFilesUpdates)) {
                    applyWorkspaceFileUpdates(epilogue.projectFilesUpdates);
                  }
@@ -1151,25 +1080,24 @@ let activityId: string | null = null;
       const awaitingApproval = planAwaitingApproval;
       if (sendGenRef.current !== sendGen) return;
       const visible = accumulatedText
+        .replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/gi, "")
         .replace(/<\/?(?:think|思考)>/gi, "")
         .trim();
       const empty = !visible;
       const failed = Boolean(streamError) || empty;
 
       updateMessageInConversation(convId, agentMsgId, {
-        text: accumulatedText,
+        text: visible,
         preamble,
         isStreaming: false,
         interrupted: failed,
         interruptKind: streamError ? "engine" : empty ? "empty" : undefined,
-        ...(thinkingDurationRecorded !== undefined ? { thinkingDuration: thinkingDurationRecorded } : {}),
-        thought: thought || undefined,
         awaitingApproval,
         taskFolder: planTaskFolder
       });
 
       if (shouldTitle && !failed) {
-        void assignAiTopic(convId, userMsg, accumulatedText);
+        void assignAiTopic(convId, userMsg, visible);
       }
 
       agentStore.setStreaming(false);
@@ -1182,20 +1110,22 @@ let activityId: string | null = null;
       const reason = abortReasonRef.current;
       if (aborted && reason === "user") {
         updateMessageInConversation(convId, agentMsgId, {
-          text: accumulatedText,
+          text: accumulatedText
+            .replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/gi, "")
+            .replace(/<\/?(?:think|思考)>/gi, ""),
           preamble,
           isStreaming: false,
           interrupted: false,
-          ...(thinkingDurationRecorded !== undefined ? { thinkingDuration: thinkingDurationRecorded } : {}),
         });
       } else {
         updateMessageInConversation(convId, agentMsgId, {
-          text: accumulatedText,
+          text: accumulatedText
+            .replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/gi, "")
+            .replace(/<\/?(?:think|思考)>/gi, ""),
           preamble,
           isStreaming: false,
           interrupted: true,
           interruptKind: aborted && reason === "stall" ? "stalled" : "network",
-          ...(thinkingDurationRecorded !== undefined ? { thinkingDuration: thinkingDurationRecorded } : {}),
         });
       }
     } finally {
@@ -1562,73 +1492,28 @@ const handleApproveDiurnal = async (sessionId: string) => {
                    </div>
                  </div>
                ) : (() => {
-                 let displayThought = msg.thought || "";
-                 let displayText = msg.text;
-
-                 // Extract all completed <think> blocks
-                 const thinkRegex = /<think>([\s\S]*?)<\/think>|<思考>([\s\S]*?)<\/思考>/g;
-                 let combinedThoughts = "";
-                 let match;
-                 while ((match = thinkRegex.exec(displayText)) !== null) {
-                   combinedThoughts += (match[1] || match[2]).trim() + "\n\n";
-                 }
-
-                 if (combinedThoughts) {
-                   displayThought = combinedThoughts.trim();
-                   displayText = displayText.replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/g, "");
-                 }
-
-                 // Check if there is an unclosed think block (streaming)
-                 const openMatch = displayText.match(/<(?:think|思考)>/);
-                 if (openMatch && openMatch.index !== undefined) {
-                   const unclosedThought = displayText.slice(openMatch.index + openMatch[0].length);
-                   if (unclosedThought || openMatch) {
-                     displayThought = displayThought
-                       ? (unclosedThought ? displayThought + "\n\n" + unclosedThought : displayThought)
-                       : unclosedThought;
-                   }
-                   displayText = displayText.slice(0, openMatch.index).trim();
-                 }
-                 
-                 // Clean up any stray closing tags that were outside of matched blocks
-                 displayText = displayText.replace(/<\/(?:think|思考)>/g, "");
-                 displayThought = displayThought.replace(/<\/?(?:think|思考)>/gi, "");
+                 let displayText = msg.text.replace(/<think>[\s\S]*?<\/think>|<思考>[\s\S]*?<\/思考>/g, "");
+                 displayText = displayText.replace(/<\/?(?:think|思考)>/gi, "");
                  if (!msg.isStreaming) displayText = displayText.trim();
-                 displayThought = cleanDisplayedThought(displayThought);
 
-                 const rawText = msg.text || "";
-                 const thinkOpen = /<(?:think|思考)>/i.test(rawText);
-                 const thinkClosed = /<\/(?:think|思考)>/i.test(rawText);
-                 const stillThinking =
-                   Boolean(msg.isStreaming) &&
-                   !displayText.trim() &&
-                   (Boolean(displayThought) || (thinkOpen && !thinkClosed));
-                 const showCompletedThought = !stillThinking && Boolean(displayThought);
-                 const waitingForFirstToken = Boolean(msg.isStreaming) && !displayText && !displayThought && !stillThinking;
+                 const waitingForFirstToken = Boolean(msg.isStreaming) && !displayText;
                  const hasProjectData = projectFiles.some((f) => Boolean(fileContents[f.id]?.trim()));
                  const showConfidence = !msg.isStreaming
                    && hasProjectData
                    && Boolean(displayText.trim())
                    && Boolean(msg.preamble?.confidence)
-                   && ((msg.preamble as StreamPreamble & { showConfidence?: boolean })?.showConfidence
-                     || (msg.preamble?.rulesMatched?.length ?? 0) > 0
-                     || (msg.preamble?.capabilityTrace?.length ?? 0) > 0);
+                   && Boolean((msg.preamble as StreamPreamble & { showConfidence?: boolean })?.showConfidence);
 
                  const isPlanRun = displayText.includes("Plan approved.");
                  const { intro, outro } = isPlanRun
                    ? splitExecutionNarrative(displayText)
                    : { intro: displayText, outro: "" };
                  const showWorking = isPlanRun || Boolean(msg.workSteps?.length);
+                 const reasoningLines = (msg.preamble?.reasoningSummary || []).filter(Boolean);
 
                  return (
                  <>
-                   {(stillThinking || showCompletedThought) ? (
-                     <ThoughtDisclosure
-                       duration={msg.thinkingDuration ?? 1}
-                       thought={displayThought || undefined}
-                       isThinking={stillThinking}
-                     />
-                   ) : null}
+                   <ReasoningSummary lines={reasoningLines} />
                    {waitingForFirstToken ? (
                      <TypingDots />
                    ) : isPlanRun ? (

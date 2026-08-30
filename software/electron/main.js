@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { createServer } = require("http");
 const { parse } = require("url");
-const { spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 const workspaceFs = require("./workspace-fs");
 const desktopAuth = require("./desktop-auth");
 
@@ -403,30 +403,59 @@ function ollamaEnv() {
   };
 }
 
+function ollamaHasAlias(ollamaPath, env, alias) {
+  try {
+    const out = execFileSync(ollamaPath, ["list"], {
+      env: { ...process.env, ...env },
+      encoding: "utf8",
+      timeout: 8000,
+      windowsHide: true,
+    });
+    return String(out)
+      .split(/\r?\n/)
+      .some((line) => {
+        const name = line.split(/\s+/)[0] || "";
+        return name === alias || name === `${alias}:latest` || name.startsWith(`${alias}:`);
+      });
+  } catch {
+    return false;
+  }
+}
+
 function ensureFastOrchestra() {
   const ollamaPath = resolveOllamaPath();
   const modelfile = orchestraFastModelfilePath();
   if (!ollamaPath || !fs.existsSync(ollamaPath) || !modelfile) {
-    log("Orchestra Fast model or Modelfile missing");
+    log("G-AID Orchestra Fast model or Modelfile missing");
     return;
   }
-  spawnHidden(ollamaPath, ["create", "g-aid-orchestra-fast", "-f", modelfile], ollamaEnv());
+  const env = ollamaEnv();
+  if (ollamaHasAlias(ollamaPath, env, "g-aid-orchestra-fast")) {
+    log("g-aid-orchestra-fast alias already present; leaving existing local alias unchanged");
+    return;
+  }
+  spawnHidden(ollamaPath, ["create", "g-aid-orchestra-fast", "-f", modelfile], env);
 }
 
 function ensureOrchestraModel() {
   const modelfile = orchestraModelfilePath();
   if (!modelfile) {
-    log("Orchestra Modelfile missing");
+    log("G-AID Orchestra Modelfile missing");
     return;
   }
   const ollamaDir = path.join(process.resourcesPath, "ai");
   const ollamaPath = resolveOllamaPath();
   if (!ollamaPath || !fs.existsSync(ollamaPath)) return;
-  spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], {
+  const env = {
     OLLAMA_MODELS: path.join(ollamaDir, "models"),
     OLLAMA_HOST: "127.0.0.1:11434",
     OLLAMA_LIBRARY_PATH: ollamaDir,
-  });
+  };
+  if (ollamaHasAlias(ollamaPath, env, "g-aid-orchestra")) {
+    log("g-aid-orchestra alias already present; leaving existing local alias unchanged");
+    return;
+  }
+  spawnHidden(ollamaPath, ["create", "g-aid-orchestra", "-f", modelfile], env);
 }
 
 function listenOnPort(server, port) {

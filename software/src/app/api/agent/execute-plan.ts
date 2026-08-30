@@ -16,9 +16,10 @@ import {
   writeRunFile,
 } from "@/lib/run-layout";
 import { loadProjectCatalog } from "@/lib/catalog";
+import { dagForPlan } from "@/lib/capabilities";
 import { compiledNodeIds } from "@/lib/capabilities/compile";
 import { catalogInputsPayload, verifyBoundInputIdentity } from "@/lib/capabilities/inputs";
-import { dagForPlan } from "@/lib/capabilities";
+import { executionCapabilityTrace } from "@/lib/model-role";
 import {
   generateTasksMarkdown,
   getPendingPlan,
@@ -348,10 +349,10 @@ export function streamPlanDecision(
         persistRunDocs(frozen, tasksContent.current);
 
         enqueue(`\x00${JSON.stringify({
-          agentId: "magnetic-agent",
+          agentId: "orchestrator-agent",
           confidence: 0,
           showConfidence: false,
-          capabilityTrace: frozen.steps.diurnal ? ["diurnal-correction"] : ["planning"],
+          capabilityTrace: executionCapabilityTrace(frozen.steps),
         })}\n`);
         enqueue(`\x02${JSON.stringify({
           type: "workspace_file",
@@ -404,7 +405,7 @@ export function streamPlanDecision(
           enqueue(`\n\nStopped. This run did not finish. Click Proceed to retry — a new run folder will be created and this one stays as-is.`);
           enqueue(`\n\x02${JSON.stringify({
             type: "execution_failed",
-            agentId: "magnetic-agent",
+            agentId: "orchestrator-agent",
             taskFolder: frozen.taskFolder,
             productsRel: frozen.productsRel,
             runId: frozen.runId,
@@ -423,7 +424,7 @@ export function streamPlanDecision(
         enqueue(`\n\nFinished. Results are on the map under \`${frozen.productsRel}/\`.`);
         enqueue(`\n\x02${JSON.stringify({
           type: "execution_complete",
-          agentId: "magnetic-agent",
+          agentId: "orchestrator-agent",
           taskFolder: frozen.taskFolder,
           productsRel: frozen.productsRel,
           runId: frozen.runId,

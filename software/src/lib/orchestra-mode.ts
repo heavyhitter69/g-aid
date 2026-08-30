@@ -4,17 +4,17 @@ export type OrchestraChoice = "auto" | "fast" | "thinking";
 export type OrchestraSpeed = "fast" | "thinking";
 
 export const ORCHESTRA_CHOICES: { id: OrchestraChoice; label: string; hint: string }[] = [
-  { id: "auto", label: "Auto", hint: "Fast for chat, Thinking for analysis" },
-  { id: "fast", label: "G-AID Orchestra (Fast)", hint: "Quick replies, no long think" },
-  { id: "thinking", label: "G-AID Orchestra (Thinking)", hint: "DeepSeek R1 for survey work" },
+  { id: "auto", label: "Auto", hint: "Orchestra Fast for chat, Orchestra for survey work" },
+  { id: "fast", label: "G-AID Orchestra Fast", hint: "Quick replies and ordinary conversation" },
+  { id: "thinking", label: "G-AID Orchestra", hint: "Workspace investigation and planning" },
 ];
 
 export function orchestraSpeedLabel(speed: OrchestraSpeed): string {
-  return speed === "thinking" ? "G-AID Orchestra (Thinking)" : "G-AID Orchestra (Fast)";
+  return speed === "thinking" ? "G-AID Orchestra" : "G-AID Orchestra Fast";
 }
 
 export function pickerLabel(choice: OrchestraChoice, preview: OrchestraSpeed): string {
-  if (choice === "auto") return `Auto · ${preview === "thinking" ? "Thinking" : "Fast"}`;
+  if (choice === "auto") return `Auto · ${preview === "thinking" ? "Orchestra" : "Orchestra Fast"}`;
   return orchestraSpeedLabel(choice);
 }
 
