@@ -19,9 +19,10 @@ import {
 } from "@/lib/workspace-index";
 import { inventoryAnswer, loadProjectCatalog } from "@/lib/catalog";
 import { buildMapLayers, isMapQuestion, listRunArtifactPaths, mapWorkspaceAnswer } from "@/lib/map";
-import { streamOrchestra } from "@/lib/ollama-orchestra";
+import { ModelUnavailableError, streamOrchestra } from "@/lib/ollama-orchestra";
 import type { PluginState } from "@/lib/plugins";
 import { resolveOrchestraSpeed, type OrchestraChoice } from "@/lib/orchestra-mode";
+import { classifyDirectQuestion, planningReasoningSummary } from "@/lib/model-role";
 import { validatePlan } from "@/lib/plan-spec";
 
 export const dynamic = "force-dynamic";
@@ -57,48 +58,6 @@ function streamAgentResponse(
   });
 }
 
-async function proxyPython(
-  prompt: string,
-  sessionId: string,
-  epiloguePatch?: Record<string, unknown>,
-  onComplete?: (raw: string) => void
-): Promise<Response> {
-  let pythonResponse: Response | null = null;
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 8; attempt++) {
-    try {
-      pythonResponse = await fetch("http://127.0.0.1:8000/api/v1/orchestrate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, session_id: sessionId }),
-      });
-      break;
-    } catch (err) {
-      lastError = err;
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    }
-  }
-  if (!pythonResponse) {
-    throw lastError ?? new Error("Python backend unreachable");
-  }
-  if (!pythonResponse.ok) {
-    const errorText = await pythonResponse.text();
-    throw new Error(`Python API responded with ${pythonResponse.status}: ${errorText}`);
-  }
-  if (!pythonResponse.body) {
-    throw new Error("Python API returned an empty body");
-  }
-  const body = epiloguePatch
-    ? patchStreamEpilogue(pythonResponse.body, epiloguePatch, onComplete)
-    : pythonResponse.body;
-  return new Response(body, {
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Transfer-Encoding": "chunked",
-    },
-  });
-}
-
 async function proxyOrchestra(
   prompt: string,
   sessionId: string,
@@ -107,10 +66,23 @@ async function proxyOrchestra(
   lookupQuery?: string,
   pluginState?: Partial<PluginState>,
   speed?: "fast" | "thinking",
-  resumePartial?: string
+  resumePartial?: string,
+  extras?: {
+    userText?: string;
+    completedRuns?: { runId?: string; productsRel?: string; status?: string }[];
+    reasoningSummary?: string[];
+  }
 ): Promise<Response> {
   try {
-    const body = await streamOrchestra(prompt, { lookupQuery, pluginState, speed, resumePartial });
+    const body = await streamOrchestra(prompt, {
+      lookupQuery,
+      pluginState,
+      speed,
+      resumePartial,
+      userText: extras?.userText,
+      completedRuns: extras?.completedRuns,
+      reasoningSummary: extras?.reasoningSummary,
+    });
     const patched = epiloguePatch
       ? patchStreamEpilogue(body, epiloguePatch, onComplete)
       : body;
@@ -120,8 +92,14 @@ async function proxyOrchestra(
         "Transfer-Encoding": "chunked",
       },
     });
-  } catch {
-    return proxyPython(prompt, sessionId, epiloguePatch, onComplete);
+  } catch (error: unknown) {
+    const message =
+      error instanceof ModelUnavailableError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "G-AID Orchestra is not available locally.";
+    return streamAgentResponse(`\n\n> ${message}`, { type: "error", message });
   }
 }
 
@@ -192,6 +170,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
   }
 
+  const liveExtras = {
+    userText,
+    completedRuns: catalog?.runs || [],
+  };
+
+  if (classifyDirectQuestion(userText)) {
+    const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn: false });
+    return await proxyOrchestra(userText, sessionId, undefined, undefined, userText, pluginState, speed, undefined, liveExtras);
+  }
+
   const planTurn = Boolean(intent || pending || isProcessingRequest(userText)) && !isGeneralKnowledgeQuestion(userText);
   const speed = resolveOrchestraSpeed(userText, { choice: orchestraChoice, planTurn });
   if (planTurn && !root) {
@@ -234,29 +222,25 @@ export async function POST(request: NextRequest): Promise<Response> {
         undefined,
         undefined,
         undefined,
-        speed
+        speed,
+        undefined,
+        {
+          ...liveExtras,
+          reasoningSummary: planningReasoningSummary({
+            projectName: plan.projectName,
+            targetFolder: plan.targetFolder,
+            boundCount: plan.inputs?.length || 0,
+          }),
+        }
       );
     }
 
-    return await proxyOrchestra(message, sessionId, undefined, undefined, userText, pluginState, speed, resumePartial);
+    return await proxyOrchestra(message, sessionId, undefined, undefined, userText, pluginState, speed, resumePartial, liveExtras);
   } catch (error: unknown) {
-    console.error("Failed to proxy to Python backend:", error);
     const err = error as { message?: string };
-    const stream = new ReadableStream({
-      start(controller) {
-        const preamble = {
-          agentId: "orchestrator-agent",
-          confidence: 0,
-          capabilityTrace: [],
-          rulesMatched: [],
-          epistemicTypesProduced: [],
-        };
-        controller.enqueue(encoder.encode(`\x00${JSON.stringify(preamble)}\n`));
-        controller.enqueue(encoder.encode(`\n\n> ❌ **Intelligence Engine Offline.** ${err?.message || "The Python server is not running."}`));
-        controller.enqueue(encoder.encode(`\n\x02${JSON.stringify({ type: "error" })}\n`));
-        controller.close();
-      },
-    });
-    return new Response(stream, { headers: { "Content-Type": "application/octet-stream" } });
+    return streamAgentResponse(
+      `\n\n> ${err?.message || "G-AID Orchestra is not available locally."}`,
+      { type: "error", message: err?.message }
+    );
   }
 }

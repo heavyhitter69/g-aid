@@ -83,6 +83,8 @@ test("Electron main and builder paths stay inside software/", () => {
   assert.equal(main.includes("g-aid.io"), false);
   assert.match(main, /pendingAuthSession\.take/);
   assert.match(main, /isAllowedDesktopAuthIpc/);
+  assert.match(main, /const gotTheLock = app\.requestSingleInstanceLock\(\)/);
+  assert.match(main, /if \(!gotTheLock\) \{\s*app\.quit\(\);/s);
   assert.match(main, /applyWindowIcon/);
   assert.match(main, /app-icon\.png/);
   assert.match(main, /GAID_OPEN_DEVTOOLS/);

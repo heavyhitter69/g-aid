@@ -533,6 +533,7 @@ export interface StreamPreamble {
   rulesMatched: string[];
   hypothesesUpdated: string[];
   epistemicTypesProduced: HypothesisEpistemicType[];
+  reasoningSummary?: string[];
 }
 
 export interface ActivityEntry {

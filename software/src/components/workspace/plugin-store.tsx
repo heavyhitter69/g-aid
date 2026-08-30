@@ -211,7 +211,7 @@ export function PluginStoreView() {
         </div>
         <p className="text-[13px] leading-relaxed text-[#cccccc] mb-4">{selected.detail}</p>
         <p className="text-[12px] text-[#9d9d9d] mb-6">
-          Orchestra only sends the chat question to a plugin, never survey files or folder paths. Disable a plugin here to stop it.
+          G-AID only sends the chat question to a plugin, never survey files or folder paths. Disable a plugin here to stop it.
         </p>
         {selected.needsKey && (
           <label className="block max-w-md">

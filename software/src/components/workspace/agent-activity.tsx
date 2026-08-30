@@ -31,6 +31,7 @@ const AGENT_COLORS: Record<string, string> = {
 };
 
 function agentLabel(actorId: string): string {
+  if (actorId === "orchestrator-agent" || actorId === "g-aid") return "G-AID";
   return actorId
     .replace("-agent", "")
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -54,7 +55,7 @@ export function AgentActivity({ collapsed: initialCollapsed = false }: { collaps
         className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#252526] transition-colors text-left"
       >
         <Cpu className="h-3 w-3 text-[#858585]" />
-        <span className="text-[10px] text-[#858585] font-medium flex-1">Agent Activity</span>
+        <span className="text-[10px] text-[#858585] font-medium flex-1">G-AID activity</span>
         {activeAgentId && (
           <span
             className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
@@ -78,7 +79,7 @@ export function AgentActivity({ collapsed: initialCollapsed = false }: { collaps
           {isOrchestratorThinking && (
             <ActivityRow
               actorId="orchestrator-agent"
-              description="Resolving capabilities and dispatching agents…"
+              description="G-AID is reviewing the workspace"
               status="running"
               relatedToolId={null}
             />
