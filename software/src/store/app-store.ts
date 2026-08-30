@@ -325,7 +325,20 @@ export const useAppStore = create<AppState>()(
       setAgent: (agent) => set({ assignedAgent: agent }),
       completeOnboarding: () =>
         set({ onboardingComplete: true, onboardingStep: "complete" }),
-      setWorkspaceView: (view) => set({ workspaceView: view }),
+      setWorkspaceView: (view) => set((s) => {
+        if (view !== "settings") return { workspaceView: view };
+        const id = "settings";
+        const alreadyOpen = s.workbenchTabs.some((t) => t.id === id);
+        const workbenchTabs = alreadyOpen
+          ? s.workbenchTabs
+          : [...s.workbenchTabs, { id, type: "settings" as const, title: "Settings" }];
+        return {
+          workspaceView: "settings" as WorkspaceView,
+          workbenchTabs,
+          activeWorkbenchTabId: id,
+          activeFile: null,
+        };
+      }),
       presentJobResults: (results) =>
         set((s) => {
           const id = "visualization";

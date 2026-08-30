@@ -4,23 +4,18 @@
  */
 
 import { createBrowserClient } from "@supabase/ssr";
+import { publicSupabaseAnonKey, publicSupabaseUrl } from "./browser-env";
 import { isUsableSupabaseConfig } from "./config";
 
 export { isUsableSupabaseConfig };
 
 export function hasSupabaseConfig(): boolean {
-  return isUsableSupabaseConfig(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return isUsableSupabaseConfig(publicSupabaseUrl(), publicSupabaseAnonKey());
 }
 
 export function createClient() {
   if (!hasSupabaseConfig()) {
     throw new Error("Supabase is not configured. Local desktop verification does not require a remote auth project.");
   }
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  return createBrowserClient(publicSupabaseUrl(), publicSupabaseAnonKey());
 }

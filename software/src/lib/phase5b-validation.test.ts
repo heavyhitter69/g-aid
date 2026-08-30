@@ -48,6 +48,10 @@ test("placeholder Supabase env is treated as unconfigured so desktop verificatio
     isUsableSupabaseConfig("https://abcd.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.real"),
     true
   );
+  assert.equal(
+    isUsableSupabaseConfig(" https://abcd.supabase.co ", "  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.real  "),
+    true
+  );
 });
 
 test("independent gravity terrain benchmarks pass and refuse Complete Bouguer naming", () => {
