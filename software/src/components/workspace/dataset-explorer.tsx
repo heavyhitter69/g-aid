@@ -3,7 +3,7 @@
 import { useAppStore } from "@/store/app-store";
 import type { CatalogRecord, SupportStatus } from "@/lib/catalog/types";
 import { VECTOR_ROLES, type VectorRoleId } from "@/lib/catalog/geojson-contract";
-import { isGaidStatePath } from "@/lib/project-state";
+import { isGaidStatePath } from "@/lib/project-state-paths";
 
 function statusLabel(status: SupportStatus): string {
   if (status === "supported") return "supported";

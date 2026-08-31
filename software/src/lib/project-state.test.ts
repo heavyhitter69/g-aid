@@ -235,6 +235,7 @@ test("no Python dispatch before frozen approval", () => {
 test("Dataset Explorer and file index hide .g-aid", () => {
   const explorer = fs.readFileSync(path.join(process.cwd(), "src/components/workspace/dataset-explorer.tsx"), "utf8");
   assert.match(explorer, /isGaidStatePath/);
+  assert.match(explorer, /project-state-paths/);
   assert.match(explorer, /\.g-aid\/project\.catalog\.json/);
   assert.equal(explorer.includes("G-AID Output/project.catalog.json"), false);
   const openWorkspace = fs.readFileSync(path.join(process.cwd(), "src/lib/open-workspace.ts"), "utf8");

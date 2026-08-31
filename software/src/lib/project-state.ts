@@ -7,14 +7,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import { GAID_OUTPUT_DIR } from "./workspace-index.ts";
+import {
+  GAID_STATE_DIR,
+  LEGACY_PENDING_NAME,
+  STATE_CATALOG_NAME,
+  STATE_MIGRATION_NAME,
+  STATE_PENDING_NAME,
+} from "./project-state-paths.ts";
 
-export const GAID_STATE_DIR = ".g-aid";
-export const STATE_CATALOG_NAME = "project.catalog.json";
-export const STATE_PENDING_NAME = "pending-plans.json";
-export const STATE_MIGRATION_NAME = "migration.json";
-export const LEGACY_PENDING_NAME = ".pending-plans.json";
-
-export type ProjectStateCopyStatus = "copied" | "kept-existing" | "conflict" | "missing";
+export {
+  GAID_STATE_DIR,
+  LEGACY_PENDING_NAME,
+  STATE_CATALOG_NAME,
+  STATE_MIGRATION_NAME,
+  STATE_PENDING_NAME,
+  isGaidStatePath,
+} from "./project-state-paths.ts";
 
 export interface ProjectStateCopy {
   kind: "catalog" | "pending-plans";
@@ -32,12 +40,7 @@ export interface ProjectStateMigration {
   conflicts: string[];
 }
 
-export function isGaidStatePath(rel: string): boolean {
-  return rel
-    .replace(/\\/g, "/")
-    .split("/")
-    .some((part) => part === GAID_STATE_DIR);
-}
+export type ProjectStateCopyStatus = "copied" | "kept-existing" | "conflict" | "missing";
 
 export function gaidStateDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, GAID_STATE_DIR);

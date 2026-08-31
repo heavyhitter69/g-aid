@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/app-store";
 import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
 import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
-import { isGaidStatePath } from "@/lib/project-state";
+import { isGaidStatePath } from "@/lib/project-state-paths";
 import { writeWindowSession } from "@/lib/window-session";
 import type { ProjectCatalog } from "@/lib/catalog/types";
 
