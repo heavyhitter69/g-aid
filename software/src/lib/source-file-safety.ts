@@ -1,10 +1,13 @@
 /**
- * Source survey files are read-only. Edits land under `G-AID Output/`.
+ * Source survey files are read-only. An explicit user save of a source file
+ * writes a backup under hidden `.g-aid/edits/`. That folder is project state,
+ * not analysis output, and is created only by that save action.
  */
 
-import { GAID_OUTPUT_DIR, isGaidOutputPath } from "./workspace-index.ts";
+import { isGaidOutputPath } from "./workspace-index.ts";
+import { GAID_STATE_DIR, STATE_EDITS_SUBDIR } from "./project-state-paths.ts";
 
-export const SOURCE_EDITS_SUBDIR = "edits";
+export const SOURCE_EDITS_SUBDIR = STATE_EDITS_SUBDIR;
 
 export function posixRel(rel: string): string {
   return String(rel || "")
@@ -13,18 +16,24 @@ export function posixRel(rel: string): string {
     .trim();
 }
 
+/** True for `.g-aid/edits` itself or a file nested under it. */
+export function isSourceEditBackupPath(rel: string): boolean {
+  const parts = posixRel(rel).split("/").filter(Boolean);
+  return parts[0] === GAID_STATE_DIR && parts[1] === STATE_EDITS_SUBDIR;
+}
+
 export function isWritableWorkspaceRel(rel: string): boolean {
   const cleaned = posixRel(rel);
   if (!cleaned) return false;
-  return isGaidOutputPath(cleaned);
+  return isGaidOutputPath(cleaned) || isSourceEditBackupPath(cleaned);
 }
 
-/** Destination under G-AID Output for a copy of a source file the user tried to save. */
+/** Destination for a copy of a source file the user tried to save. */
 export function copyToOutputRelative(rel: string): string {
   const cleaned = posixRel(rel);
-  if (!cleaned) return `${GAID_OUTPUT_DIR}/${SOURCE_EDITS_SUBDIR}/untitled.txt`;
-  if (isGaidOutputPath(cleaned)) return cleaned;
-  return `${GAID_OUTPUT_DIR}/${SOURCE_EDITS_SUBDIR}/${cleaned}`;
+  if (!cleaned) return `${GAID_STATE_DIR}/${SOURCE_EDITS_SUBDIR}/untitled.txt`;
+  if (isWritableWorkspaceRel(cleaned)) return cleaned;
+  return `${GAID_STATE_DIR}/${SOURCE_EDITS_SUBDIR}/${cleaned}`;
 }
 
 export function shouldCopySourceSave(rel: string, exists: boolean): boolean {

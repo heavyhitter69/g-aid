@@ -6,6 +6,7 @@ export const GAID_STATE_DIR = ".g-aid";
 export const STATE_CATALOG_NAME = "project.catalog.json";
 export const STATE_PENDING_NAME = "pending-plans.json";
 export const STATE_MIGRATION_NAME = "migration.json";
+export const STATE_EDITS_SUBDIR = "edits";
 export const LEGACY_PENDING_NAME = ".pending-plans.json";
 
 /** True for `.g-aid` itself or anything nested under it. */

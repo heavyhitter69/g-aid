@@ -138,10 +138,11 @@ test("a non-magnetic request does not create a magnetic plan", () => {
   );
 });
 
-test("source-file overwrite is blocked and copied under G-AID Output", () => {
+test("source-file overwrite is blocked and copied under .g-aid/edits", () => {
   assert.equal(shouldCopySourceSave("DAY 1/rover.csv", true), true);
   assert.equal(shouldCopySourceSave("G-AID Output/runs/r1/tmi_grid.asc", true), false);
-  assert.equal(copyToOutputRelative("DAY 1/rover.csv"), "G-AID Output/edits/DAY 1/rover.csv");
+  assert.equal(shouldCopySourceSave(".g-aid/edits/DAY 1/rover.csv", true), false);
+  assert.equal(copyToOutputRelative("DAY 1/rover.csv"), ".g-aid/edits/DAY 1/rover.csv");
 
   const root = tmpWorkspace();
   try {
@@ -152,7 +153,8 @@ test("source-file overwrite is blocked and copied under G-AID Output", () => {
     const ws = require(path.join(process.cwd(), "electron/workspace-fs.js"));
     const written = ws.saveWorkspaceFile(root, srcRel.replace(/\\/g, "/"), "edited\n");
     assert.equal(fs.readFileSync(src, "utf8"), "original\n");
-    assert.match(String(written).replace(/\\/g, "/"), /G-AID Output\/edits\//);
+    assert.match(String(written).replace(/\\/g, "/"), /\.g-aid\/edits\//);
+    assert.equal(fs.existsSync(path.join(root, "G-AID Output")), false);
     assert.equal(fs.readFileSync(path.join(root, written), "utf8"), "edited\n");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

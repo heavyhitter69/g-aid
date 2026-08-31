@@ -457,10 +457,22 @@ function isGaidOutputRel(relativePath) {
     .some((part) => part.toLowerCase() === "g-aid output");
 }
 
+function isSourceEditBackupRel(relativePath) {
+  const parts = String(relativePath || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter(Boolean);
+  return parts[0] === ".g-aid" && parts[1] === "edits";
+}
+
+function isWritableWorkspaceRel(relativePath) {
+  return isGaidOutputRel(relativePath) || isSourceEditBackupRel(relativePath);
+}
+
 function copyToOutputRel(relativePath) {
   const cleaned = sanitizeRelative(relativePath);
-  if (isGaidOutputRel(cleaned)) return cleaned;
-  return ["G-AID Output", "edits", ...cleaned.split("/")].join("/");
+  if (isWritableWorkspaceRel(cleaned)) return cleaned;
+  return [".g-aid", "edits", ...cleaned.split("/")].join("/");
 }
 
 function saveWorkspaceFile(root, relativePath, content = "") {
@@ -477,7 +489,7 @@ function saveWorkspaceFile(root, relativePath, content = "") {
   if (!isInsideRoot(resolvedRoot, full)) {
     throw new Error("Path is outside the open workspace");
   }
-  if (fs.existsSync(full) && !isGaidOutputRel(relativePath)) {
+  if (fs.existsSync(full) && !isWritableWorkspaceRel(relativePath)) {
     return saveWorkspaceFile(root, copyToOutputRel(relativePath), content);
   }
   fs.mkdirSync(path.dirname(full), { recursive: true });

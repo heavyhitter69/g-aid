@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { refreshProjectCatalog, catalogFilePath } from "./catalog/persist.ts";
 import {
   allocateApprovedRun,
@@ -11,11 +12,16 @@ import {
 } from "./run-layout.ts";
 import {
   isGaidStatePath,
+  loadStoredProjectStateMigration,
   migrateLegacyProjectState,
+  migrationResultPath,
   pendingPlansPath as statePendingPath,
   writePendingPlansFile,
 } from "./project-state.ts";
+import { copyToOutputRelative, shouldCopySourceSave } from "./source-file-safety.ts";
 import { EMPTY_STEPS, type AgentPlan } from "./plan-spec.ts";
+
+const require = createRequire(path.join(process.cwd(), "src/lib/project-state.test.ts"));
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -75,6 +81,7 @@ test("open/refresh catalog writes only .g-aid and does not create G-AID Output",
     assert.equal(fs.existsSync(catalogFilePath(root)), true);
     assert.equal(gaidOutputExists(root), false);
     assert.equal(fs.existsSync(path.join(root, "G-AID Output", "runs")), false);
+    assert.equal(fs.existsSync(path.join(root, ".g-aid", "edits")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -117,7 +124,7 @@ test("pending plan and revision store only under .g-aid, not G-AID Output", () =
   }
 });
 
-test("legacy catalog and pending plans copy into .g-aid without deleting G-AID Output products", () => {
+test("legacy metadata migrates once; later refresh is remnant, not a false conflict", () => {
   const root = tmpRoot();
   try {
     writeSurvey(root);
@@ -143,40 +150,73 @@ test("legacy catalog and pending plans copy into .g-aid without deleting G-AID O
     const first = migrateLegacyProjectState(root);
     assert.equal(first.copies.find((item) => item.kind === "catalog")?.status, "copied");
     assert.equal(first.copies.find((item) => item.kind === "pending-plans")?.status, "copied");
+    const stored = loadStoredProjectStateMigration(root);
+    assert.ok(stored);
+    assert.equal(stored.schemaVersion, 1);
+    assert.match(stored.files.catalog?.sourceChecksum || "", /^sha256:[0-9a-f]{64}$/);
+    assert.match(stored.files["pending-plans"]?.sourceChecksum || "", /^sha256:[0-9a-f]{64}$/);
+    assert.equal(stored.files.catalog?.from, path.join(output, "project.catalog.json"));
+    assert.equal(stored.files.catalog?.to, path.join(root, ".g-aid", "project.catalog.json"));
+    const recordedAt = stored.at;
     assert.equal(fs.existsSync(path.join(root, ".g-aid", "project.catalog.json")), true);
     assert.equal(fs.existsSync(statePendingPath(root)), true);
     assert.equal(fs.readFileSync(product, "utf8"), "ncols 1\n");
     assert.equal(fs.readFileSync(mapNote, "utf8"), "user edit\n");
-    assert.equal(fs.existsSync(path.join(output, "project.catalog.json")), true);
-    assert.equal(fs.existsSync(path.join(output, ".pending-plans.json")), true);
-    assert.equal(fs.existsSync(path.join(root, ".g-aid", "migration.json")), true);
+    assert.equal(fs.readFileSync(path.join(output, "project.catalog.json"), "utf8"), `${legacyCatalog}\n`);
+    assert.equal(fs.readFileSync(path.join(output, ".pending-plans.json"), "utf8"), `${leftoverPending}\n`);
 
     const second = migrateLegacyProjectState(root);
-    assert.equal(second.copies.find((item) => item.kind === "catalog")?.status, "kept-existing");
-    assert.equal(second.copies.find((item) => item.kind === "pending-plans")?.status, "kept-existing");
-    assert.equal(fs.readFileSync(product, "utf8"), "ncols 1\n");
-    assert.equal(fs.readFileSync(mapNote, "utf8"), "user edit\n");
+    assert.equal(second.copies.find((item) => item.kind === "catalog")?.status, "remnant");
+    assert.equal(second.copies.find((item) => item.kind === "pending-plans")?.status, "remnant");
+    assert.equal(second.conflicts.length, 0);
+    assert.equal(loadStoredProjectStateMigration(root)?.at, recordedAt);
 
     const catalog = refreshProjectCatalog(root);
     assert.ok(catalog.runs.some((run) => run.runId === "r-prior-1"));
     assert.match(catalogFilePath(root).replace(/\\/g, "/"), /\/\.g-aid\/project\.catalog.json$/);
-    assert.equal(fs.existsSync(path.join(output, "project.catalog.json")), true);
-    assert.equal(fs.existsSync(path.join(output, ".pending-plans.json")), true);
-    assert.equal(fs.readFileSync(product, "utf8"), "ncols 1\n");
-    assert.equal(fs.readFileSync(mapNote, "utf8"), "user edit\n");
-    assert.equal(fs.existsSync(path.join(output, "project.catalog.json")), true);
-    // Refresh rewrites .g-aid catalog; leftover G-AID Output metadata is left in place.
+    assert.notEqual(fs.readFileSync(path.join(root, ".g-aid", "project.catalog.json"), "utf8"), `${legacyCatalog}\n`);
+
     const afterRefresh = migrateLegacyProjectState(root);
-    assert.equal(afterRefresh.copies.find((item) => item.kind === "catalog")?.status, "conflict");
-    assert.equal(fs.readFileSync(path.join(root, ".g-aid", "project.catalog.json"), "utf8").includes("r-prior-1"), true);
+    assert.equal(afterRefresh.copies.find((item) => item.kind === "catalog")?.status, "remnant");
+    assert.equal(afterRefresh.copies.find((item) => item.kind === "pending-plans")?.status, "remnant");
+    assert.equal(afterRefresh.conflicts.length, 0);
+    assert.equal(loadStoredProjectStateMigration(root)?.at, recordedAt);
+    assert.equal(loadStoredProjectStateMigration(root)?.files.catalog?.sourceChecksum, stored.files.catalog?.sourceChecksum);
     assert.equal(fs.readFileSync(path.join(output, "project.catalog.json"), "utf8"), `${legacyCatalog}\n`);
     assert.equal(fs.readFileSync(product, "utf8"), "ncols 1\n");
+    assert.equal(fs.readFileSync(mapNote, "utf8"), "user edit\n");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("conflicting .g-aid metadata is kept and leftover G-AID Output is not overwritten", () => {
+test("legacy leftover modified after migration is a real conflict and does not overwrite .g-aid", () => {
+  const root = tmpRoot();
+  try {
+    writeSurvey(root);
+    const output = path.join(root, "G-AID Output");
+    fs.mkdirSync(output, { recursive: true });
+    fs.writeFileSync(path.join(output, "project.catalog.json"), "{\"keep\":\"legacy\"}\n");
+    const first = migrateLegacyProjectState(root);
+    assert.equal(first.copies.find((item) => item.kind === "catalog")?.status, "copied");
+    refreshProjectCatalog(root);
+    const destBefore = fs.readFileSync(path.join(root, ".g-aid", "project.catalog.json"), "utf8");
+    const recordedAt = loadStoredProjectStateMigration(root)?.at;
+
+    fs.writeFileSync(path.join(output, "project.catalog.json"), "{\"keep\":\"legacy-edited\"}\n");
+    const conflicted = migrateLegacyProjectState(root);
+    const catalogCopy = conflicted.copies.find((item) => item.kind === "catalog");
+    assert.equal(catalogCopy?.status, "conflict");
+    assert.ok(conflicted.conflicts.length >= 1);
+    assert.equal(fs.readFileSync(path.join(root, ".g-aid", "project.catalog.json"), "utf8"), destBefore);
+    assert.equal(fs.readFileSync(path.join(output, "project.catalog.json"), "utf8"), "{\"keep\":\"legacy-edited\"}\n");
+    assert.equal(loadStoredProjectStateMigration(root)?.at, recordedAt);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("independent .g-aid and leftover metadata without a migration record is a conflict", () => {
   const root = tmpRoot();
   try {
     const stateDir = path.join(root, ".g-aid");
@@ -190,6 +230,7 @@ test("conflicting .g-aid metadata is kept and leftover G-AID Output is not overw
     assert.ok(result.conflicts.length >= 1);
     assert.equal(fs.readFileSync(path.join(stateDir, "project.catalog.json"), "utf8"), "{\"keep\":\"state\"}\n");
     assert.equal(fs.readFileSync(path.join(root, "G-AID Output", "project.catalog.json"), "utf8"), "{\"keep\":\"legacy\"}\n");
+    assert.equal(fs.existsSync(migrationResultPath(root)), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -230,6 +271,31 @@ test("no Python dispatch before frozen approval", () => {
   const agentPlan = fs.readFileSync(path.join(process.cwd(), "src/app/api/agent/orchestrate/agent-plan.ts"), "utf8");
   assert.equal(agentPlan.includes("MagneticPreprocessingPipeline"), false);
   assert.equal(agentPlan.includes("runDiurnalPipeline"), false);
+});
+
+test("source-save backups go to .g-aid/edits and are not created by open or plan", () => {
+  assert.equal(copyToOutputRelative("DAY 1/rover.csv"), ".g-aid/edits/DAY 1/rover.csv");
+  assert.equal(shouldCopySourceSave("DAY 1/rover.csv", true), true);
+  assert.equal(shouldCopySourceSave(".g-aid/edits/DAY 1/rover.csv", true), false);
+  const root = tmpRoot();
+  try {
+    writeSurvey(root);
+    refreshProjectCatalog(root);
+    writePendingPlansFile(root, { s1: basePlan(root, { status: "draft", rev: 1 }) });
+    assert.equal(gaidOutputExists(root), false);
+    assert.equal(fs.existsSync(path.join(root, ".g-aid", "edits")), false);
+    const ws = require(path.join(process.cwd(), "electron/workspace-fs.js"));
+    const written = ws.saveWorkspaceFile(root, "DAY 1/rover.csv", "edited\n");
+    assert.equal(String(written).replace(/\\/g, "/"), ".g-aid/edits/DAY 1/rover.csv");
+    assert.equal(fs.readFileSync(path.join(root, "DAY 1", "rover.csv"), "utf8"), "latitude,longitude,mag\n1,2,3\n");
+    assert.equal(fs.readFileSync(path.join(root, written), "utf8"), "edited\n");
+    assert.equal(gaidOutputExists(root), false);
+    const safety = fs.readFileSync(path.join(process.cwd(), "src/lib/source-file-safety.ts"), "utf8");
+    assert.match(safety, /\.g-aid\/edits/);
+    assert.equal(safety.includes("G-AID Output/edits"), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("Dataset Explorer and file index hide .g-aid", () => {
