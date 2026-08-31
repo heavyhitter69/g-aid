@@ -46,6 +46,7 @@ const SKIP_DIRS = new Set([
 function skipDirName(name: string): boolean {
   const lower = name.toLowerCase();
   if (SKIP_DIRS.has(lower)) return true;
+  if (lower === ".g-aid") return true;
   return lower === "g-aid output";
 }
 
@@ -287,7 +288,7 @@ export interface BuildCatalogOptions {
   fileCountLimit?: number;
 }
 
-/** Walk source files read-only. Never writes outside G-AID Output. */
+/** Walk source files read-only. Catalog persist writes only under `.g-aid/`. */
 export function buildProjectCatalog(root: string, options: BuildCatalogOptions = {}): ProjectCatalog {
   if (typeof root !== "string" || !root.trim()) {
     throw new Error("workspace root is required");

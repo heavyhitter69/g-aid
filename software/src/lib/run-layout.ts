@@ -8,11 +8,12 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { GAID_OUTPUT_DIR } from "./workspace-index.ts";
+import { pendingPlansPath as statePendingPlansPath, STATE_PENDING_NAME } from "./project-state.ts";
 import type { AgentPlan } from "./plan-spec.ts";
 
 const DAY_LEAF = /^day\s*\d+$/i;
 export const RUNS_SUBDIR = "runs";
-export const PENDING_PLANS_NAME = ".pending-plans.json";
+export const PENDING_PLANS_NAME = STATE_PENDING_NAME;
 export const RUN_PLAN_JSON = "plan.json";
 export const RUN_PLAN_MD = "Implementation Plan.md";
 export const RUN_TASKS_MD = "tasks.md";
@@ -41,7 +42,7 @@ export function runsDir(workspaceRoot: string, targetFolder: string): string {
 }
 
 export function pendingPlansPath(workspaceRoot: string): string {
-  return path.join(workspaceRoot, GAID_OUTPUT_DIR, PENDING_PLANS_NAME);
+  return statePendingPlansPath(workspaceRoot);
 }
 
 export function generateRunId(now: Date = new Date(), nonce?: string): string {

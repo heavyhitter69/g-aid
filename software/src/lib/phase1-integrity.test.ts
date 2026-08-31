@@ -219,7 +219,7 @@ test("completed-run record is plan.json in the run folder, not /tmp", () => {
     assert.ok(frozen.includes(`${path.sep}G-AID Output${path.sep}runs${path.sep}r-record${path.sep}plan.json`));
     assert.equal(frozen.includes(`${path.sep}tmp${path.sep}g-aid-pending`), false);
     const pending = pendingPlansPath(root);
-    assert.ok(pending.replace(/\\/g, "/").endsWith("G-AID Output/.pending-plans.json"));
+    assert.ok(pending.replace(/\\/g, "/").endsWith(".g-aid/pending-plans.json"));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

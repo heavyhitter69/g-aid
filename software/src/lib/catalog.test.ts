@@ -253,6 +253,7 @@ test("refresh preserves prior run provenance and stable ids", () => {
   try {
     const first = refreshProjectCatalog(root);
     assert.ok(fs.existsSync(catalogFilePath(root)));
+    assert.match(catalogFilePath(root).replace(/\\/g, "/"), /\/\.g-aid\/project\.catalog.json$/);
     const roverId = byPath(first.records, "DAY 1/rover.csv").id;
     assert.ok(first.runs.some((run) => run.runId === "r-prior-1"));
     assert.equal(first.runs.find((run) => run.runId === "r-prior-1")?.source, "disk");
@@ -293,14 +294,15 @@ test("truncation is recorded and inventory answers from the catalog", () => {
   }
 });
 
-test("write catalog is under G-AID Output only", () => {
+test("write catalog is under .g-aid only", () => {
   const root = tmpCopy();
   try {
     const catalog = buildProjectCatalog(root);
     const dest = writeProjectCatalog(catalog);
-    assert.match(dest.replace(/\\/g, "/"), /G-AID Output\/project\.catalog.json$/);
+    assert.match(dest.replace(/\\/g, "/"), /\/\.g-aid\/project\.catalog.json$/);
     assert.equal(fs.existsSync(path.join(root, "DAY 1", "rover.csv")), true);
     assert.equal(fs.readFileSync(path.join(root, "DAY 1", "rover.csv"), "utf8").includes("latitude"), true);
+    assert.equal(fs.existsSync(path.join(root, "G-AID Output", "project.catalog.json")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

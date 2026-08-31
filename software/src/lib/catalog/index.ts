@@ -57,6 +57,7 @@ export {
 export { shapefileReadyForSupport, SHAPEFILE_ADAPTER_ID } from "./shapefile-contract.ts";
 export { buildProjectCatalog } from "./build.ts";
 export { catalogFilePath, loadProjectCatalog, refreshProjectCatalog, writeProjectCatalog } from "./persist.ts";
+export { migrateLegacyProjectState, lastProjectStateMigration, isGaidStatePath } from "../project-state.ts";
 export {
   countBySupport,
   findRecord,

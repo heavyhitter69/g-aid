@@ -1,5 +1,5 @@
 /**
- * Persistent project catalog: `{project}/G-AID Output/project.catalog.json`.
+ * Persistent project catalog: `{project}/.g-aid/project.catalog.json`.
  * Support is three-way. Extension sniffing is not processing support.
  */
 

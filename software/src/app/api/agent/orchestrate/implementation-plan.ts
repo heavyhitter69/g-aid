@@ -1,8 +1,8 @@
 import fs from "fs";
-import path from "path";
 import { GAID_OUTPUT_DIR } from "@/lib/workspace-index";
 import { EMPTY_STEPS, type AgentPlan, type PlanSteps } from "@/lib/plan-spec";
 import { pendingPlansPath } from "@/lib/run-layout";
+import { migrateLegacyProjectState, writePendingPlansFile } from "@/lib/project-state";
 import { checkNodeInTasks } from "@/lib/tasks-tick";
 import { generateTasksMarkdown } from "@/lib/capabilities/tasks";
 
@@ -17,6 +17,7 @@ const PENDING_APPROVAL: Record<string, AgentPlan> = globalAny.PENDING_APPROVAL;
 function loadPlansFromDisk(workspaceRoot?: string): Record<string, AgentPlan> {
   if (!workspaceRoot) return {};
   try {
+    migrateLegacyProjectState(workspaceRoot);
     const store = pendingPlansPath(workspaceRoot);
     if (!fs.existsSync(store)) return {};
     const parsed = JSON.parse(fs.readFileSync(store, "utf8")) as Record<string, AgentPlan>;
@@ -28,9 +29,7 @@ function loadPlansFromDisk(workspaceRoot?: string): Record<string, AgentPlan> {
 
 function savePlansToDisk(workspaceRoot: string, plans: Record<string, AgentPlan>): void {
   try {
-    const store = pendingPlansPath(workspaceRoot);
-    fs.mkdirSync(path.dirname(store), { recursive: true });
-    fs.writeFileSync(store, `${JSON.stringify(plans, null, 2)}\n`);
+    writePendingPlansFile(workspaceRoot, plans);
   } catch {
     /* in-memory pending plan still works in this process */
   }

@@ -14,6 +14,7 @@ const SKIP_DIRS = new Set([
   "venv",
   ".vscode",
   ".idea",
+  ".g-aid",
   "tmp",
   "temp",
   "cache",

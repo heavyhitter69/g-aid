@@ -3,6 +3,7 @@
 import { useAppStore } from "@/store/app-store";
 import type { CatalogRecord, SupportStatus } from "@/lib/catalog/types";
 import { VECTOR_ROLES, type VectorRoleId } from "@/lib/catalog/geojson-contract";
+import { isGaidStatePath } from "@/lib/project-state";
 
 function statusLabel(status: SupportStatus): string {
   if (status === "supported") return "supported";
@@ -135,26 +136,27 @@ export function DatasetExplorer() {
       <section className="p-6 bg-[#1e1e1e] h-full text-[#cccccc]">
         <h2 className="text-lg font-semibold mb-4 text-white">Dataset Explorer</h2>
         <p className="text-sm text-[#858585]">
-          Catalog not ready yet. Opening a folder writes <span className="font-mono">G-AID Output/project.catalog.json</span>.
+          Catalog not ready yet. Opening a folder writes hidden <span className="font-mono">.g-aid/project.catalog.json</span>. Visible <span className="font-mono">G-AID Output</span> is created only after you click Proceed.
         </p>
       </section>
     );
   }
 
-  const supported = catalog.records.filter((r) => r.supportStatus === "supported").length;
-  const recognised = catalog.records.filter((r) => r.supportStatus === "recognised-unsupported").length;
-  const unknown = catalog.records.filter((r) => r.supportStatus === "unknown").length;
+  const records = catalog.records.filter((record) => !isGaidStatePath(record.relativePath));
+  const supported = records.filter((r) => r.supportStatus === "supported").length;
+  const recognised = records.filter((r) => r.supportStatus === "recognised-unsupported").length;
+  const unknown = records.filter((r) => r.supportStatus === "unknown").length;
 
   return (
     <section className="p-6 bg-[#1e1e1e] h-full text-[#cccccc] overflow-auto">
       <h2 className="text-lg font-semibold mb-2 text-white">Dataset Explorer</h2>
       <p className="text-sm text-[#858585] mb-4">
-        {catalog.records.length} source files
+        {records.length} source files
         {catalog.truncated ? " (truncated)" : ""}. Supported {supported}, recognised-unsupported {recognised}, unknown {unknown}.
         Mixed folders do not start a magnetic workflow. Only supported MagArrow, GSM-19, gravity-contract, ERT, radiometric, GPR, LAS 2.0, documented GeoJSON, and G-AID GEOCHEM 1.0 records can be processing inputs.
         Click a raster or vector row to locate it on the map workspace. Shapefile, GeoPackage, LAS/LAZ point clouds, and SEG-Y will not decode as map layers. GeoJSON layer roles are user-assigned and are not inferred from filenames. Geochemistry mappings are user-reviewed; Fe/Cu column names are not a contract.
       </p>
-      {catalog.records.length === 0 ? (
+      {records.length === 0 ? (
         <p className="text-sm text-[#858585]">No source files were catalogued in this folder.</p>
       ) : (
         <table className="w-full text-left border border-[#3c3c3c] rounded overflow-hidden">
@@ -170,7 +172,7 @@ export function DatasetExplorer() {
             </tr>
           </thead>
           <tbody>
-            {catalog.records.map((record) => (
+            {records.map((record) => (
               <RecordRow key={record.id} record={record} />
             ))}
           </tbody>

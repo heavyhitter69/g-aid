@@ -1,14 +1,21 @@
+/**
+ * Catalog persist lives under `{workspaceRoot}/.g-aid/`.
+ * This module never creates `G-AID Output/`.
+ */
+
 import fs from "node:fs";
 import path from "node:path";
-import { CATALOG_FILENAME, type ProjectCatalog } from "./types.ts";
-import { GAID_OUTPUT_DIR } from "../workspace-index.ts";
+import { type ProjectCatalog } from "./types.ts";
 import { buildProjectCatalog } from "./build.ts";
+import {
+  catalogFilePath,
+  migrateLegacyProjectState,
+} from "../project-state.ts";
 
-export function catalogFilePath(workspaceRoot: string): string {
-  return path.join(workspaceRoot, GAID_OUTPUT_DIR, CATALOG_FILENAME);
-}
+export { catalogFilePath };
 
 export function loadProjectCatalog(workspaceRoot: string): ProjectCatalog | null {
+  migrateLegacyProjectState(workspaceRoot);
   const dest = catalogFilePath(workspaceRoot);
   if (!fs.existsSync(dest)) return null;
   try {
@@ -29,6 +36,7 @@ export function writeProjectCatalog(catalog: ProjectCatalog): string {
 }
 
 export function refreshProjectCatalog(workspaceRoot: string): ProjectCatalog {
+  migrateLegacyProjectState(workspaceRoot);
   const previous = loadProjectCatalog(workspaceRoot);
   const catalog = buildProjectCatalog(workspaceRoot, { previous });
   writeProjectCatalog(catalog);

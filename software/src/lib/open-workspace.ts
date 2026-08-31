@@ -6,6 +6,7 @@ import { useAppStore } from "@/store/app-store";
 import type { ProjectFile } from "@/types/project";
 import type { WorkspaceIndex } from "@/lib/workspace-index";
 import { isTemporaryWorkspaceFile } from "@/lib/workspace-file-ids";
+import { isGaidStatePath } from "@/lib/project-state";
 import { writeWindowSession } from "@/lib/window-session";
 import type { ProjectCatalog } from "@/lib/catalog/types";
 
@@ -16,17 +17,20 @@ function folderNameFromRoot(root: string): string {
 }
 
 export function indexToProjectFiles(index: WorkspaceIndex): ProjectFile[] {
-  const folders: ProjectFile[] = (index.folders || []).map((rel) => ({
-    id: rel,
-    name: rel.split("/").pop() || rel,
-    type: "folder",
-    path: rel,
-  }));
+  const folders: ProjectFile[] = (index.folders || [])
+    .filter((rel) => !isGaidStatePath(rel))
+    .map((rel) => ({
+      id: rel,
+      name: rel.split("/").pop() || rel,
+      type: "folder" as const,
+      path: rel,
+    }));
   const files: ProjectFile[] = index.files
     .filter(
       (file) =>
         !isTemporaryWorkspaceFile(file.relativePath) &&
-        !isTemporaryWorkspaceFile(file.name)
+        !isTemporaryWorkspaceFile(file.name) &&
+        !isGaidStatePath(file.relativePath)
     )
     .map((file) => ({
       id: file.relativePath,
