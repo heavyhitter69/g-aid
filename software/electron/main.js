@@ -9,13 +9,14 @@ const desktopAuth = require("./desktop-auth");
 
 const PROTOCOL = "gaid";
 const PRODUCTION_PORT = 47821;
+const APP_NAME = "G-AID";
+const APP_USER_MODEL_ID = "com.geophysics.gaid";
 const dev = !app.isPackaged;
 const hostname = "localhost";
 
-app.setName("G-AID");
-app.setAppUserModelId("com.geophysics.gaid");
-
+applyAppName();
 if (process.platform === "linux") {
+  app.commandLine.appendSwitch("class", APP_NAME);
   // npm Electron ships chrome-sandbox without root/SUID. Chromium then aborts
   // in C++ before this file runs, so appendSwitch is too late. `dev:electron`
   // and launch-g-aid.sh pass --no-sandbox on argv. This is a fallback when the
@@ -50,13 +51,60 @@ let pendingAuthSession = desktopAuth.createPendingSessionHolder();
 let publicLogin = null;
 let serverPort = PRODUCTION_PORT;
 
+function applyAppName() {
+  try {
+    app.setName(APP_NAME);
+  } catch {
+    /* name still comes from package.json productName */
+  }
+  if (process.platform === "win32") {
+    try {
+      app.setAppUserModelId(APP_USER_MODEL_ID);
+    } catch {
+      /* taskbar grouping still uses the default id */
+    }
+  }
+  if (process.platform === "darwin") {
+    try {
+      app.setAboutPanelOptions({ applicationName: APP_NAME });
+    } catch {
+      /* About panel keeps Electron defaults */
+    }
+  }
+}
+
+function loadAppIconImage() {
+  const file = iconPath();
+  if (!file) return null;
+  try {
+    const image = nativeImage.createFromPath(file);
+    if (image && !image.isEmpty()) return image;
+  } catch {
+    /* try the path as-is below */
+  }
+  return null;
+}
+
+function applyAppIcon() {
+  const image = loadAppIconImage();
+  if (!image) return;
+  if (process.platform === "darwin" && app.dock) {
+    try {
+      app.dock.setIcon(image);
+    } catch {
+      /* unpackaged Electron can keep the default gear until this succeeds */
+    }
+  }
+}
+
 function browserWindowOptions() {
+  const image = loadAppIconImage();
   return {
     width: 1280,
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: "G-AID",
+    title: APP_NAME,
     backgroundColor: "#0b0b0b",
     autoHideMenuBar: true,
     titleBarStyle: "hidden",
@@ -70,28 +118,22 @@ function browserWindowOptions() {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    icon: iconPath(),
+    icon: image || iconPath(),
     show: true,
   };
 }
 
 function applyWindowIcon(win) {
+  const image = loadAppIconImage();
   const file = iconPath();
-  if (!file || !win || win.isDestroyed()) return;
+  if ((!image && !file) || !win || win.isDestroyed()) return;
   try {
-    const image = nativeImage.createFromPath(file);
-    if (!image.isEmpty()) {
-      win.setIcon(image);
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  try {
-    win.setIcon(file);
+    if (image) win.setIcon(image);
+    else if (file) win.setIcon(file);
   } catch {
     /* Linux/Wayland can ignore a missing icon and keep the Electron gear. */
   }
+  applyAppIcon();
 }
 
 function wantsNewWindow(argv = process.argv) {
@@ -551,9 +593,7 @@ function iconPath() {
   const names =
     process.platform === "win32"
       ? ["icon.ico", "app-icon.png", "icon.png", "icons/512x512.png"]
-      : process.platform === "darwin"
-        ? ["icon.icns", "app-icon.png", "icons/512x512.png", "icon.png"]
-        : ["app-icon.png", "icons/512x512.png", "icons/256x256.png", "icon.png"];
+      : ["app-icon.png", "icons/512x512.png", "icons/256x256.png", "icon.png", "icon.icns"];
   const dirs = [
     path.join(__dirname, "..", "public"),
     path.join(__dirname, "..", "build"),
@@ -969,6 +1009,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    applyAppName();
+    applyAppIcon();
     log("App ready, log file:", logPath());
     registerLinuxProtocolHandler();
     try {

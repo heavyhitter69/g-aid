@@ -86,7 +86,13 @@ test("Electron main and builder paths stay inside software/", () => {
   assert.match(main, /const gotTheLock = app\.requestSingleInstanceLock\(\)/);
   assert.match(main, /if \(!gotTheLock\) \{\s*app\.quit\(\);/s);
   assert.match(main, /applyWindowIcon/);
+  assert.match(main, /applyAppIcon/);
+  assert.match(main, /app\.dock\.setIcon/);
+  assert.match(main, /app\.setName\(APP_NAME\)/);
   assert.match(main, /app-icon\.png/);
+  assert.equal(pkg.productName, "G-AID");
+  assert.equal(pkg.build?.productName, "G-AID");
+  assert.equal(pkg.name, "g-aid-software");
   assert.match(main, /GAID_OPEN_DEVTOOLS/);
   assert.match(main, /toggleDevTools/);
   assert.equal(main.includes('if (dev) {\n    mainWindow.webContents.openDevTools'), false);

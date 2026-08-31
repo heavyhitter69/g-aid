@@ -1,5 +1,6 @@
 {
   "name": "g-aid-software",
+  "productName": "G-AID",
   "version": "0.1.0",
   "private": true,
   "description": "G-AID Electron desktop workspace",
