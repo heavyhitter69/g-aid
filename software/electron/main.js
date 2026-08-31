@@ -11,12 +11,15 @@ const PROTOCOL = "gaid";
 const PRODUCTION_PORT = 47821;
 const APP_NAME = "G-AID";
 const APP_USER_MODEL_ID = "com.geophysics.gaid";
+const LINUX_WM_CLASS = "g-aid";
+const LINUX_DESKTOP_ID = "g-aid";
 const dev = !app.isPackaged;
 const hostname = "localhost";
 
 applyAppName();
 if (process.platform === "linux") {
-  app.commandLine.appendSwitch("class", APP_NAME);
+  process.env.CHROME_DESKTOP = `${LINUX_DESKTOP_ID}.desktop`;
+  app.commandLine.appendSwitch("class", LINUX_WM_CLASS);
   // npm Electron ships chrome-sandbox without root/SUID. Chromium then aborts
   // in C++ before this file runs, so appendSwitch is too late. `dev:electron`
   // and launch-g-aid.sh pass --no-sandbox on argv. This is a fallback when the
@@ -57,6 +60,13 @@ function applyAppName() {
   } catch {
     /* name still comes from package.json productName */
   }
+  if (process.platform === "linux") {
+    try {
+      app.setDesktopName(`${LINUX_DESKTOP_ID}.desktop`);
+    } catch {
+      /* GNOME then cannot map this process to g-aid.desktop */
+    }
+  }
   if (process.platform === "win32") {
     try {
       app.setAppUserModelId(APP_USER_MODEL_ID);
@@ -94,6 +104,56 @@ function applyAppIcon() {
     } catch {
       /* unpackaged Electron can keep the default gear until this succeeds */
     }
+  }
+}
+
+function linuxDesktopExec() {
+  if (dev) {
+    return `${JSON.stringify(process.execPath)} ${JSON.stringify(app.getAppPath())} --no-sandbox %u`;
+  }
+  return `${JSON.stringify(process.execPath)} %u`;
+}
+
+function installLinuxDesktopIdentity() {
+  if (process.platform !== "linux") return;
+  const execPath = process.execPath;
+  if (!dev && (execPath.startsWith("/opt/") || execPath.startsWith("/usr/"))) return;
+  try {
+    const home = app.getPath("home");
+    const apps = path.join(home, ".local", "share", "applications");
+    const iconDir = path.join(home, ".local", "share", "icons", "hicolor", "512x512", "apps");
+    fs.mkdirSync(apps, { recursive: true });
+    fs.mkdirSync(iconDir, { recursive: true });
+    const icon = iconPath();
+    const themedIcon = path.join(iconDir, `${LINUX_DESKTOP_ID}.png`);
+    if (icon && fs.existsSync(icon)) {
+      fs.copyFileSync(icon, themedIcon);
+    }
+    const iconValue = fs.existsSync(themedIcon) ? themedIcon : icon || LINUX_DESKTOP_ID;
+    const desktop = path.join(apps, `${LINUX_DESKTOP_ID}.desktop`);
+    fs.writeFileSync(
+      desktop,
+      [
+        "[Desktop Entry]",
+        "Type=Application",
+        `Name=${APP_NAME}`,
+        "Comment=Geophysics AI desktop workspace",
+        `Exec=${linuxDesktopExec()}`,
+        `Icon=${iconValue}`,
+        "Terminal=false",
+        "Categories=Science;Education;",
+        "MimeType=x-scheme-handler/gaid;",
+        `StartupWMClass=${LINUX_WM_CLASS}`,
+        "",
+      ].join("\n")
+    );
+    fs.chmodSync(desktop, 0o755);
+    spawn("update-desktop-database", [apps], { stdio: "ignore" });
+    spawn("xdg-mime", ["default", `${LINUX_DESKTOP_ID}.desktop`, "x-scheme-handler/gaid"], {
+      stdio: "ignore",
+    });
+  } catch (err) {
+    log("Linux desktop identity skipped", err);
   }
 }
 
@@ -941,32 +1001,7 @@ ipcMain.handle("open-path", async (_event, root, relativePath) => {
 });
 
 function registerLinuxProtocolHandler() {
-  if (process.platform !== "linux" || dev) return;
-  const execPath = process.execPath;
-  if (execPath.startsWith("/opt/") || execPath.startsWith("/usr/")) return;
-  try {
-    const apps = path.join(app.getPath("home"), ".local", "share", "applications");
-    fs.mkdirSync(apps, { recursive: true });
-    const desktop = path.join(apps, "g-aid.desktop");
-    fs.writeFileSync(
-      desktop,
-      [
-        "[Desktop Entry]",
-        "Type=Application",
-        "Name=G-AID",
-        "Exec=" + JSON.stringify(execPath) + " %u",
-        "Icon=g-aid",
-        "Terminal=false",
-        "Categories=Science;Education;",
-        "MimeType=x-scheme-handler/gaid;",
-        "StartupWMClass=g-aid",
-        "",
-      ].join("\n")
-    );
-    spawn("xdg-mime", ["default", "g-aid.desktop", "x-scheme-handler/gaid"], { stdio: "ignore" });
-  } catch (err) {
-    log("Linux protocol handler skipped", err);
-  }
+  installLinuxDesktopIdentity();
 }
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -1010,9 +1045,9 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     applyAppName();
+    registerLinuxProtocolHandler();
     applyAppIcon();
     log("App ready, log file:", logPath());
-    registerLinuxProtocolHandler();
     try {
       await createWindow();
       if (startupProtocolUrl) {
