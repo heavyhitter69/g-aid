@@ -157,7 +157,40 @@ function installLinuxDesktopIdentity() {
   }
 }
 
+function windowsShortcutArgs() {
+  if (!dev) return "";
+  return `${JSON.stringify(app.getAppPath())} --no-sandbox`;
+}
+
+function installWindowsAppIdentity() {
+  if (process.platform !== "win32" || !dev) return;
+  try {
+    const programs = path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs");
+    fs.mkdirSync(programs, { recursive: true });
+    const shortcut = path.join(programs, `${APP_NAME}.lnk`);
+    const icon = iconPath() || process.execPath;
+    const written = shell.writeShortcutLink(shortcut, "replace", {
+      target: process.execPath,
+      cwd: app.getAppPath(),
+      args: windowsShortcutArgs(),
+      description: APP_NAME,
+      icon,
+      iconIndex: 0,
+      appUserModelId: APP_USER_MODEL_ID,
+    });
+    if (!written) log("Windows shortcut identity not written");
+  } catch (err) {
+    log("Windows app identity skipped", err);
+  }
+}
+
+function registerHostAppIdentity() {
+  installLinuxDesktopIdentity();
+  installWindowsAppIdentity();
+}
+
 function browserWindowOptions() {
+  const file = iconPath();
   const image = loadAppIconImage();
   return {
     width: 1280,
@@ -178,7 +211,7 @@ function browserWindowOptions() {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    icon: image || iconPath(),
+    icon: process.platform === "win32" ? file || image : image || file,
     show: true,
   };
 }
@@ -188,8 +221,9 @@ function applyWindowIcon(win) {
   const file = iconPath();
   if ((!image && !file) || !win || win.isDestroyed()) return;
   try {
-    if (image) win.setIcon(image);
-    else if (file) win.setIcon(file);
+    if (process.platform === "win32" && file) win.setIcon(file);
+    else if (image) win.setIcon(image);
+    else win.setIcon(file);
   } catch {
     /* Linux/Wayland can ignore a missing icon and keep the Electron gear. */
   }
@@ -285,11 +319,12 @@ function setWindowsJumpList() {
     const args = dev
       ? `${JSON.stringify(path.resolve(process.argv[1] || "."))} --new-window`
       : "--new-window";
+    const icon = iconPath() || program;
     app.setUserTasks([
       {
         program,
         arguments: args,
-        iconPath: program,
+        iconPath: icon,
         iconIndex: 0,
         title: "New Window",
         description: "Open a new G-AID window",
@@ -1001,7 +1036,7 @@ ipcMain.handle("open-path", async (_event, root, relativePath) => {
 });
 
 function registerLinuxProtocolHandler() {
-  installLinuxDesktopIdentity();
+  registerHostAppIdentity();
 }
 
 const gotTheLock = app.requestSingleInstanceLock();

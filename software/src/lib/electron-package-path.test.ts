@@ -90,11 +90,16 @@ test("Electron main and builder paths stay inside software/", () => {
   assert.match(main, /app\.dock\.setIcon/);
   assert.match(main, /app\.setName\(APP_NAME\)/);
   assert.match(main, /app\.setDesktopName/);
+  assert.match(main, /app\.setAppUserModelId\(APP_USER_MODEL_ID\)/);
   assert.match(main, /installLinuxDesktopIdentity/);
+  assert.match(main, /installWindowsAppIdentity/);
+  assert.match(main, /writeShortcutLink/);
   assert.match(main, /LINUX_WM_CLASS = "g-aid"/);
   assert.match(main, /appendSwitch\("class", LINUX_WM_CLASS\)/);
   assert.match(main, /CHROME_DESKTOP/);
   assert.match(main, /StartupWMClass=\$\{LINUX_WM_CLASS\}/);
+  assert.match(main, /iconPath: icon/);
+  assert.equal(main.includes("iconPath: program"), false);
   assert.equal(main.includes("if (process.platform !== \"linux\" || dev) return"), false);
   assert.match(main, /app-icon\.png/);
   assert.equal(pkg.productName, "G-AID");
